@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+motor
+pymongo
+neo4j
+python-dotenv
+httpx
