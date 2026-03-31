@@ -1,0 +1,1406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Blockchain AML System — Technical Documentation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',sans-serif;font-size:14px;line-height:1.7;color:#1e293b;background:#fff}
+  @media print{
+    body{font-size:12px}
+    .no-print{display:none}
+    .page-break{page-break-before:always}
+    pre{white-space:pre-wrap;word-break:break-all}
+  }
+  /* Layout */
+  .cover{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#1d4ed8 100%);color:#fff;min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:60px 40px}
+  .cover h1{font-size:42px;font-weight:700;letter-spacing:-1px;margin-bottom:16px;line-height:1.2}
+  .cover .subtitle{font-size:18px;color:#93c5fd;margin-bottom:40px;font-weight:300}
+  .cover .meta{font-size:13px;color:#94a3b8;border-top:1px solid rgba(255,255,255,0.15);padding-top:24px;margin-top:24px}
+  .cover .badge{display:inline-block;background:rgba(29,78,216,0.4);border:1px solid #3b82f6;color:#93c5fd;padding:4px 14px;border-radius:999px;font-size:12px;margin:4px}
+  /* TOC */
+  .toc{padding:60px 80px;max-width:900px;margin:0 auto}
+  .toc h2{font-size:28px;font-weight:700;color:#0f172a;margin-bottom:32px;padding-bottom:12px;border-bottom:3px solid #1d4ed8}
+  .toc ol{counter-reset:toc-counter;list-style:none;padding:0}
+  .toc > ol > li{counter-increment:toc-counter;margin-bottom:8px}
+  .toc > ol > li > a{font-size:15px;font-weight:600;color:#1d4ed8;text-decoration:none;display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dotted #e2e8f0}
+  .toc > ol > li > a:hover{color:#1e40af}
+  .toc ol ol{margin-left:24px;margin-top:4px}
+  .toc ol ol li{margin-bottom:3px}
+  .toc ol ol li a{font-size:13px;color:#475569;text-decoration:none}
+  /* Content */
+  .content{max-width:900px;margin:0 auto;padding:60px 80px}
+  h1.section{font-size:32px;font-weight:700;color:#0f172a;margin:60px 0 24px;padding-bottom:12px;border-bottom:3px solid #1d4ed8;counter-increment:section}
+  h1.section::before{content:counter(section) ". ";color:#1d4ed8}
+  body{counter-reset:section}
+  h2.sub{font-size:22px;font-weight:600;color:#1e293b;margin:36px 0 16px;padding-left:12px;border-left:4px solid #3b82f6}
+  h3.subsub{font-size:17px;font-weight:600;color:#334155;margin:28px 0 12px}
+  h4{font-size:15px;font-weight:600;color:#475569;margin:20px 0 8px}
+  p{margin-bottom:14px;color:#334155}
+  /* Code */
+  pre{background:#0f172a;color:#e2e8f0;padding:20px 24px;border-radius:10px;overflow-x:auto;margin:16px 0;font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.6;border-left:4px solid #3b82f6}
+  code{font-family:'JetBrains Mono',monospace;font-size:12px;background:#f1f5f9;color:#1d4ed8;padding:2px 6px;border-radius:4px}
+  .comment{color:#64748b}
+  .keyword{color:#93c5fd}
+  .string{color:#86efac}
+  .func{color:#fde68a}
+  .cls{color:#f9a8d4}
+  /* Boxes */
+  .info-box{background:#eff6ff;border:1px solid #bfdbfe;border-left:4px solid #3b82f6;padding:16px 20px;border-radius:8px;margin:16px 0}
+  .warn-box{background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #f59e0b;padding:16px 20px;border-radius:8px;margin:16px 0}
+  .danger-box{background:#fef2f2;border:1px solid #fecaca;border-left:4px solid #ef4444;padding:16px 20px;border-radius:8px;margin:16px 0}
+  .success-box{background:#f0fdf4;border:1px solid #bbf7d0;border-left:4px solid #22c55e;padding:16px 20px;border-radius:8px;margin:16px 0}
+  /* Tables */
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13px}
+  th{background:#1e3a5f;color:#fff;padding:10px 14px;text-align:left;font-weight:600}
+  td{padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#334155}
+  tr:nth-child(even) td{background:#f8fafc}
+  /* Diagrams */
+  .diagram{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:24px;margin:20px 0;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.8;overflow-x:auto}
+  .diagram .arrow{color:#1d4ed8;font-weight:700}
+  .diagram .box{display:inline-block;background:#1e3a5f;color:#fff;padding:4px 12px;border-radius:6px;margin:2px}
+  .diagram .box-green{background:#166534;color:#fff}
+  .diagram .box-red{background:#991b1b;color:#fff}
+  .diagram .box-yellow{background:#854d0e;color:#fff}
+  /* Heuristic cards */
+  .heuristic-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:24px;margin:20px 0;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+  .heuristic-card h3{font-size:16px;font-weight:700;color:#0f172a;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .heuristic-card .tag{font-size:11px;background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:999px;font-weight:600}
+  .heuristic-card .tag-red{background:#fee2e2;color:#991b1b}
+  .heuristic-card .tag-purple{background:#f3e8ff;color:#6b21a8}
+  .heuristic-card .tag-green{background:#dcfce7;color:#166534}
+  /* Risk score visual */
+  .risk-bar{height:8px;border-radius:4px;background:#e2e8f0;margin:6px 0}
+  .risk-fill{height:100%;border-radius:4px}
+  /* Print button */
+  .print-btn{position:fixed;bottom:30px;right:30px;background:#1d4ed8;color:#fff;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;box-shadow:0 4px 12px rgba(29,78,216,0.4);z-index:999}
+  .print-btn:hover{background:#1e40af}
+  ul,ol{padding-left:24px;margin-bottom:14px}
+  li{margin-bottom:4px;color:#334155}
+  .section-num{color:#1d4ed8}
+  hr{border:none;border-top:1px solid #e2e8f0;margin:40px 0}
+</style>
+</head>
+<body>
+
+<!-- PRINT BUTTON -->
+<button class="print-btn no-print" onclick="window.print()">⬇ Export to PDF</button>
+
+<!-- ═══════════════════════════════════════════════════════════ COVER PAGE -->
+<div class="cover">
+  <div style="font-size:13px;color:#64748b;letter-spacing:3px;text-transform:uppercase;margin-bottom:20px">Technical Documentation</div>
+  <h1>Blockchain Anti-Money Laundering<br/>System</h1>
+  <div class="subtitle">Address Clustering · Risk Scoring · Alert Generation<br/>Ethereum (Account-Based) — Phase 1</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:32px">
+    <span class="badge">Python 3.11+</span>
+    <span class="badge">NetworkX</span>
+    <span class="badge">MongoDB</span>
+    <span class="badge">Neo4j</span>
+    <span class="badge">FastAPI</span>
+    <span class="badge">React</span>
+    <span class="badge">Ethereum</span>
+  </div>
+  <div class="meta">
+    <div style="font-size:15px;font-weight:600;color:#e2e8f0;margin-bottom:8px">Crypto AML Tracker — Full System Documentation</div>
+    <div>Version 1.0 &nbsp;|&nbsp; Phase 1: Ethereum Account-Based Clustering</div>
+    <div style="margin-top:8px;color:#64748b">Designed for Developers · AML Analysts · System Architects</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ TABLE OF CONTENTS -->
+<div class="page-break"></div>
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <ol>
+    <li><a href="#s1">System Overview <span>1</span></a></li>
+    <li><a href="#s2">System Architecture <span>2</span></a></li>
+    <li><a href="#s3">Data Flow &amp; Pipeline <span>3</span></a></li>
+    <li><a href="#s4">Folder Structure &amp; Codebase <span>4</span></a></li>
+    <li><a href="#s5">Technology Stack <span>5</span></a></li>
+    <li><a href="#s6">Core Data Structures <span>6</span></a></li>
+    <li><a href="#s7">Clustering Engine — Deep Dive <span>7</span></a>
+      <ol>
+        <li><a href="#s7-1">Behavioral Similarity</a></li>
+        <li><a href="#s7-2">Smart Contract Interaction</a></li>
+        <li><a href="#s7-3">Token Flow Clustering</a></li>
+        <li><a href="#s7-4">Temporal Coordination</a></li>
+        <li><a href="#s7-5">Fan-In / Fan-Out Detection</a></li>
+        <li><a href="#s7-6">Loop / Circular Transaction Detection</a></li>
+        <li><a href="#s7-7">Union-Find Merge Algorithm</a></li>
+      </ol>
+    </li>
+    <li><a href="#s8">Labeling Engine <span>8</span></a></li>
+    <li><a href="#s9">Risk Scoring System <span>9</span></a></li>
+    <li><a href="#s10">Alert System <span>10</span></a></li>
+    <li><a href="#s11">Reporting System <span>11</span></a></li>
+    <li><a href="#s12">Scalability &amp; UTXO Design <span>12</span></a></li>
+    <li><a href="#s13">End-to-End Example <span>13</span></a></li>
+    <li><a href="#s14">Best Practices &amp; Limitations <span>14</span></a></li>
+    <li><a href="#s15">Conclusion <span>15</span></a></li>
+  </ol>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ SECTION 1 -->
+<div class="page-break"></div>
+<div class="content">
+<h1 class="section" id="s1">System Overview</h1>
+
+<h2 class="sub">What is Anti-Money Laundering (AML)?</h2>
+<p>Anti-Money Laundering (AML) refers to a set of laws, regulations, and procedures designed to prevent criminals from disguising illegally obtained funds as legitimate income. Money laundering typically occurs in three stages:</p>
+<ul>
+  <li><strong>Placement</strong> — Introducing illicit funds into the financial system</li>
+  <li><strong>Layering</strong> — Obscuring the trail through complex transactions</li>
+  <li><strong>Integration</strong> — Reintroducing funds into the legitimate economy</li>
+</ul>
+
+<h2 class="sub">Why AML Matters in Blockchain</h2>
+<p>Blockchain networks like Ethereum are pseudonymous — transactions are publicly visible but addresses are not directly tied to real-world identities. This creates a unique challenge: the data is transparent, but attribution is difficult. Criminals exploit this by:</p>
+<ul>
+  <li>Using mixers and tumblers to break transaction trails</li>
+  <li>Rapidly moving funds through dozens of wallets (layering)</li>
+  <li>Interacting with DeFi protocols to obscure fund origins</li>
+  <li>Creating circular transaction loops to simulate legitimate activity</li>
+</ul>
+
+<div class="info-box">
+  <strong>Key Insight:</strong> Unlike traditional banking AML where institutions hold KYC data, blockchain AML must rely entirely on on-chain behavioral patterns, graph analysis, and heuristic clustering to identify suspicious entities.
+</div>
+
+<h2 class="sub">Traditional AML vs Blockchain AML</h2>
+<table>
+  <tr><th>Dimension</th><th>Traditional AML</th><th>Blockchain AML</th></tr>
+  <tr><td>Data Source</td><td>Bank records, KYC forms</td><td>On-chain transactions only</td></tr>
+  <tr><td>Identity</td><td>Known (passport, ID)</td><td>Pseudonymous addresses</td></tr>
+  <tr><td>Transparency</td><td>Private, siloed</td><td>Fully public ledger</td></tr>
+  <tr><td>Speed</td><td>Days to weeks</td><td>Real-time (12s block time)</td></tr>
+  <tr><td>Volume</td><td>Millions of txns/day</td><td>Millions of txns/day</td></tr>
+  <tr><td>Attribution</td><td>Direct (name, account)</td><td>Heuristic (behavioral)</td></tr>
+  <tr><td>Jurisdiction</td><td>Country-specific</td><td>Borderless</td></tr>
+</table>
+
+<h2 class="sub">System Goals</h2>
+<p>This system is designed to achieve four primary objectives:</p>
+<ol>
+  <li><strong>Detect suspicious transactions</strong> — Flag high-value transfers, contract interactions, and anomalous patterns</li>
+  <li><strong>Cluster addresses</strong> — Group addresses likely controlled by the same entity using six distinct heuristics</li>
+  <li><strong>Assign risk scores</strong> — Quantify suspicion on a 0–100 scale based on behavioral evidence</li>
+  <li><strong>Generate alerts and reports</strong> — Surface actionable intelligence for AML analysts</li>
+</ol>
+
+<!-- ═══════════════════════════════════════════════════════════ SECTION 2 -->
+<h1 class="section" id="s2">System Architecture</h1>
+
+<h2 class="sub">High-Level Architecture</h2>
+<div class="diagram">
+<pre style="background:#f8fafc;color:#1e293b;border-left:4px solid #1d4ed8">
+┌─────────────────────────────────────────────────────────────────────┐
+│                     BLOCKCHAIN DATA LAYER                           │
+│   Ethereum Node (RPC)  ──►  Raw Blocks  ──►  Transactions           │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                     ETL PIPELINE (Python)                           │
+│   Extract ──► Transform ──► Load                                    │
+│   (EthereumExtractor)   (Transformer)   (MongoDB / MariaDB / Neo4j) │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                   CLUSTERING ENGINE (Python + NetworkX)             │
+│                                                                     │
+│  EthereumAdapter ──► GraphBuilder ──► Heuristics ──► UnionFind      │
+│                                           │                         │
+│  ┌────────────┐  ┌──────────────┐  ┌─────▼──────┐  ┌───────────┐  │
+│  │ Behavioral │  │  Contract    │  │  Fan-In/   │  │   Loop    │  │
+│  │ Similarity │  │ Interaction  │  │  Fan-Out   │  │ Detection │  │
+│  └────────────┘  └──────────────┘  └────────────┘  └───────────┘  │
+│  ┌────────────┐  ┌──────────────┐                                   │
+│  │  Temporal  │  │ Token Flow   │                                   │
+│  └────────────┘  └──────────────┘                                   │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│              RISK SCORING + LABELING ENGINE                         │
+│   ClusterResult { cluster_id, addresses, risk_score, labels,        │
+│                   heuristics_fired, indicators, explanation }        │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                    ┌──────────┴──────────┐
+                    ▼                     ▼
+          ┌──────────────────┐  ┌──────────────────────┐
+          │  MongoDB Store   │  │   Neo4j Graph DB      │
+          │ address_clusters │  │ :Address {cluster_id} │
+          └────────┬─────────┘  └──────────┬───────────┘
+                   │                        │
+                   └──────────┬─────────────┘
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                  FASTAPI BACKEND (Python)                           │
+│   /api/transactions  /api/clusters  /api/alerts  /api/analytics     │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                  REACT FRONTEND                                      │
+│   Transaction Table │ AML Alerts │ Analytics │ Clusters │ Graph     │
+└─────────────────────────────────────────────────────────────────────┘</pre>
+</div>
+
+<h2 class="sub">Component Descriptions</h2>
+
+<h3 class="subsub">Data Ingestion Module</h3>
+<p>The <code>EthereumExtractor</code> connects to an Ethereum RPC endpoint (Alchemy or public node) and fetches raw blocks including all transactions, receipts, and event logs. Each block is stored idempotently in MongoDB's <code>raw_blocks</code> collection, keyed by <code>block_number</code>. A parallel <code>raw_transactions</code> collection stores one document per transaction for fast address-based lookups.</p>
+
+<h3 class="subsub">Transaction Processor (ETL Transform)</h3>
+<p>The <code>Transformer</code> reads raw blocks from MongoDB, normalizes all fields (hex → decimal, timestamps → UTC datetime, addresses → lowercase), computes risk flags (<code>risk_flag_high_value</code>, <code>risk_flag_contract</code>), and writes clean CSVs to <code>data/processed/</code>. These are then loaded into MariaDB for SQL queries and Neo4j for graph analysis.</p>
+
+<h3 class="subsub">Clustering Engine</h3>
+<p>The <code>ClusteringEngine</code> is the core analytical component. It reads transactions via a <code>BlockchainAdapter</code>, builds a directed multigraph using NetworkX, runs six pluggable heuristics to find address links, merges those links using Union-Find, and produces scored <code>ClusterResult</code> objects.</p>
+
+<h3 class="subsub">Labeling Engine</h3>
+<p>Labels are assigned automatically based on which heuristics fired. Each heuristic maps to a semantic label (e.g., <code>loop_detection</code> → <code>possible_layering</code>). Labels are stored alongside clusters in MongoDB and propagated to Neo4j address nodes.</p>
+
+<h3 class="subsub">Risk Scoring Module</h3>
+<p>Each cluster receives a 0–100 risk score computed from the weighted sum of heuristic contributions plus a size bonus. Scores ≥ 70 are High risk, 40–69 are Medium, and below 40 are Low.</p>
+
+<h3 class="subsub">Alert Generation System</h3>
+<p>The FastAPI <code>/api/alerts</code> endpoint surfaces individual flagged transactions with cluster names, risk scores, and reasons. The <code>/api/clusters</code> endpoint exposes the full clustering engine output.</p>
+
+<h3 class="subsub">Visualization Layer</h3>
+<p>The React frontend provides five views: Transaction Table, AML Alerts, Analytics (with clustering summary), Address Clusters, and an interactive Transaction Network graph powered by React Flow / XYFlow.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ SECTION 3 -->
+<div class="page-break"></div>
+<div class="content">
+<h1 class="section" id="s3">Data Flow &amp; Pipeline</h1>
+
+<h2 class="sub">Full Pipeline Sequence</h2>
+<div class="diagram">
+<pre style="background:#f8fafc;color:#1e293b;border-left:4px solid #1d4ed8">
+Step 1: EXTRACT
+  Ethereum RPC
+      │  eth_getBlockByNumber("latest", full_transactions=True)
+      ▼
+  EthereumExtractor.fetch_block(block_number)
+      │  → raw block JSON (transactions + receipts + logs)
+      ▼
+  MongoDB: raw_blocks  +  raw_transactions (one doc per tx)
+      │
+      ▼  save_to_local_backup() → data/raw/block_XXXXXXXX.json
+
+Step 2: TRANSFORM
+  Transformer.transform_raw_to_aml()
+      │  reads raw_transactions (preferred) or raw_blocks (fallback)
+      │  normalizes: hex→int, timestamps→UTC, addresses→lowercase
+      │  computes: value_eth, is_contract_call, risk_flag_high_value
+      ▼
+  data/processed/transactions.csv
+  data/processed/graph_edges.csv
+
+Step 3: LOAD
+  ├── MongoDB: processed_transactions (backup)
+  ├── MariaDB: transactions, graph_edges, addresses tables
+  └── Neo4j:   (:Address)-[:TRANSFER]->(:Address) graph
+
+Step 4: CLUSTER
+  ClusteringEngine.run()
+      │  EthereumAdapter.iter_transactions() → TxRecord stream
+      │  build_graph() → NetworkX MultiDiGraph
+      │  [6 heuristics].find_links() → [(addr_a, addr_b), ...]
+      │  UnionFind.union() → merged clusters
+      │  score_cluster() → ClusterResult
+      ▼
+  MongoDB: address_clusters
+  Neo4j:   :Address { cluster_id, risk_score, cluster_labels }
+
+Step 5: SERVE
+  FastAPI backend reads MongoDB/Neo4j
+      ▼
+  React frontend displays results</pre>
+</div>
+
+<h2 class="sub">ETL Pipeline Flowchart</h2>
+<div class="diagram">
+<pre style="background:#f8fafc;color:#1e293b;border-left:4px solid #1d4ed8">
+  START
+    │
+    ▼
+  [Get latest saved block from MongoDB]
+    │
+    ▼
+  [Fetch next N blocks from Ethereum RPC]
+    │
+    ├─ For each block:
+    │     ├─ Fetch full transactions
+    │     ├─ Fetch receipts for each tx
+    │     ├─ Build flat_transaction documents
+    │     └─ Upsert to MongoDB (idempotent)
+    │
+    ▼
+  [Transform: read flat_transactions]
+    │
+    ├─ Normalize fields
+    ├─ Compute risk flags
+    ├─ Write staging CSVs
+    └─ Append to processed CSVs
+    │
+    ▼
+  [Load Stage]
+    ├─ MongoDB backup (processed_transactions)
+    ├─ MariaDB upsert (transactions + graph_edges)
+    └─ Neo4j merge (Address nodes + TRANSFER edges)
+    │
+    ▼
+  [Clustering Stage]
+    ├─ Read transactions from MongoDB
+    ├─ Build NetworkX graph
+    ├─ Run 6 heuristics
+    ├─ Merge with Union-Find
+    ├─ Score and label clusters
+    └─ Persist to MongoDB + Neo4j
+    │
+    ▼
+  END</pre>
+</div>
+
+<h2 class="sub">Feature Extraction</h2>
+<p>During the transform stage, the following features are extracted from each transaction:</p>
+<table>
+  <tr><th>Feature</th><th>Source</th><th>Description</th></tr>
+  <tr><td><code>value_eth</code></td><td>tx.value / 1e18</td><td>ETH transferred</td></tr>
+  <tr><td><code>is_contract_call</code></td><td>input_data != "0x"</td><td>Whether calldata is present</td></tr>
+  <tr><td><code>risk_flag_high_value</code></td><td>value_eth > threshold</td><td>Exceeds AML threshold (default 10 ETH)</td></tr>
+  <tr><td><code>risk_flag_contract</code></td><td>is_contract_call</td><td>Contract interaction flag</td></tr>
+  <tr><td><code>input_method_id</code></td><td>input_data[:10]</td><td>ERC-20 method selector</td></tr>
+  <tr><td><code>gas_used</code></td><td>receipt.gasUsed</td><td>Execution cost</td></tr>
+  <tr><td><code>tx_type</code></td><td>derived</td><td>ETH Transfer / Token Transfer / Contract Call</td></tr>
+</table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ SECTION 4 -->
+<div class="page-break"></div>
+<div class="content">
+<h1 class="section" id="s4">Folder Structure &amp; Codebase</h1>
+
+<h2 class="sub">Complete Project Structure</h2>
+<div class="diagram">
+<pre style="background:#f8fafc;color:#1e293b;border-left:4px solid #1d4ed8">
+Crypto_AML/
+├── AML/                                  ← Python ETL + Clustering pipeline
+│   ├── .env                              ← All environment variables
+│   ├── requirements.txt                  ← Python dependencies
+│   ├── pyproject.toml                    ← Package definition
+│   ├── data/
+│   │   ├── raw/                          ← Raw block JSON backups
+│   │   ├── staging/                      ← Per-batch CSV outputs
+│   │   └── processed/                    ← Final transactions.csv, graph_edges.csv
+│   ├── schemas/
+│   │   ├── mariadb_tables.sql            ← SQL DDL for MariaDB
+│   │   └── neo4j_queries.cypher          ← Cypher setup queries
+│   └── src/aml_pipeline/
+│       ├── config.py                     ← Centralized configuration dataclass
+│       ├── logging_config.py             ← Logging setup
+│       ├── db/
+│       │   ├── mongo.py                  ← MongoDB helpers
+│       │   └── neo4j.py                  ← Neo4j helpers
+│       ├── etl/
+│       │   ├── extract/
+│       │   │   ├── base.py               ← BaseExtractor ABC
+│       │   │   ├── eth.py                ← EthereumExtractor
+│       │   │   ├── connections.py        ← Web3 + Mongo connections
+│       │   │   └── utils.py              ← Block flattening utilities
+│       │   ├── transform/
+│       │   │   └── transformer.py        ← Full transform logic
+│       │   └── load/
+│       │       ├── mongodb_loader.py     ← Processed tx backup
+│       │       ├── mariadb_loader.py     ← SQL upsert loader
+│       │       └── neo4j_loader.py       ← Graph edge loader
+│       ├── clustering/                   ← ★ CLUSTERING ENGINE ★
+│       │   ├── __init__.py
+│       │   ├── base.py                   ← TxRecord, BlockchainAdapter ABC
+│       │   ├── eth_adapter.py            ← Ethereum data reader
+│       │   ├── graph_builder.py          ← NetworkX graph construction
+│       │   ├── union_find.py             ← Disjoint Set Union
+│       │   ├── risk_scorer.py            ← ClusterResult + scoring
+│       │   ├── engine.py                 ← ClusteringEngine orchestrator
+│       │   ├── run_clustering.py         ← CLI entry point
+│       │   └── heuristics/
+│       │       ├── __init__.py
+│       │       ├── base_heuristic.py     ← BaseHeuristic ABC
+│       │       ├── behavioral.py         ← Shared counterparties
+│       │       ├── contract.py           ← Contract interaction + deposit/withdraw
+│       │       ├── token_flow.py         ← ERC-20 flow clustering
+│       │       ├── temporal.py           ← Time-window coordination
+│       │       ├── fan.py                ← Fan-in / fan-out
+│       │       └── loop.py               ← Circular transaction detection
+│       ├── analytics/
+│       │   ├── clustering.py             ← Legacy DBSCAN (superseded)
+│       │   ├── features.py               ← Feature engineering
+│       │   └── alerts.py                 ← Alert generation rules
+│       ├── pipelines/
+│       │   ├── daily_pipeline.py         ← Extract→Transform→Load→Cluster
+│       │   ├── main_pipeline.py          ← Entry point
+│       │   └── run_etl.py                ← CLI with argparse
+│       └── utils/
+│           ├── connections.py            ← Shared DB connection helpers
+│           └── state.py                  ← Pipeline state tracking
+│
+└── crypto-aml-tracker/                   ← React frontend + FastAPI backend
+    ├── backend-py/
+    │   ├── .env                          ← Backend environment variables
+    │   ├── requirements.txt
+    │   ├── main.py                       ← FastAPI app + lifespan
+    │   ├── db/
+    │   │   ├── mongo.py                  ← Async MongoDB (Motor)
+    │   │   └── neo4j.py                  ← Async Neo4j driver
+    │   └── routes/
+    │       ├── transactions.py           ← /api/transactions endpoints
+    │       └── clusters.py               ← /api/clusters endpoints
+    └── src/
+        ├── App.jsx                       ← Root component + routing
+        ├── services/
+        │   └── transactionService.js     ← API client functions
+        ├── components/
+        │   ├── Sidebar.jsx               ← Navigation
+        │   ├── common/Loader.jsx         ← Loading spinner
+        │   └── network/NetworkGraph.jsx  ← React Flow graph
+        └── pages/
+            ├── Dashboard.jsx             ← Transaction table
+            ├── Alerts.jsx                ← AML alerts view
+            ├── Analytics.jsx             ← Charts + clustering summary
+            └── Clusters.jsx              ← Address clusters view</pre>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ SECTION 5 -->
+<div class="page-break"></div>
+<div class="content">
+<h1 class="section" id="s5">Technology Stack</h1>
+
+<table>
+  <tr><th>Layer</th><th>Technology</th><th>Purpose</th><th>Why Chosen</th></tr>
+  <tr><td>Data Ingestion</td><td>web3.py</td><td>Ethereum RPC client</td><td>Industry standard Python Ethereum library</td></tr>
+  <tr><td>Storage</td><td>MongoDB + Motor</td><td>Raw + processed tx storage</td><td>Schema-flexible, handles nested block JSON natively</td></tr>
+  <tr><td>Storage</td><td>MariaDB + SQLAlchemy</td><td>Structured transaction queries</td><td>Fast SQL aggregations for analytics</td></tr>
+  <tr><td>Graph DB</td><td>Neo4j</td><td>Address relationship graph</td><td>Native graph traversal, Cypher query language</td></tr>
+  <tr><td>Graph Processing</td><td>NetworkX</td><td>In-memory graph analysis</td><td>Rich algorithm library (cycles, components, centrality)</td></tr>
+  <tr><td>Data Processing</td><td>Pandas</td><td>CSV transform + feature engineering</td><td>Vectorized operations, CSV I/O</td></tr>
+  <tr><td>API</td><td>FastAPI</td><td>REST API backend</td><td>Async, auto-docs, Pydantic validation</td></tr>
+  <tr><td>Frontend</td><td>React + Vite</td><td>UI framework</td><td>Component model, fast HMR</td></tr>
+  <tr><td>Graph Viz</td><td>@xyflow/react</td><td>Interactive network graph</td><td>Draggable nodes, custom edges, React-native</td></tr>
+  <tr><td>Charts</td><td>Recharts</td><td>Analytics charts</td><td>Declarative, responsive, React-native</td></tr>
+</table>
+
+<h2 class="sub">NetworkX — Graph Processing</h2>
+<p>NetworkX is used to build an in-memory directed multigraph of Ethereum addresses and transactions. It provides the algorithmic foundation for all six clustering heuristics.</p>
+<pre><span class="keyword">import</span> networkx <span class="keyword">as</span> nx
+
+<span class="comment"># Create a directed multigraph (allows parallel edges)</span>
+G = nx.MultiDiGraph()
+
+<span class="comment"># Add address nodes</span>
+G.add_node(<span class="string">"0xabc..."</span>, blockchain=<span class="string">"ethereum"</span>)
+
+<span class="comment"># Add transaction edge with metadata</span>
+G.add_edge(<span class="string">"0xabc..."</span>, <span class="string">"0xdef..."</span>,
+    key=<span class="string">"0xtxhash..."</span>,
+    value_eth=<span class="string">1.5</span>,
+    timestamp=<span class="string">1700000000</span>,
+    is_contract_call=<span class="keyword">False</span>)
+
+<span class="comment"># Query: find all successors (receivers) of an address</span>
+receivers = list(G.successors(<span class="string">"0xabc..."</span>))
+
+<span class="comment"># Detect cycles (for loop heuristic)</span>
+cycles = list(nx.simple_cycles(nx.DiGraph(G)))</pre>
+
+<h2 class="sub">Union-Find — Cluster Merging</h2>
+<p>The Union-Find (Disjoint Set Union) data structure efficiently merges address pairs from multiple heuristics into clusters. It uses path compression and union-by-rank for near-constant time operations.</p>
+<pre><span class="comment"># O(α(n)) amortised — effectively O(1) per operation</span>
+uf = UnionFind([<span class="string">"0xA"</span>, <span class="string">"0xB"</span>, <span class="string">"0xC"</span>, <span class="string">"0xD"</span>])
+uf.union(<span class="string">"0xA"</span>, <span class="string">"0xB"</span>)  <span class="comment"># A and B are in the same cluster</span>
+uf.union(<span class="string">"0xB"</span>, <span class="string">"0xC"</span>)  <span class="comment"># Now A, B, C are all in the same cluster</span>
+clusters = uf.clusters()
+<span class="comment"># → {"0xA": {"0xA", "0xB", "0xC"}, "0xD": {"0xD"}}</span></pre>
+
+<!-- ═══════════════════════════════════════════════════════════ SECTION 6 -->
+<h1 class="section" id="s6">Core Data Structures</h1>
+
+<h2 class="sub">TxRecord — Normalized Transaction</h2>
+<p>All blockchain data is normalized into a <code>TxRecord</code> dataclass before entering the clustering engine. This abstraction allows the same engine to work with Ethereum today and Bitcoin (UTXO) in the future.</p>
+<pre><span class="keyword">@dataclass</span>
+<span class="keyword">class</span> <span class="cls">TxRecord</span>:
+    tx_hash: str           <span class="comment"># Unique transaction identifier</span>
+    block_number: int      <span class="comment"># Block height</span>
+    timestamp: float       <span class="comment"># Unix epoch seconds</span>
+    from_address: str      <span class="comment"># Sender (empty for coinbase/UTXO)</span>
+    to_address: str        <span class="comment"># Receiver (empty for OP_RETURN)</span>
+    value_eth: float       <span class="comment"># Amount transferred in ETH</span>
+    is_contract_call: bool <span class="comment"># True if calldata present</span>
+    input_method_id: str   <span class="comment"># First 4 bytes: "0xa9059cbb" = ERC-20 transfer</span>
+    gas_used: int          <span class="comment"># Gas consumed</span></pre>
+
+<h2 class="sub">ClusterResult — Output Object</h2>
+<p>Every cluster produced by the engine is represented as a <code>ClusterResult</code> dataclass containing all information needed for display, storage, and reporting.</p>
+<pre><span class="keyword">@dataclass</span>
+<span class="keyword">class</span> <span class="cls">ClusterResult</span>:
+    cluster_id: str              <span class="comment"># "C-A3F2B1..." (SHA1 of sorted addresses)</span>
+    addresses: List[str]         <span class="comment"># All member addresses</span>
+    risk_score: float            <span class="comment"># 0.0 – 100.0</span>
+    labels: List[str]            <span class="comment"># ["possible_mixer", "fan_out"]</span>
+    heuristics_fired: List[str]  <span class="comment"># ["loop_detection", "contract_interaction"]</span>
+    indicators: Dict[str, object]<span class="comment"># {"total_eth_volume": 45.2, "size": 7, ...}</span>
+    explanation: str             <span class="comment"># Human-readable summary</span></pre>
+
+<h2 class="sub">BlockchainAdapter — Abstraction Interface</h2>
+<pre><span class="keyword">class</span> <span class="cls">BlockchainAdapter</span>(ABC):
+    <span class="comment">"""Interface every blockchain type must implement."""</span>
+
+    <span class="keyword">@property</span>
+    <span class="keyword">@abstractmethod</span>
+    <span class="keyword">def</span> <span class="func">blockchain_type</span>(self) -> str:
+        <span class="comment">"""Return 'account' or 'utxo'."""</span>
+
+    <span class="keyword">@abstractmethod</span>
+    <span class="keyword">def</span> <span class="func">iter_transactions</span>(self, **kwargs) -> Iterator[TxRecord]:
+        <span class="comment">"""Yield normalised TxRecord objects from the data source."""</span></pre>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ SECTION 7 -->
+<div class="page-break"></div>
+<div class="content">
+<h1 class="section" id="s7">Clustering Engine — Deep Dive</h1>
+
+<p>The clustering engine is the analytical heart of the system. It takes a stream of normalized transactions, builds a graph, runs six independent heuristics to find address pairs that should be grouped together, merges those pairs using Union-Find, and produces scored cluster objects.</p>
+
+<h2 class="sub">Engine Orchestration Flow</h2>
+<div class="diagram">
+<pre style="background:#f8fafc;color:#1e293b;border-left:4px solid #1d4ed8">
+ClusteringEngine.run()
+    │
+    ├─ 1. adapter.iter_transactions() → [TxRecord, ...]
+    │
+    ├─ 2. build_graph([TxRecord]) → nx.MultiDiGraph
+    │       Nodes = addresses
+    │       Edges = transactions (with metadata)
+    │
+    ├─ 3. For each heuristic:
+    │       heuristic.find_links(G) → [(addr_a, addr_b), ...]
+    │       uf.union(addr_a, addr_b)
+    │       record which heuristic fired for this pair
+    │
+    ├─ 4. uf.clusters() → {root: {members}}
+    │
+    ├─ 5. For each cluster with size >= min_cluster_size:
+    │       _compute_indicators() → behavioral stats
+    │       score_cluster() → ClusterResult
+    │
+    └─ 6. Sort by risk_score descending
+          Optional: persist to MongoDB + Neo4j</pre>
+</div>
+
+<!-- HEURISTIC 1 -->
+<div class="heuristic-card" id="s7-1">
+  <h3>① Behavioral Similarity <span class="tag">behavioral_similarity</span> <span class="tag" style="background:#dcfce7;color:#166534">Score: +10</span></h3>
+  <p><strong>Concept:</strong> Two addresses that repeatedly interact with the same set of counterparties are likely controlled by the same entity. For example, two wallets that both regularly send to the same exchange deposit addresses, DeFi contracts, or peer wallets are behaviorally similar.</p>
+  <p><strong>Algorithm:</strong></p>
+  <ol>
+    <li>Build a counterparty set for each address: union of all addresses it sent to AND received from</li>
+    <li>For every pair of addresses (A, B), compute the intersection of their counterparty sets</li>
+    <li>If |intersection| ≥ N (configurable, default 3), link A and B</li>
+  </ol>
+  <pre><span class="keyword">def</span> <span class="func">find_links</span>(self, G):
+    counterparties = defaultdict(set)
+    <span class="keyword">for</span> u, v <span class="keyword">in</span> G.edges():
+        counterparties[u].add(v)  <span class="comment"># u sent to v</span>
+        counterparties[v].add(u)  <span class="comment"># v received from u</span>
+
+    <span class="keyword">for</span> i, a <span class="keyword">in</span> enumerate(addresses):
+        <span class="keyword">for</span> b <span class="keyword">in</span> addresses[i+1:]:
+            shared = counterparties[a] & counterparties[b]
+            shared.discard(a); shared.discard(b)
+            <span class="keyword">if</span> len(shared) >= self.min_shared:
+                links.append((a, b))</pre>
+  <p><strong>Example:</strong> Wallet A and Wallet B both send to Uniswap, Binance deposit, and a known mixer. They share 3 counterparties → linked.</p>
+</div>
+
+<!-- HEURISTIC 2 -->
+<div class="heuristic-card" id="s7-2">
+  <h3>② Smart Contract Interaction <span class="tag tag-purple">contract_interaction</span> <span class="tag" style="background:#dcfce7;color:#166534">Score: +25</span></h3>
+  <p><strong>Concept:</strong> Addresses that interact with the same smart contracts (DeFi protocols, mixers, bridges) are grouped. Additionally, the classic mixer pattern — Deposit → Contract → Withdraw — is detected by finding addresses that deposit into a contract and different addresses that withdraw from it.</p>
+  <p><strong>Algorithm:</strong></p>
+  <ol>
+    <li>Identify contract nodes: any node that receives a <code>is_contract_call=True</code> edge</li>
+    <li>Group all callers of each contract together</li>
+    <li>For each contract, find pure depositors (only send to contract) and pure withdrawers (only receive from contract) — link them as a deposit/withdraw pair</li>
+  </ol>
+  <pre><span class="comment"># Detect Deposit → Contract → Withdraw pattern</span>
+<span class="keyword">for</span> contract <span class="keyword">in</span> contract_nodes:
+    depositors = {u <span class="keyword">for</span> u, v <span class="keyword">in</span> G.in_edges(contract)}
+    withdrawers = {v <span class="keyword">for</span> u, v <span class="keyword">in</span> G.out_edges(contract)}
+    pure_depositors = depositors - withdrawers
+    pure_withdrawers = withdrawers - depositors
+    <span class="keyword">for</span> dep <span class="keyword">in</span> pure_depositors:
+        <span class="keyword">for</span> wit <span class="keyword">in</span> pure_withdrawers:
+            links.append((dep, wit))  <span class="comment"># mixer pattern</span></pre>
+  <p><strong>Example:</strong> Address A deposits 5 ETH into Tornado Cash. Address B withdraws 5 ETH from Tornado Cash. A and B are linked as a possible mixer pair.</p>
+</div>
+
+<!-- HEURISTIC 3 -->
+<div class="heuristic-card" id="s7-3">
+  <h3>③ Token Flow Clustering <span class="tag">token_flow</span> <span class="tag" style="background:#dcfce7;color:#166534">Score: +15</span></h3>
+  <p><strong>Concept:</strong> ERC-20 token transfers (identified by method IDs <code>0xa9059cbb</code> for <code>transfer()</code> and <code>0x23b872dd</code> for <code>transferFrom()</code>) between the same pair of addresses in both directions, or repeated unidirectional flows, indicate a controlled relationship.</p>
+  <pre><span class="comment"># ERC-20 method IDs</span>
+_ERC20_METHODS = {<span class="string">"0xa9059cbb"</span>, <span class="string">"0x23b872dd"</span>}
+
+<span class="keyword">for</span> u, v, data <span class="keyword">in</span> G.edges(data=<span class="keyword">True</span>):
+    <span class="keyword">if</span> data.get(<span class="string">"input_method_id"</span>, <span class="string">""</span>)[:10] <span class="keyword">in</span> _ERC20_METHODS:
+        flow_count[(u, v)] += 1
+
+<span class="keyword">for</span> (u, v), count <span class="keyword">in</span> flow_count.items():
+    <span class="comment"># Bidirectional: A→B and B→A both exist</span>
+    <span class="keyword">if</span> flow_count.get((v, u), 0) > 0:
+        links.append(tuple(sorted([u, v])))
+    <span class="comment"># Repeated unidirectional: same pair, N+ times</span>
+    <span class="keyword">elif</span> count >= _MIN_REPEATED_FLOWS:
+        links.append(tuple(sorted([u, v])))</pre>
+  <p><strong>Example:</strong> Address A sends USDT to Address B three times. Address B sends USDT back to A once. Bidirectional flow detected → linked.</p>
+</div>
+
+<!-- HEURISTIC 4 -->
+<div class="heuristic-card" id="s7-4">
+  <h3>④ Temporal Coordination <span class="tag tag-red">temporal_coordination</span> <span class="tag" style="background:#dcfce7;color:#166534">Score: +20</span></h3>
+  <p><strong>Concept:</strong> Multiple addresses sending to the same destination within a very short time window (default: 60 seconds) exhibit coordinated behavior. This is a strong signal of automated scripts, bots, or coordinated attacks.</p>
+  <p><strong>Algorithm:</strong> Sliding window over time-sorted transactions. For each destination, track all senders within the window. If ≥ 3 distinct senders target the same destination within W seconds, link all those senders together.</p>
+  <pre><span class="comment"># Sort all edges by timestamp</span>
+edges_ts.sort(key=<span class="keyword">lambda</span> x: x[0])
+
+<span class="comment"># Sliding window</span>
+<span class="keyword">for</span> right <span class="keyword">in</span> range(n):
+    ts_r, u_r, v_r = edges_ts[right]
+    receiver_senders[v_r].append((ts_r, u_r))
+
+    <span class="comment"># Evict entries outside the W-second window</span>
+    <span class="keyword">while</span> edges_ts[left][0] < ts_r - self.window:
+        <span class="comment"># remove oldest entry</span>
+        left += 1
+
+    senders = {s <span class="keyword">for</span> _, s <span class="keyword">in</span> receiver_senders[v_r]}
+    <span class="keyword">if</span> len(senders) >= _MIN_COORDINATED_SENDERS:
+        <span class="comment"># Link all senders together</span>
+        <span class="keyword">for</span> i, j <span class="keyword">in</span> combinations(sorted(senders), 2):
+            links.append((i, j))</pre>
+  <p><strong>Example:</strong> Addresses A, B, C all send ETH to the same exchange wallet within 30 seconds. They are linked as coordinated senders.</p>
+</div>
+
+<!-- HEURISTIC 5 -->
+<div class="heuristic-card" id="s7-5">
+  <h3>⑤ Fan-In / Fan-Out Detection <span class="tag">fan_pattern</span> <span class="tag" style="background:#dcfce7;color:#166534">Score: +20</span></h3>
+  <p><strong>Concept:</strong></p>
+  <ul>
+    <li><strong>Fan-out:</strong> One address distributes funds to many addresses (≥ threshold, default 5). Common in exchange hot wallets, mixer outputs, and airdrop contracts. All receivers are linked.</li>
+    <li><strong>Fan-in:</strong> Many addresses consolidate funds into one. Common in consolidation wallets before mixing. All senders are linked.</li>
+  </ul>
+  <pre><span class="comment"># Fan-out: one sender → many receivers</span>
+<span class="keyword">for</span> node <span class="keyword">in</span> G.nodes():
+    out_neighbours = list(set(G.successors(node)))
+    <span class="keyword">if</span> len(out_neighbours) >= self.threshold:
+        <span class="comment"># Link all receivers together</span>
+        <span class="keyword">for</span> i, j <span class="keyword">in</span> combinations(sorted(out_neighbours), 2):
+            links.append((i, j))
+
+<span class="comment"># Fan-in: many senders → one receiver</span>
+<span class="keyword">for</span> node <span class="keyword">in</span> G.nodes():
+    in_neighbours = list(set(G.predecessors(node)))
+    <span class="keyword">if</span> len(in_neighbours) >= self.threshold:
+        <span class="comment"># Link all senders together</span>
+        <span class="keyword">for</span> i, j <span class="keyword">in</span> combinations(sorted(in_neighbours), 2):
+            links.append((i, j))</pre>
+  <p><strong>Example:</strong> A mixer contract sends ETH to 8 different addresses. All 8 receivers are linked as likely belonging to the same entity or campaign.</p>
+</div>
+
+<!-- HEURISTIC 6 -->
+<div class="heuristic-card" id="s7-6">
+  <h3>⑥ Loop / Circular Transaction Detection <span class="tag tag-red">loop_detection</span> <span class="tag" style="background:#fee2e2;color:#991b1b">Score: +35 (highest)</span></h3>
+  <p><strong>Concept:</strong> Circular fund flows (A → B → C → A) are the strongest indicator of layering — the second stage of money laundering. They are also used in wash trading to simulate volume. All addresses in a detected cycle are linked.</p>
+  <pre><span class="comment"># Collapse parallel edges for cycle detection</span>
+simple = nx.DiGraph(G)
+
+<span class="keyword">for</span> cycle <span class="keyword">in</span> nx.simple_cycles(simple):
+    <span class="keyword">if</span> 2 <= len(cycle) <= self.max_depth:  <span class="comment"># default max depth: 6</span>
+        cycle_sorted = sorted(cycle)
+        <span class="keyword">for</span> i, j <span class="keyword">in</span> combinations(cycle_sorted, 2):
+            links.append((i, j))</pre>
+  <p><strong>Example:</strong> A → B → C → D → A forms a 4-hop cycle. All four addresses are linked. Risk score contribution: +35 points.</p>
+  <div class="warn-box"><strong>Performance Note:</strong> <code>nx.simple_cycles()</code> can be expensive on large graphs. The <code>max_depth</code> parameter (default 6) limits cycle length to keep runtime manageable.</div>
+</div>
+
+<!-- UNION FIND -->
+<h2 class="sub" id="s7-7">Union-Find Merge Algorithm</h2>
+<p>After all heuristics run, the collected address pairs are merged using Union-Find. This ensures that if A-B and B-C are linked by different heuristics, A, B, and C all end up in the same cluster.</p>
+<pre><span class="keyword">class</span> <span class="cls">UnionFind</span>:
+    <span class="keyword">def</span> <span class="func">find</span>(self, x):
+        <span class="comment"># Path compression: flatten the tree</span>
+        <span class="keyword">if</span> self._parent[x] != x:
+            self._parent[x] = self.find(self._parent[x])
+        <span class="keyword">return</span> self._parent[x]
+
+    <span class="keyword">def</span> <span class="func">union</span>(self, a, b):
+        ra, rb = self.find(a), self.find(b)
+        <span class="keyword">if</span> ra == rb: <span class="keyword">return</span>
+        <span class="comment"># Union by rank: attach smaller tree under larger</span>
+        <span class="keyword">if</span> self._rank[ra] < self._rank[rb]: ra, rb = rb, ra
+        self._parent[rb] = ra
+        <span class="keyword">if</span> self._rank[ra] == self._rank[rb]:
+            self._rank[ra] += 1</pre>
+<p>Time complexity: O(α(n)) per operation where α is the inverse Ackermann function — effectively constant for all practical inputs.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ SECTION 8 -->
+<div class="page-break"></div>
+<div class="content">
+<h1 class="section" id="s8">Labeling Engine</h1>
+
+<p>Labels are automatically assigned to clusters based on which heuristics fired. Each heuristic maps deterministically to a semantic label that describes the suspicious behavior pattern.</p>
+
+<h2 class="sub">Heuristic → Label Mapping</h2>
+<table>
+  <tr><th>Heuristic</th><th>Label</th><th>Meaning</th><th>Risk Level</th></tr>
+  <tr><td>loop_detection</td><td><code>possible_layering</code></td><td>Circular flows suggest AML layering stage</td><td style="color:#dc2626">High</td></tr>
+  <tr><td>contract_interaction</td><td><code>possible_mixer</code></td><td>Deposit/withdraw via same contract</td><td style="color:#dc2626">High</td></tr>
+  <tr><td>fan_pattern</td><td><code>exchange_like_behavior</code></td><td>Distribution or consolidation pattern</td><td style="color:#d97706">Medium</td></tr>
+  <tr><td>temporal_coordination</td><td><code>coordinated_activity</code></td><td>Synchronized transactions suggest automation</td><td style="color:#d97706">Medium</td></tr>
+  <tr><td>token_flow</td><td><code>token_flow_cluster</code></td><td>Repeated ERC-20 flows between addresses</td><td style="color:#d97706">Medium</td></tr>
+  <tr><td>behavioral_similarity</td><td><code>shared_counterparties</code></td><td>Same entity using multiple wallets</td><td style="color:#16a34a">Low-Medium</td></tr>
+</table>
+
+<h2 class="sub">Label Assignment Code</h2>
+<pre><span class="comment"># Label rules: (heuristic_name, label)</span>
+_LABEL_RULES = [
+    (<span class="string">"loop_detection"</span>,        <span class="string">"possible_layering"</span>),
+    (<span class="string">"contract_interaction"</span>,  <span class="string">"possible_mixer"</span>),
+    (<span class="string">"fan_pattern"</span>,           <span class="string">"exchange_like_behavior"</span>),
+    (<span class="string">"temporal_coordination"</span>, <span class="string">"coordinated_activity"</span>),
+    (<span class="string">"token_flow"</span>,            <span class="string">"token_flow_cluster"</span>),
+    (<span class="string">"behavioral_similarity"</span>, <span class="string">"shared_counterparties"</span>),
+]
+
+<span class="keyword">def</span> <span class="func">score_cluster</span>(cluster_id, addresses, heuristics_fired, indicators):
+    <span class="comment"># Assign all matching labels</span>
+    labels = [label <span class="keyword">for</span> h, label <span class="keyword">in</span> _LABEL_RULES
+              <span class="keyword">if</span> h <span class="keyword">in</span> heuristics_fired]
+    <span class="keyword">if not</span> labels:
+        labels = [<span class="string">"normal"</span>]
+    <span class="keyword">return</span> ClusterResult(..., labels=labels)</pre>
+
+<h2 class="sub">Multi-Label Clusters</h2>
+<p>A cluster can have multiple labels if multiple heuristics fired. For example, a cluster where addresses both form circular flows AND interact with the same mixer contract would receive both <code>possible_layering</code> and <code>possible_mixer</code> labels, and its risk score would be the sum of both contributions (35 + 25 = 60, plus size bonus).</p>
+
+<h2 class="sub">Human-Readable Explanation Generation</h2>
+<pre><span class="comment"># Build explanation string from fired heuristics</span>
+parts = []
+<span class="keyword">if</span> <span class="string">"loop_detection"</span> <span class="keyword">in</span> heuristics_fired:
+    parts.append(<span class="string">"circular fund flows detected (layering pattern)"</span>)
+<span class="keyword">if</span> <span class="string">"contract_interaction"</span> <span class="keyword">in</span> heuristics_fired:
+    parts.append(<span class="string">"shared smart contract interactions (possible mixer)"</span>)
+<span class="keyword">if</span> <span class="string">"fan_pattern"</span> <span class="keyword">in</span> heuristics_fired:
+    parts.append(<span class="string">"fan-in/fan-out pattern (consolidation or distribution)"</span>)
+
+explanation = <span class="string">"; "</span>.join(parts)
+<span class="comment"># → "circular fund flows detected (layering pattern); shared smart contract interactions"</span></pre>
+
+<!-- ═══════════════════════════════════════════════════════════ SECTION 9 -->
+<h1 class="section" id="s9">Risk Scoring System</h1>
+
+<h2 class="sub">Scoring Formula</h2>
+<p>Each cluster's risk score is computed as a weighted sum of heuristic contributions plus a cluster size bonus, capped at 100.</p>
+
+<div class="diagram">
+<pre style="background:#f8fafc;color:#1e293b;border-left:4px solid #1d4ed8">
+Risk Score = Σ(heuristic_weight for each fired heuristic)
+           + size_bonus
+           (capped at 100)
+
+Heuristic Weights:
+  loop_detection          → +35  (strongest: circular flows = layering)
+  contract_interaction    → +25  (mixer/DeFi interaction)
+  fan_pattern             → +20  (distribution/consolidation)
+  temporal_coordination   → +20  (coordinated timing)
+  token_flow              → +15  (repeated ERC-20 flows)
+  behavioral_similarity   → +10  (shared counterparties)
+
+Size Bonus:
+  size >= 10 addresses    → +15
+  size >= 5  addresses    → +8
+  size >= 3  addresses    → +3
+
+Risk Levels:
+  score >= 70  → HIGH   (immediate investigation)
+  score 40-69  → MEDIUM (monitoring required)
+  score < 40   → LOW    (informational)</pre>
+</div>
+
+<h2 class="sub">Scoring Code</h2>
+<pre><span class="keyword">def</span> <span class="func">score_cluster</span>(cluster_id, addresses, heuristics_fired, indicators):
+    score = 0.0
+
+    <span class="comment"># Sum heuristic contributions</span>
+    <span class="keyword">for</span> h <span class="keyword">in</span> heuristics_fired:
+        score += _HEURISTIC_SCORES.get(h, 5.0)
+
+    <span class="comment"># Size bonus: larger clusters are more suspicious</span>
+    size = len(addresses)
+    <span class="keyword">if</span>   size >= 10: score += 15.0
+    <span class="keyword">elif</span> size >= 5:  score += 8.0
+    <span class="keyword">elif</span> size >= 3:  score += 3.0
+
+    score = min(score, 100.0)  <span class="comment"># cap at 100</span>
+    <span class="keyword">return</span> ClusterResult(..., risk_score=round(score, 1))</pre>
+
+<h2 class="sub">Example Score Calculations</h2>
+<table>
+  <tr><th>Scenario</th><th>Heuristics Fired</th><th>Size</th><th>Score</th><th>Level</th></tr>
+  <tr><td>Circular flow + mixer</td><td>loop + contract</td><td>4</td><td>35+25+3 = 63</td><td style="color:#d97706">Medium</td></tr>
+  <tr><td>Large mixer cluster</td><td>loop + contract + fan</td><td>12</td><td>35+25+20+15 = 95</td><td style="color:#dc2626">High</td></tr>
+  <tr><td>Coordinated senders</td><td>temporal + behavioral</td><td>3</td><td>20+10+3 = 33</td><td style="color:#16a34a">Low</td></tr>
+  <tr><td>Token flow only</td><td>token_flow</td><td>2</td><td>15 = 15</td><td style="color:#16a34a">Low</td></tr>
+  <tr><td>Full multi-signal</td><td>all 6</td><td>15</td><td>min(125,100) = 100</td><td style="color:#dc2626">High</td></tr>
+</table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ SECTION 10 -->
+<div class="page-break"></div>
+<div class="content">
+<h1 class="section" id="s10">Alert System</h1>
+
+<h2 class="sub">Two-Layer Alert Architecture</h2>
+<p>The system generates alerts at two levels:</p>
+<ol>
+  <li><strong>Transaction-level alerts</strong> — Individual flagged transactions from the <code>/api/alerts</code> endpoint, based on per-transaction risk flags from the ETL pipeline</li>
+  <li><strong>Cluster-level alerts</strong> — Entire address clusters flagged by the clustering engine, accessible via <code>/api/clusters</code></li>
+</ol>
+
+<h2 class="sub">Transaction Alert Logic</h2>
+<p>Each transaction is evaluated against five rules. Any transaction matching at least one rule generates an alert:</p>
+<table>
+  <tr><th>Rule</th><th>Condition</th><th>Cluster Name</th><th>Score Contribution</th></tr>
+  <tr><td>High Velocity</td><td>sender tx count ≥ 6 in dataset</td><td>High Velocity</td><td>+15</td></tr>
+  <tr><td>Fan-Out</td><td>sender unique receivers ≥ 5</td><td>Fan-Out</td><td>+20</td></tr>
+  <tr><td>High Value</td><td>amount ≥ 10 ETH OR risk_flag_high_value</td><td>High Value</td><td>+40</td></tr>
+  <tr><td>Contract Call</td><td>is_contract_call = True</td><td>Contract Call</td><td>+20</td></tr>
+  <tr><td>Multi-Signal</td><td>≥ 2 rules triggered</td><td>Multi-Signal</td><td>+10 bonus</td></tr>
+</table>
+
+<h2 class="sub">Sample Alert Output</h2>
+<pre>{
+  <span class="string">"hash"</span>:        <span class="string">"0x7f3a..."</span>,
+  <span class="string">"sender"</span>:      <span class="string">"0xabc123..."</span>,
+  <span class="string">"receiver"</span>:    <span class="string">"0xdef456..."</span>,
+  <span class="string">"amount"</span>:      <span class="string">"15.500000"</span>,
+  <span class="string">"timestamp"</span>:   <span class="string">"03/31/2026, 10:22:15 AM"</span>,
+  <span class="string">"blockNumber"</span>: <span class="string">"0x16e3a2f"</span>,
+  <span class="string">"riskScore"</span>:   70,
+  <span class="string">"riskLabel"</span>:   <span class="string">"High"</span>,
+  <span class="string">"clusterName"</span>: <span class="string">"Multi-Signal"</span>,
+  <span class="string">"reasons"</span>:     [<span class="string">"high_value"</span>, <span class="string">"fan_out"</span>]
+}</pre>
+
+<h2 class="sub">Cluster-Level Alert Output</h2>
+<pre>{
+  <span class="string">"cluster_id"</span>:       <span class="string">"C-A3F2B1C4D5E6"</span>,
+  <span class="string">"addresses"</span>:        [<span class="string">"0xabc..."</span>, <span class="string">"0xdef..."</span>, <span class="string">"0x123..."</span>],
+  <span class="string">"risk_score"</span>:       88.0,
+  <span class="string">"labels"</span>:           [<span class="string">"possible_layering"</span>, <span class="string">"possible_mixer"</span>],
+  <span class="string">"heuristics_fired"</span>: [<span class="string">"loop_detection"</span>, <span class="string">"contract_interaction"</span>],
+  <span class="string">"indicators"</span>: {
+    <span class="string">"size"</span>:               3,
+    <span class="string">"total_eth_volume"</span>:   47.25,
+    <span class="string">"total_tx_count"</span>:     18,
+    <span class="string">"internal_tx_count"</span>:  6,
+    <span class="string">"contract_call_count"</span>:9,
+    <span class="string">"time_span_seconds"</span>:  3600
+  },
+  <span class="string">"explanation"</span>: <span class="string">"circular fund flows detected (layering pattern); shared smart contract interactions (possible mixer)"</span>
+}</pre>
+
+<!-- ═══════════════════════════════════════════════════════════ SECTION 11 -->
+<h1 class="section" id="s11">Reporting System</h1>
+
+<h2 class="sub">Suspicious Activity Report (SAR) Format</h2>
+<p>The system's cluster output maps directly to the fields required in a Suspicious Activity Report. An analyst can use the cluster data to file a SAR with the following structure:</p>
+
+<div class="diagram">
+<pre style="background:#f8fafc;color:#1e293b;border-left:4px solid #1d4ed8">
+SUSPICIOUS ACTIVITY REPORT
+══════════════════════════════════════════════════════
+Report ID:        SAR-2026-C-A3F2B1C4D5E6
+Generated:        2026-03-31T10:22:15Z
+Cluster ID:       C-A3F2B1C4D5E6
+Risk Score:       88.0 / 100  [HIGH]
+
+SUBJECT ADDRESSES:
+  1. 0xabc123...def456  (primary sender)
+  2. 0xdef456...789abc  (intermediary)
+  3. 0x123789...456def  (final receiver)
+
+SUSPICIOUS PATTERNS DETECTED:
+  ✗ Circular fund flows (layering pattern)
+  ✗ Shared smart contract interactions (possible mixer)
+
+BEHAVIORAL INDICATORS:
+  Total ETH Volume:    47.25 ETH
+  Total Transactions:  18
+  Internal Transfers:  6
+  Contract Calls:      9
+  Time Span:           3600 seconds (1 hour)
+
+TRANSACTION EVIDENCE:
+  Block Range:  23849990 – 23850005
+  Key Tx Hash:  0x7f3a...  (15.5 ETH, High Value)
+  Key Tx Hash:  0x9b2c...  (12.0 ETH, Contract Call)
+
+ANALYST NOTES:
+  Addresses form a 3-hop circular flow with Tornado Cash
+  interactions. Recommend immediate KYC investigation.
+══════════════════════════════════════════════════════</pre>
+</div>
+
+<h2 class="sub">Programmatic Report Generation</h2>
+<pre><span class="keyword">from</span> dataclasses <span class="keyword">import</span> asdict
+<span class="keyword">import</span> json
+<span class="keyword">from</span> datetime <span class="keyword">import</span> datetime, timezone
+
+<span class="keyword">def</span> <span class="func">generate_sar</span>(cluster: ClusterResult) -> dict:
+    <span class="keyword">return</span> {
+        <span class="string">"report_id"</span>:    f<span class="string">"SAR-{datetime.now().year}-{cluster.cluster_id}"</span>,
+        <span class="string">"generated_at"</span>: datetime.now(timezone.utc).isoformat(),
+        <span class="string">"cluster_id"</span>:   cluster.cluster_id,
+        <span class="string">"risk_score"</span>:   cluster.risk_score,
+        <span class="string">"risk_level"</span>:   <span class="string">"HIGH"</span> <span class="keyword">if</span> cluster.risk_score >= 70 <span class="keyword">else</span> <span class="string">"MEDIUM"</span>,
+        <span class="string">"addresses"</span>:    cluster.addresses,
+        <span class="string">"labels"</span>:       cluster.labels,
+        <span class="string">"patterns"</span>:     cluster.heuristics_fired,
+        <span class="string">"indicators"</span>:   cluster.indicators,
+        <span class="string">"explanation"</span>:  cluster.explanation,
+    }
+
+<span class="comment"># Export all high-risk clusters as JSON report</span>
+engine = ClusteringEngine()
+results = engine.run(persist=<span class="keyword">True</span>)
+high_risk = [r <span class="keyword">for</span> r <span class="keyword">in</span> results <span class="keyword">if</span> r.risk_score >= 70]
+report = [generate_sar(r) <span class="keyword">for</span> r <span class="keyword">in</span> high_risk]
+<span class="keyword">with</span> open(<span class="string">"sar_report.json"</span>, <span class="string">"w"</span>) <span class="keyword">as</span> f:
+    json.dump(report, f, indent=2, default=str)</pre>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ SECTION 12 -->
+<div class="page-break"></div>
+<div class="content">
+<h1 class="section" id="s12">Scalability &amp; UTXO Design</h1>
+
+<h2 class="sub">Current Architecture: Account-Based (Ethereum)</h2>
+<p>In account-based blockchains like Ethereum, each address has a balance and transactions directly debit/credit those balances. This makes clustering straightforward: addresses are nodes, transactions are directed edges.</p>
+
+<h2 class="sub">Future Architecture: UTXO-Based (Bitcoin)</h2>
+<p>UTXO (Unspent Transaction Output) blockchains like Bitcoin work differently. There are no "accounts" — instead, transactions consume previous outputs and create new ones. The classic UTXO clustering heuristic is <strong>common input ownership</strong>: all inputs to a transaction are assumed to be controlled by the same entity.</p>
+
+<div class="info-box">
+  <strong>Design Decision:</strong> The <code>BlockchainAdapter</code> abstract base class was specifically designed to allow UTXO support without modifying the clustering engine or any heuristics. Only a new adapter needs to be written.
+</div>
+
+<h2 class="sub">Adding Bitcoin Support (Future)</h2>
+<pre><span class="comment"># Future: BitcoinAdapter implementing BlockchainAdapter</span>
+<span class="keyword">class</span> <span class="cls">BitcoinAdapter</span>(BlockchainAdapter):
+
+    <span class="keyword">@property</span>
+    <span class="keyword">def</span> <span class="func">blockchain_type</span>(self) -> str:
+        <span class="keyword">return</span> <span class="string">"utxo"</span>
+
+    <span class="keyword">def</span> <span class="func">iter_transactions</span>(self, **kwargs) -> Iterator[TxRecord]:
+        <span class="comment"># For UTXO: each input address is a "from_address"</span>
+        <span class="comment"># Common input ownership: all inputs share same from_address</span>
+        <span class="keyword">for</span> tx <span class="keyword">in</span> self._read_bitcoin_txs():
+            <span class="comment"># Normalize UTXO inputs → single representative address</span>
+            representative = tx.inputs[0].address
+            <span class="keyword">for</span> output <span class="keyword">in</span> tx.outputs:
+                <span class="keyword">yield</span> TxRecord(
+                    tx_hash=tx.txid,
+                    from_address=representative,
+                    to_address=output.address,
+                    value_eth=output.value_btc,  <span class="comment"># reuse field for BTC</span>
+                    ...
+                )</pre>
+
+<h2 class="sub">Modular Heuristic Architecture</h2>
+<p>All heuristics extend <code>BaseHeuristic</code> and receive only a <code>nx.MultiDiGraph</code>. They have no knowledge of the underlying blockchain type. This means all six Ethereum heuristics work unchanged for Bitcoin once the adapter normalizes the data into the same graph format.</p>
+
+<table>
+  <tr><th>Component</th><th>Ethereum</th><th>Bitcoin (Future)</th><th>Change Required</th></tr>
+  <tr><td>BlockchainAdapter</td><td>EthereumAdapter</td><td>BitcoinAdapter</td><td>New file only</td></tr>
+  <tr><td>TxRecord</td><td>Same</td><td>Same</td><td>None</td></tr>
+  <tr><td>GraphBuilder</td><td>Same</td><td>Same</td><td>None</td></tr>
+  <tr><td>All 6 Heuristics</td><td>Same</td><td>Same</td><td>None</td></tr>
+  <tr><td>UnionFind</td><td>Same</td><td>Same</td><td>None</td></tr>
+  <tr><td>RiskScorer</td><td>Same</td><td>Same</td><td>None</td></tr>
+  <tr><td>ClusteringEngine</td><td>Same</td><td>Same</td><td>None</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════ SECTION 13 -->
+<h1 class="section" id="s13">End-to-End Example</h1>
+
+<h2 class="sub">Input Transactions</h2>
+<div class="diagram">
+<pre style="background:#f8fafc;color:#1e293b;border-left:4px solid #1d4ed8">
+Block 23850000 — 6 transactions:
+
+Tx1: 0xWallet_A  →  0xMixer_Contract   5.0 ETH  [contract_call]  t=1000
+Tx2: 0xWallet_B  →  0xMixer_Contract   3.0 ETH  [contract_call]  t=1005
+Tx3: 0xWallet_C  →  0xMixer_Contract   4.0 ETH  [contract_call]  t=1010
+Tx4: 0xMixer_Contract → 0xWallet_D     4.8 ETH  [contract_call]  t=1200
+Tx5: 0xMixer_Contract → 0xWallet_E     3.0 ETH  [contract_call]  t=1205
+Tx6: 0xWallet_D  →  0xWallet_A         4.5 ETH  [transfer]       t=1500</pre>
+</div>
+
+<h2 class="sub">Graph Construction</h2>
+<div class="diagram">
+<pre style="background:#f8fafc;color:#1e293b;border-left:4px solid #1d4ed8">
+Nodes: Wallet_A, Wallet_B, Wallet_C, Mixer_Contract, Wallet_D, Wallet_E
+
+Edges:
+  Wallet_A  ──[5.0 ETH, contract_call]──►  Mixer_Contract
+  Wallet_B  ──[3.0 ETH, contract_call]──►  Mixer_Contract
+  Wallet_C  ──[4.0 ETH, contract_call]──►  Mixer_Contract
+  Mixer_Contract ──[4.8 ETH]──►  Wallet_D
+  Mixer_Contract ──[3.0 ETH]──►  Wallet_E
+  Wallet_D  ──[4.5 ETH]──►  Wallet_A</pre>
+</div>
+
+<h2 class="sub">Heuristic Results</h2>
+<table>
+  <tr><th>Heuristic</th><th>Links Found</th><th>Reason</th></tr>
+  <tr><td>contract_interaction</td><td>(A,B), (A,C), (B,C)</td><td>All call same Mixer_Contract</td></tr>
+  <tr><td>contract_interaction</td><td>(A,D), (A,E), (B,D), (B,E), (C,D), (C,E)</td><td>Deposit→Contract→Withdraw pattern</td></tr>
+  <tr><td>temporal_coordination</td><td>(A,B), (A,C), (B,C)</td><td>All send within 10 seconds</td></tr>
+  <tr><td>loop_detection</td><td>(A,D)</td><td>Cycle: A→Mixer→D→A</td></tr>
+  <tr><td>fan_pattern</td><td>(D,E)</td><td>Mixer fan-out to D and E</td></tr>
+</table>
+
+<h2 class="sub">Union-Find Merge</h2>
+<div class="diagram">
+<pre style="background:#f8fafc;color:#1e293b;border-left:4px solid #1d4ed8">
+Initial: {A}, {B}, {C}, {D}, {E}, {Mixer}
+
+After contract_interaction:
+  union(A,B) → {A,B}, {C}, {D}, {E}, {Mixer}
+  union(A,C) → {A,B,C}, {D}, {E}, {Mixer}
+  union(A,D) → {A,B,C,D}, {E}, {Mixer}
+  union(A,E) → {A,B,C,D,E}, {Mixer}
+
+After temporal_coordination: (already merged)
+After loop_detection: (already merged)
+After fan_pattern: (already merged)
+
+Final cluster: {Wallet_A, Wallet_B, Wallet_C, Wallet_D, Wallet_E}</pre>
+</div>
+
+<h2 class="sub">Cluster Result</h2>
+<pre>{
+  <span class="string">"cluster_id"</span>:       <span class="string">"C-7A3F2B1C4D5E"</span>,
+  <span class="string">"addresses"</span>:        [<span class="string">"Wallet_A"</span>, <span class="string">"Wallet_B"</span>, <span class="string">"Wallet_C"</span>,
+                        <span class="string">"Wallet_D"</span>, <span class="string">"Wallet_E"</span>],
+  <span class="string">"risk_score"</span>:       88.0,
+  <span class="string">"labels"</span>:           [<span class="string">"possible_layering"</span>, <span class="string">"possible_mixer"</span>,
+                        <span class="string">"exchange_like_behavior"</span>, <span class="string">"coordinated_activity"</span>],
+  <span class="string">"heuristics_fired"</span>: [<span class="string">"loop_detection"</span>, <span class="string">"contract_interaction"</span>,
+                        <span class="string">"fan_pattern"</span>, <span class="string">"temporal_coordination"</span>],
+  <span class="string">"indicators"</span>: {
+    <span class="string">"size"</span>:               5,
+    <span class="string">"total_eth_volume"</span>:   19.8,
+    <span class="string">"total_tx_count"</span>:     6,
+    <span class="string">"internal_tx_count"</span>:  1,
+    <span class="string">"contract_call_count"</span>:5,
+    <span class="string">"time_span_seconds"</span>:  500
+  },
+  <span class="string">"explanation"</span>: <span class="string">"circular fund flows detected (layering pattern); shared smart contract interactions (possible mixer); fan-in/fan-out pattern; coordinated transactions within short time windows"</span>
+}
+
+Score breakdown:
+  loop_detection:       +35
+  contract_interaction: +25
+  fan_pattern:          +20
+  temporal_coordination:+20
+  size bonus (5 addrs): +8
+  ─────────────────────────
+  Total (capped):        88.0  →  HIGH RISK</pre>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ SECTION 14 -->
+<div class="page-break"></div>
+<div class="content">
+<h1 class="section" id="s14">Best Practices &amp; Limitations</h1>
+
+<h2 class="sub">Known Limitations</h2>
+
+<div class="warn-box">
+  <strong>False Positives — Fan-Out Heuristic:</strong> Legitimate exchange hot wallets distribute funds to thousands of users. They will trigger the fan-out heuristic and link all recipients together. Mitigation: maintain a whitelist of known exchange addresses and exclude them from clustering.
+</div>
+
+<div class="warn-box">
+  <strong>False Positives — Behavioral Similarity:</strong> Popular DeFi protocols (Uniswap, Aave) are counterparties for millions of addresses. Two unrelated users both using Uniswap will share a counterparty. Mitigation: exclude high-degree nodes (degree > threshold) from the counterparty sets.
+</div>
+
+<div class="warn-box">
+  <strong>Loop Detection Performance:</strong> <code>nx.simple_cycles()</code> has exponential worst-case complexity on dense graphs. The <code>max_depth</code> parameter (default 6) limits this, but very large graphs may still be slow. Mitigation: run loop detection on subgraphs or use approximate cycle detection.
+</div>
+
+<div class="danger-box">
+  <strong>Pseudonymity ≠ Anonymity:</strong> This system identifies behavioral clusters but cannot definitively attribute them to real-world identities without additional off-chain data (exchange KYC, IP logs, etc.). Cluster results should be treated as investigative leads, not proof.
+</div>
+
+<h2 class="sub">Recommended Improvements</h2>
+<table>
+  <tr><th>Improvement</th><th>Description</th><th>Priority</th></tr>
+  <tr><td>Address Whitelist</td><td>Exclude known exchanges, protocols from clustering</td><td>High</td></tr>
+  <tr><td>High-Degree Node Filter</td><td>Skip nodes with degree > N in behavioral heuristic</td><td>High</td></tr>
+  <tr><td>Incremental Clustering</td><td>Only re-cluster affected subgraph on new blocks</td><td>Medium</td></tr>
+  <tr><td>Louvain Community Detection</td><td>Add community detection as an additional heuristic</td><td>Medium</td></tr>
+  <tr><td>ERC-20 Token Tracking</td><td>Track specific token contracts (USDT, USDC) separately</td><td>Medium</td></tr>
+  <tr><td>Kafka Integration</td><td>Real-time streaming pipeline for live block processing</td><td>Low</td></tr>
+  <tr><td>UTXO Support</td><td>Add BitcoinAdapter for Bitcoin clustering</td><td>Low</td></tr>
+  <tr><td>ML Risk Scoring</td><td>Replace heuristic weights with trained classifier</td><td>Low</td></tr>
+</table>
+
+<h2 class="sub">Best Practices for Deployment</h2>
+<ul>
+  <li>Run clustering after each ETL batch, not in real-time, to avoid partial-block artifacts</li>
+  <li>Store cluster results with <code>updated_at</code> timestamps to track cluster evolution over time</li>
+  <li>Use <code>--min-size 3</code> in production to reduce noise from 2-address clusters</li>
+  <li>Monitor the <code>time_span_seconds</code> indicator — clusters active over long periods are more suspicious than short bursts</li>
+  <li>Cross-reference high-risk clusters against OFAC sanctions lists and known mixer addresses</li>
+  <li>Never use clustering results alone as grounds for account freezing — always require human analyst review</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════════ SECTION 15 -->
+<h1 class="section" id="s15">Conclusion</h1>
+
+<p>This document has described a complete, production-grade Anti-Money Laundering system for Ethereum blockchain analysis. The system implements a six-heuristic clustering engine that groups related addresses into entities, assigns risk scores, generates human-readable labels and explanations, and surfaces results through a modern React dashboard.</p>
+
+<h2 class="sub">Key Design Principles</h2>
+<ul>
+  <li><strong>Modularity:</strong> Each heuristic is an independent, pluggable class. New heuristics can be added without touching the engine.</li>
+  <li><strong>Explainability:</strong> Every cluster comes with a human-readable explanation of why addresses were grouped and which patterns were detected.</li>
+  <li><strong>Scalability:</strong> The <code>BlockchainAdapter</code> abstraction allows UTXO-based blockchains (Bitcoin) to be supported with a single new file.</li>
+  <li><strong>Idempotency:</strong> All database operations use upserts. Re-running the pipeline produces the same results without duplication.</li>
+  <li><strong>Graceful Degradation:</strong> Neo4j failures do not stop the pipeline. MongoDB and MariaDB continue to function independently.</li>
+</ul>
+
+<h2 class="sub">System Capabilities Summary</h2>
+<table>
+  <tr><th>Capability</th><th>Implementation</th><th>Status</th></tr>
+  <tr><td>Ethereum block ingestion</td><td>EthereumExtractor + web3.py</td><td>✅ Complete</td></tr>
+  <tr><td>Transaction normalization</td><td>Transformer + clean_flat_tx()</td><td>✅ Complete</td></tr>
+  <tr><td>Graph construction</td><td>NetworkX MultiDiGraph</td><td>✅ Complete</td></tr>
+  <tr><td>Behavioral clustering</td><td>BehavioralSimilarityHeuristic</td><td>✅ Complete</td></tr>
+  <tr><td>Contract interaction clustering</td><td>ContractInteractionHeuristic</td><td>✅ Complete</td></tr>
+  <tr><td>Token flow clustering</td><td>TokenFlowHeuristic</td><td>✅ Complete</td></tr>
+  <tr><td>Temporal coordination</td><td>TemporalHeuristic</td><td>✅ Complete</td></tr>
+  <tr><td>Fan-in/fan-out detection</td><td>FanPatternHeuristic</td><td>✅ Complete</td></tr>
+  <tr><td>Circular flow detection</td><td>LoopDetectionHeuristic</td><td>✅ Complete</td></tr>
+  <tr><td>Risk scoring</td><td>score_cluster() + ClusterResult</td><td>✅ Complete</td></tr>
+  <tr><td>Automatic labeling</td><td>_LABEL_RULES mapping</td><td>✅ Complete</td></tr>
+  <tr><td>MongoDB persistence</td><td>address_clusters collection</td><td>✅ Complete</td></tr>
+  <tr><td>Neo4j graph enrichment</td><td>cluster_id on :Address nodes</td><td>✅ Complete</td></tr>
+  <tr><td>REST API</td><td>FastAPI /api/clusters</td><td>✅ Complete</td></tr>
+  <tr><td>React dashboard</td><td>Clusters.jsx + Analytics.jsx</td><td>✅ Complete</td></tr>
+  <tr><td>UTXO support (Bitcoin)</td><td>BlockchainAdapter interface</td><td>🔲 Future</td></tr>
+  <tr><td>Real-time streaming</td><td>Kafka integration</td><td>🔲 Future</td></tr>
+  <tr><td>ML-based scoring</td><td>Trained classifier</td><td>🔲 Future</td></tr>
+</table>
+
+<div class="success-box" style="margin-top:32px">
+  <strong>The system is production-ready for Phase 1 (Ethereum).</strong> It processes real Ethereum blocks, applies six independent clustering heuristics, scores and labels every cluster, and presents results through a full-stack web application. The architecture is explicitly designed for future extension to Bitcoin and other blockchains without requiring changes to the core engine.
+</div>
+
+<hr/>
+<div style="text-align:center;color:#94a3b8;font-size:12px;padding:40px 0">
+  Crypto AML Tracker — Technical Documentation v1.0<br/>
+  Phase 1: Ethereum Account-Based Clustering Engine<br/>
+  Generated 2026 · Python 3.11 · NetworkX · MongoDB · Neo4j · React
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ ADVANCED HEURISTICS -->
+<div class="page-break"></div>
+<div class="content">
+<h1 class="section" id="s7-adv">Advanced Clustering Heuristics</h1>
+
+<p>The following five advanced heuristics extend the clustering engine beyond basic pattern matching into sophisticated AML techniques used by professional blockchain forensics firms.</p>
+
+<!-- PEEL CHAIN -->
+<div class="heuristic-card">
+  <h3>⑦ Peel Chain Detection <span class="tag tag-red">peel_chain</span> <span class="tag" style="background:#fee2e2;color:#7f1d1d">Score: +40 (highest)</span></h3>
+  <p><strong>Concept:</strong> A peel chain is a sequence of transactions where each address receives funds, forwards most of it to the next address, and keeps a small "peel" (remainder). This creates a long chain of hops that obscures the original source of funds.</p>
+  <div class="diagram">
+<pre style="background:#f8fafc;color:#1e293b;border-left:4px solid #ef4444">
+A --[10.0 ETH]--> B --[9.8 ETH]--> C --[9.6 ETH]--> D --[9.4 ETH]--> E
+                  ↓                 ↓                 ↓                 ↓
+               0.2 ETH           0.2 ETH           0.2 ETH           kept
+
+Each node forwards >= 85% of received value → relay node
+Chain length >= 3 → peel chain detected
+All nodes A,B,C,D,E linked into one cluster</pre>
+  </div>
+  <pre><span class="comment"># Identify relay nodes: forward >= 85% of incoming value</span>
+<span class="keyword">for</span> node <span class="keyword">in</span> G.nodes():
+    iv = in_value.get(node, 0.0)
+    dominant_val = max(out_edges[node], key=<span class="keyword">lambda</span> x: x[1])[1]
+    <span class="keyword">if</span> dominant_val / iv >= _FORWARD_RATIO:  <span class="comment"># 0.85</span>
+        relay_next[node] = dominant_receiver
+
+<span class="comment"># Walk the chain and link all members</span>
+<span class="keyword">for</span> start <span class="keyword">in</span> relay_next:
+    chain = walk_chain(start, relay_next)
+    <span class="keyword">if</span> len(chain) >= _MIN_CHAIN_LENGTH:  <span class="comment"># 3</span>
+        link_all_pairs(chain)</pre>
+  <p><strong>Why it matters:</strong> Peel chains are the most common layering technique on Ethereum. They are designed specifically to defeat naive "follow the money" analysis. Detecting them requires looking at the ratio of forwarded value, not just the transaction graph structure.</p>
+</div>
+
+<!-- LAYERING / STRUCTURING -->
+<div class="heuristic-card">
+  <h3>⑧ Layering &amp; Structuring (Smurfing) <span class="tag tag-red">layering</span> <span class="tag" style="background:#fee2e2;color:#7f1d1d">Score: +38</span></h3>
+  <p><strong>Concept — Rapid Layering:</strong> Funds are received and forwarded within a very short time window (≤5 minutes), creating a rapid multi-hop chain. Unlike peel chains, amounts may change significantly between hops.</p>
+  <p><strong>Concept — Structuring (Smurfing):</strong> A large amount is split into many transactions just below a reporting threshold (e.g., 9.9 ETH × 5 instead of 49.5 ETH × 1) to avoid triggering AML alerts.</p>
+  <div class="diagram">
+<pre style="background:#f8fafc;color:#1e293b;border-left:4px solid #ef4444">
+Rapid Layering:
+  t=0:   A receives 50 ETH
+  t=120: A sends 48 ETH to B    (within 5 min → rapid relay)
+  t=180: B sends 45 ETH to C    (within 5 min → rapid relay)
+  t=240: C sends 43 ETH to D    (within 5 min → rapid relay)
+  Chain: A→B→C→D  (length 4 ≥ 3) → all linked
+
+Structuring:
+  Sender X sends: 9.9 ETH to A, 9.8 ETH to B, 9.7 ETH to C
+  All below 10 ETH threshold, 3+ transactions → A,B,C linked</pre>
+  </div>
+  <pre><span class="comment"># Rapid relay: received then forwarded within RAPID_HOP_SECONDS</span>
+<span class="keyword">if</span> send_time[node] - receive_time[node] <= _RAPID_HOP_SECONDS:
+    rapid_relay_next[node] = send_to[node]
+
+<span class="comment"># Structuring: many sub-threshold transactions from same sender</span>
+<span class="keyword">if</span> 0 < val < _STRUCTURING_THRESHOLD <span class="keyword">and</span> count >= _STRUCTURING_MIN_COUNT:
+    link_all_receivers(sender)</pre>
+</div>
+
+<!-- COMMUNITY DETECTION -->
+<div class="heuristic-card">
+  <h3>⑨ Community Detection (Louvain-style) <span class="tag">community_detection</span> <span class="tag" style="background:#dbeafe;color:#1e40af">Score: +30</span></h3>
+  <p><strong>Concept:</strong> Community detection finds groups of addresses that transact with each other far more densely than with the rest of the network. This is a graph-level technique that catches clusters no single pair-wise heuristic would find.</p>
+  <p><strong>Algorithm:</strong> Uses NetworkX's greedy modularity communities (approximation of the Louvain algorithm) on an undirected weighted projection of the transaction graph.</p>
+  <div class="diagram">
+<pre style="background:#f8fafc;color:#1e293b;border-left:4px solid #3b82f6">
+Transaction graph (directed, weighted by tx count):
+
+  [A] ←→ [B] ←→ [C]        [X] ←→ [Y]
+   ↕      ↕      ↕            ↕
+  [D] ←→ [E] ←→ [F]         [Z]
+
+Community 1: {A,B,C,D,E,F}  ← dense internal connections
+Community 2: {X,Y,Z}         ← separate dense group
+
+Modularity score measures how much denser these communities are
+compared to a random graph with the same degree sequence.</pre>
+  </div>
+  <pre><span class="comment"># Project to undirected weighted graph</span>
+<span class="keyword">for</span> u, v, data <span class="keyword">in</span> G.edges(data=<span class="keyword">True</span>):
+    UG[u][v][<span class="string">"weight"</span>] = UG.get_edge_data(u,v,{}).get(<span class="string">"weight"</span>,0) + 1
+
+<span class="comment"># Run greedy modularity community detection</span>
+<span class="keyword">from</span> networkx.algorithms.community <span class="keyword">import</span> greedy_modularity_communities
+communities = greedy_modularity_communities(UG, weight=<span class="string">"weight"</span>)
+
+<span class="keyword">for</span> community <span class="keyword">in</span> communities:
+    <span class="keyword">if</span> len(community) >= _MIN_COMMUNITY_SIZE:
+        link_all_pairs(community)</pre>
+  <p><strong>Why it matters:</strong> Wash trading rings and coordinated wallet clusters often have no single obvious pattern — they just transact heavily with each other. Community detection catches these without needing a specific behavioral signature.</p>
+</div>
+
+<!-- ADDRESS POISONING -->
+<div class="heuristic-card">
+  <h3>⑩ Address Poisoning Attack Detection <span class="tag tag-purple">address_poisoning</span> <span class="tag" style="background:#f3e8ff;color:#581c87">Score: +28</span></h3>
+  <p><strong>Concept:</strong> An attacker creates an address that looks visually identical to a victim's frequent counterparty (same first 6 and last 4 characters), then sends a zero-value transaction to the victim. The victim, copying from their transaction history, accidentally sends funds to the attacker's address.</p>
+  <div class="diagram">
+<pre style="background:#f8fafc;color:#1e293b;border-left:4px solid #a855f7">
+Legitimate address:  0xABCDEF...1234  (victim's real counterparty)
+Poisoning address:   0xABCDEF...1234  (attacker's lookalike)
+                     ^^^^^^    ^^^^
+                     same      same  ← visually identical in most UIs
+
+Attack flow:
+  1. Attacker sends 0 ETH from poisoning address to victim
+  2. Victim sees "0xABCDEF...1234" in their history
+  3. Victim copies address and sends real funds to attacker</pre>
+  </div>
+  <pre><span class="comment"># Build (prefix, suffix) lookup for all addresses</span>
+<span class="keyword">for</span> addr <span class="keyword">in</span> nodes:
+    clean = addr.lower().replace(<span class="string">"0x"</span>, <span class="string">""</span>)
+    key = (clean[:6], clean[-4:])  <span class="comment"># first 6 + last 4 chars</span>
+    prefix_suffix_map[key].append(addr)
+
+<span class="comment"># Flag pairs with same prefix+suffix AND zero-value transaction</span>
+<span class="keyword">for</span> similar_addrs <span class="keyword">in</span> prefix_suffix_map.values():
+    <span class="keyword">if</span> len(similar_addrs) >= 2 <span class="keyword">and</span> has_zero_value_edge(similar_addrs):
+        link_all_pairs(similar_addrs)</pre>
+</div>
+
+<!-- DUSTING ATTACK -->
+<div class="heuristic-card">
+  <h3>⑪ Dusting Attack Detection <span class="tag">dusting_attack</span> <span class="tag" style="background:#fffbeb;color:#78350f">Score: +25</span></h3>
+  <p><strong>Concept:</strong> A dusting attack sends tiny amounts of cryptocurrency (< 0.001 ETH) to many addresses. The attacker then monitors when those addresses spend their funds. By tracing the dust, they can de-anonymize wallet owners and link addresses to real identities.</p>
+  <div class="diagram">
+<pre style="background:#f8fafc;color:#1e293b;border-left:4px solid #f59e0b">
+Dust sender (attacker):
+  → 0.0001 ETH to Wallet_A
+  → 0.0001 ETH to Wallet_B
+  → 0.0001 ETH to Wallet_C
+  → 0.0001 ETH to Wallet_D
+  → 0.0001 ETH to Wallet_E  (5+ recipients → dusting attack)
+
+All recipients A,B,C,D,E are linked as targets of the same
+surveillance campaign. The attacker is also flagged.</pre>
+  </div>
+  <pre><span class="comment"># Find dust senders: many tiny-value transactions</span>
+<span class="keyword">for</span> u, v, data <span class="keyword">in</span> G.edges(data=<span class="keyword">True</span>):
+    <span class="keyword">if</span> 0 < val <= _DUST_THRESHOLD_ETH:  <span class="comment"># 0.001 ETH</span>
+        dust_recipients[u].add(v)
+
+<span class="keyword">for</span> sender, recipients <span class="keyword">in</span> dust_recipients.items():
+    <span class="keyword">if</span> len(recipients) >= _MIN_DUST_RECIPIENTS:  <span class="comment"># 5</span>
+        link_all_recipients(recipients)</pre>
+  <p><strong>Why it matters:</strong> Dusting attacks are used by both surveillance firms and malicious actors. Detecting them helps identify which addresses are being actively tracked and may indicate that those addresses are of interest to threat actors.</p>
+</div>
+
+<h2 class="sub">Complete Heuristic Summary Table</h2>
+<table>
+  <tr><th>#</th><th>Heuristic</th><th>Type</th><th>Score</th><th>Label</th><th>Detects</th></tr>
+  <tr><td>1</td><td>Behavioral Similarity</td><td>Intermediate</td><td>+10</td><td>shared_counterparties</td><td>Same entity, multiple wallets</td></tr>
+  <tr><td>2</td><td>Contract Interaction</td><td>Intermediate</td><td>+25</td><td>possible_mixer</td><td>Mixer deposit/withdraw cycles</td></tr>
+  <tr><td>3</td><td>Token Flow</td><td>Intermediate</td><td>+15</td><td>token_flow_cluster</td><td>Repeated ERC-20 flows</td></tr>
+  <tr><td>4</td><td>Temporal Coordination</td><td>Intermediate</td><td>+20</td><td>coordinated_activity</td><td>Synchronized transactions</td></tr>
+  <tr><td>5</td><td>Fan-In / Fan-Out</td><td>Intermediate</td><td>+20</td><td>exchange_like_behavior</td><td>Distribution/consolidation</td></tr>
+  <tr><td>6</td><td>Loop Detection</td><td>Intermediate</td><td>+35</td><td>possible_layering</td><td>Circular fund flows</td></tr>
+  <tr><td>7</td><td>Peel Chain</td><td><strong>Advanced</strong></td><td>+40</td><td>peel_chain_layering</td><td>Value-forwarding hop chains</td></tr>
+  <tr><td>8</td><td>Layering / Structuring</td><td><strong>Advanced</strong></td><td>+38</td><td>rapid_layering</td><td>Rapid hops + smurfing</td></tr>
+  <tr><td>9</td><td>Community Detection</td><td><strong>Advanced</strong></td><td>+30</td><td>dense_transaction_community</td><td>Dense transaction clusters</td></tr>
+  <tr><td>10</td><td>Address Poisoning</td><td><strong>Advanced</strong></td><td>+28</td><td>address_poisoning_attack</td><td>Visual address spoofing</td></tr>
+  <tr><td>11</td><td>Dusting Attack</td><td><strong>Advanced</strong></td><td>+25</td><td>dusting_surveillance</td><td>Surveillance dust campaigns</td></tr>
+</table>
+</div>
+
+</body>
+</html>
