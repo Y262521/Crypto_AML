@@ -1,17 +1,23 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
+import GraphExplorer from './pages/GraphExplorer'
 import Alerts from './pages/Alerts'
 import Analytics from './pages/Analytics'
-import { getLatestTransactions, refreshTransactions } from './services/transactionService'
+import Clusters from './pages/Clusters'
+import { getLatestTransactions } from './services/transactionService'
+
+const POLL_INTERVAL_MS = 30 * 60 * 1000  // 30 minutes
 
 function App() {
-  const [activePage, setActivePage] = useState('feed')
-  const [transactions, setTransactions] = useState([])
-  const [txLoading, setTxLoading] = useState(true)
-  const [txError, setTxError] = useState(null)
-  const [graphVersion, setGraphVersion] = useState(0)
-  const [searchAddress, setSearchAddress] = useState('')
+  const [activePage, setActivePage]         = useState('feed')
+  const [transactions, setTransactions]     = useState([])
+  const [txLoading, setTxLoading]           = useState(true)
+  const [txError, setTxError]               = useState(null)
+  const [graphVersion, setGraphVersion]     = useState(0)
+  const [investigateAddress, setInvestigate] = useState('')  // address to pre-load in graph
+  const [lastUpdated, setLastUpdated]       = useState(null)
+  const intervalRef = useRef(null)
 
   const fetchTransactions = useCallback(async () => {
     setTxLoading(true)
@@ -20,6 +26,7 @@ function App() {
       const data = await getLatestTransactions()
       setTransactions(data)
       setGraphVersion(v => v + 1)
+      setLastUpdated(new Date())
     } catch (err) {
       setTxError(err.message)
     } finally {
@@ -27,24 +34,22 @@ function App() {
     }
   }, [])
 
-  const handleRefresh = useCallback(async () => {
-    setTxLoading(true)
-    setTxError(null)
-    try {
-      const data = await refreshTransactions()
-      setTransactions(data)
-      setGraphVersion(v => v + 1)
-    } catch (err) {
-      setTxError(err.message)
-    } finally {
-      setTxLoading(false)
-    }
-  }, [])
+  // Initial fetch + 30-minute auto-poll
+  useEffect(() => {
+    fetchTransactions()
+    intervalRef.current = setInterval(fetchTransactions, POLL_INTERVAL_MS)
+    return () => clearInterval(intervalRef.current)
+  }, [fetchTransactions])
 
-  useEffect(() => { fetchTransactions() }, [fetchTransactions])
+  // Called when user clicks "Investigate" on a transaction row
+  const handleInvestigate = (address) => {
+    setInvestigate(address)
+    setActivePage('graph')
+  }
 
+  // Called when user clicks an address in Alerts/Clusters
   const handleAddressClick = (address) => {
-    setSearchAddress(address)
+    setInvestigate(address)
     setActivePage('graph')
   }
 
@@ -60,25 +65,35 @@ function App() {
       <main style={{
         flex: 1,
         padding: '24px',
-        overflowY: 'auto',
+        overflowY: activePage === 'graph' ? 'hidden' : 'auto',
         overflowX: 'hidden',
         minWidth: 0,
+        height: '100vh',
+        boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
       }}>
-        {activePage === 'alerts'
-          ? <Alerts onAddressClick={handleAddressClick} />
-          : activePage === 'analytics'
-            ? <Analytics />
-            : <Dashboard
-              activePage={activePage}
+        {activePage === 'feed'
+          ? <Dashboard
               transactions={transactions}
               loading={txLoading}
               error={txError}
-              onRefresh={handleRefresh}
-              graphVersion={graphVersion}
-              onAddressClick={handleAddressClick}
-              searchAddress={searchAddress}
-              onSearchChange={setSearchAddress}
+              onInvestigate={handleInvestigate}
+              lastUpdated={lastUpdated}
             />
+          : activePage === 'graph'
+            ? <GraphExplorer
+                initialAddress={investigateAddress}
+                graphVersion={graphVersion}
+                lastUpdated={lastUpdated}
+              />
+            : activePage === 'alerts'
+              ? <Alerts onAddressClick={handleAddressClick} />
+              : activePage === 'analytics'
+                ? <Analytics />
+                : activePage === 'clusters'
+                  ? <Clusters onAddressClick={handleAddressClick} />
+                  : null
         }
       </main>
     </div>

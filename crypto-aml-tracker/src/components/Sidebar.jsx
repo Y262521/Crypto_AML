@@ -2,8 +2,9 @@ import React from 'react';
 
 const navItems = [
     { id: 'feed', label: 'Transaction Table', icon: '▦' },
-   // { id: 'alerts', label: 'AML Alerts', icon: '⚠' },
-   // { id: 'analytics', label: 'Analytics', icon: '◉' },
+    { id: 'alerts', label: 'AML Alerts', icon: '⚠' },
+    { id: 'analytics', label: 'Analytics', icon: '◉' },
+    { id: 'clusters', label: 'Address Clusters', icon: '⬡' },
     { id: 'graph', label: 'Transaction Network', icon: '❋' },
 ];
 

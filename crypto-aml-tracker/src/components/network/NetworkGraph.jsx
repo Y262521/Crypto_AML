@@ -110,14 +110,12 @@ const buildGraph = (edgesData) => {
   return { nodes: Array.from(nodesMap.values()), edges: edgesArray };
 };
 
-const NetworkGraphInner = ({ graphVersion, onRefresh, searchAddress: initialSearch, onSearchChange }) => {
+const NetworkGraphInner = ({ graphVersion, searchAddress: initialSearch, onSearchChange, lastUpdated, embedded }) => {
   const [edgesData, setEdgesData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [selectedWallet, setSelectedWallet] = useState(null);
   const [walletStats, setWalletStats] = useState(null);
 
-  // search is fully controlled by parent via searchAddress prop
   const search = initialSearch || '';
 
   const handleSearchChange = (val) => {
@@ -142,32 +140,22 @@ const NetworkGraphInner = ({ graphVersion, onRefresh, searchAddress: initialSear
       console.error(err);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, [setNodes, setEdges]);
 
-  // Reload graph whenever graphVersion changes (driven by parent fetch)
+  // Reload when graphVersion changes (driven by App's 30-min poll)
   useEffect(() => {
     setLoading(true);
     loadGraph('');
   }, [graphVersion, loadGraph]);
 
-  // When search changes, fetch graph data filtered by that address
+  // When search changes, fetch filtered graph
   useEffect(() => {
     if (search) {
       setLoading(true);
       loadGraph(search);
     }
   }, [search, loadGraph]);
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    if (onRefresh) {
-      await onRefresh();
-    } else {
-      await loadGraph('');
-    }
-  };
 
   const statsMap = useMemo(() => {
     const map = {};
@@ -208,27 +196,38 @@ const NetworkGraphInner = ({ graphVersion, onRefresh, searchAddress: initialSear
 
   if (loading) return <div style={{ padding: '2rem' }}>Loading graph from Neo4j...</div>;
 
+  // In embedded mode (inside Dashboard split-view), hide the search bar
+  // since the table controls the search. Also use full height.
+  const graphHeight = embedded ? '100%' : '600px';
+
   return (
-    <div style={{ position: 'relative' }}>
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center' }}>
-        <input type="text" placeholder="Search wallet address..." value={search}
-          onChange={e => handleSearchChange(e.target.value)}
-          style={{ flex: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '13px' }} />
-        <button onClick={handleRefresh} disabled={refreshing}
-          style={{ padding: '8px 16px', background: '#0e032bff', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
-          {refreshing ? 'Fetching...' : ' Refresh'}
-        </button>
-      </div>
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '8px', fontSize: '12px', flexWrap: 'wrap' }}>
-        <span><span style={{ color: NODE_COLOR }}>●</span> Wallet (drag to move)</span>
-        <span><span style={{ color: SUSPICIOUS_COLOR }}>●</span> ⚠️ Suspicious</span>
-        <span><span style={{ color: SEND_EDGE }}>→</span> Blue = transaction direction</span>
-        <span style={{ color: '#6b7280' }}>Click node for details</span>
-      </div>
+    <div style={{ position: 'relative', height: embedded ? '100%' : 'auto' }}>
+      {!embedded && (
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center' }}>
+          <input type="text" placeholder="Search wallet address..." value={search}
+            onChange={e => handleSearchChange(e.target.value)}
+            style={{ flex: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '13px' }} />
+          {lastUpdated && (
+            <span style={{ fontSize: '12px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+              Updated: {lastUpdated.toLocaleTimeString()}
+            </span>
+          )}
+        </div>
+      )}
+      {!embedded && (
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '8px', fontSize: '12px', flexWrap: 'wrap' }}>
+          <span><span style={{ color: NODE_COLOR }}>●</span> Wallet (drag to move)</span>
+          <span><span style={{ color: SUSPICIOUS_COLOR }}>●</span> ⚠️ Suspicious</span>
+          <span><span style={{ color: SEND_EDGE }}>→</span> Blue = transaction direction</span>
+          <span style={{ color: '#6b7280' }}>Click node for details</span>
+        </div>
+      )}
       {filteredNodes.length === 0
-        ? <div style={{ padding: '2rem', color: '#666' }}>No results{search ? ` for "${search}"` : ''}.</div>
+        ? <div style={{ padding: '2rem', color: '#666' }}>
+            {search ? `No graph results for "${search}". Click an address in the table.` : 'Click any address in the table to explore its graph.'}
+          </div>
         : (
-          <div style={{ width: '100%', height: '600px', border: '1px solid #ddd', borderRadius: '8px', background: '#f9fafb' }}>
+          <div style={{ width: '100%', height: graphHeight, minHeight: embedded ? '480px' : '600px', border: embedded ? 'none' : '1px solid #ddd', borderRadius: embedded ? '0' : '8px', background: '#f9fafb' }}>
             <ReactFlow
               nodes={filteredNodes}
               edges={filteredEdges}
@@ -249,9 +248,9 @@ const NetworkGraphInner = ({ graphVersion, onRefresh, searchAddress: initialSear
   );
 };
 
-const NetworkGraph = ({ graphVersion, onRefresh, searchAddress, onSearchChange }) => (
+const NetworkGraph = ({ graphVersion, searchAddress, onSearchChange, lastUpdated, embedded }) => (
   <ReactFlowProvider>
-    <NetworkGraphInner graphVersion={graphVersion} onRefresh={onRefresh} searchAddress={searchAddress} onSearchChange={onSearchChange} />
+    <NetworkGraphInner graphVersion={graphVersion} searchAddress={searchAddress} onSearchChange={onSearchChange} lastUpdated={lastUpdated} embedded={embedded} />
   </ReactFlowProvider>
 );
 
