@@ -6,7 +6,7 @@ Edges  = individual transactions (directed: from → to)
 
 Each edge carries:
   tx_hash, block_number, timestamp, value_eth,
-  is_contract_call, input_method_id, gas_used
+  is_contract_call, gas_used, status
 """
 
 from __future__ import annotations
@@ -51,8 +51,8 @@ def build_graph(transactions: Iterable[TxRecord]) -> nx.DiGraph:
             timestamp=tx.timestamp,
             value_eth=tx.value_eth,
             is_contract_call=tx.is_contract_call,
-            input_method_id=tx.input_method_id,
             gas_used=tx.gas_used,
+            status=tx.status,
         )
         count += 1
 

@@ -1,54 +1,200 @@
 import { useEffect, useState } from 'react';
-import { getClusters, getClustersSummary } from '../services/transactionService';
+import { ReactFlow, ReactFlowProvider, Background, Controls } from '@xyflow/react';
+import { getClusters, getClustersSummary, getGraphData, runClustering } from '../services/transactionService';
+import { filterEdgesData, applyRadialLayout } from '../utils/graphUtils';
 import Loader from '../components/common/Loader';
 
-const LABEL_COLORS = {
-    possible_layering:           { bg: '#fef2f2', border: '#fca5a5', text: '#991b1b' },
-    possible_mixer:              { bg: '#fdf4ff', border: '#d8b4fe', text: '#6b21a8' },
-    exchange_like_behavior:      { bg: '#eff6ff', border: '#93c5fd', text: '#1e40af' },
-    coordinated_activity:        { bg: '#fff7ed', border: '#fdba74', text: '#9a3412' },
-    token_flow_cluster:          { bg: '#f0fdf4', border: '#86efac', text: '#166534' },
-    shared_counterparties:       { bg: '#fefce8', border: '#fde047', text: '#854d0e' },
-    // Advanced
-    peel_chain_layering:         { bg: '#fef2f2', border: '#f87171', text: '#7f1d1d' },
-    rapid_layering:              { bg: '#fff1f2', border: '#fda4af', text: '#881337' },
-    dense_transaction_community: { bg: '#f0f9ff', border: '#7dd3fc', text: '#0c4a6e' },
-    address_poisoning_attack:    { bg: '#fdf4ff', border: '#c084fc', text: '#581c87' },
-    dusting_surveillance:        { bg: '#fffbeb', border: '#fcd34d', text: '#78350f' },
-    normal:                      { bg: '#f8fafc', border: '#e2e8f0', text: '#475569' },
-};
-
-const riskColor = (score) => {
-    if (score >= 70) return { color: '#dc2626', background: '#fee2e2' };
-    if (score >= 40) return { color: '#d97706', background: '#fef3c7' };
-    return { color: '#16a34a', background: '#dcfce7' };
-};
-
-const riskLabel = (score) => score >= 70 ? 'High' : score >= 40 ? 'Medium' : 'Low';
-
-const StatCard = ({ label, value, color }) => (
+const StatCard = ({ label, value, sub, color }) => (
     <div style={{
         background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0',
-        padding: '18px 22px', flex: 1, minWidth: '140px',
+        padding: '18px 22px', flex: 1, minWidth: '160px',
     }}>
-        <div style={{ fontSize: '26px', fontWeight: '700', color: color || '#0f172a' }}>{value}</div>
+        <div style={{ fontSize: '24px', fontWeight: '700', color: color || '#0f172a' }}>{value}</div>
         <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>{label}</div>
+        {sub && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>{sub}</div>}
     </div>
 );
+
+const formatEth = (value) => {
+    const num = Number(value || 0);
+    if (!Number.isFinite(num)) return '0';
+    return num.toLocaleString(undefined, { maximumFractionDigits: 6 });
+};
+
+const formatOwner = (owner) => {
+    if (!owner) return '—';
+    return owner.full_name || '—';
+};
+
+const formatLocation = (owner) => {
+    if (!owner) return '—';
+    const parts = [
+        owner.specifics,
+        owner.street_address,
+        owner.locality,
+        owner.city,
+        owner.administrative_area,
+        owner.postal_code,
+        owner.country
+    ].filter(Boolean);
+    return parts.length ? parts.join(', ') : '—';
+};
+
+const truncate = (value, maxLength = 24) => {
+    if (!value || value.length <= maxLength) return value || '—';
+    return `${value.slice(0, maxLength - 3)}...`;
+};
+
+const buildPreviewGraph = (edgesData, centerId) => {
+    const filtered = filterEdgesData(edgesData, { minValue: 0, maxEdges: 80 });
+    const nodesMap = new Map();
+    const edges = [];
+
+    filtered.forEach((tx, index) => {
+        const sender = tx.sender;
+        const receiver = tx.receiver;
+        if (!sender || !receiver) return;
+
+        const labelFor = (address) => `${address.slice(0, 6)}...${address.slice(-4)}`;
+
+        if (!nodesMap.has(sender)) {
+            nodesMap.set(sender, {
+                id: sender,
+                data: { label: labelFor(sender) },
+                position: { x: 0, y: 0 },
+                style: {
+                    background: '#22c55e', color: '#fff', borderRadius: '50%',
+                    padding: '12px 18px', fontSize: '11px', fontWeight: '700',
+                    border: sender === centerId ? '3px solid #1d4ed8' : '2px solid #15803d',
+                },
+            });
+        }
+        if (!nodesMap.has(receiver)) {
+            nodesMap.set(receiver, {
+                id: receiver,
+                data: { label: labelFor(receiver) },
+                position: { x: 0, y: 0 },
+                style: {
+                    background: '#0ea5e9', color: '#fff', borderRadius: '50%',
+                    padding: '12px 18px', fontSize: '11px', fontWeight: '700',
+                    border: '2px solid #0284c7',
+                },
+            });
+        }
+
+        edges.push({
+            id: `e-${index}`,
+            source: sender,
+            target: receiver,
+            type: 'default',
+            animated: false,
+            label: `${Number(tx.amount || 0).toFixed(4)} ETH`,
+            style: { stroke: '#2563eb', strokeWidth: 1.8 },
+            markerEnd: { type: 'arrowclosed', color: '#2563eb', width: 16, height: 16 },
+            labelStyle: { fontSize: '9px', fill: '#1e3a5f', fontWeight: '600' },
+            labelBgStyle: { fill: '#eff6ff', fillOpacity: 0.9 },
+        });
+    });
+
+    const nodes = Array.from(nodesMap.values());
+    const positioned = nodes.length ? applyRadialLayout(nodes, edges, centerId, { ringSpacing: 180, minRadius: 80 }) : nodes;
+    return { nodes: positioned, edges };
+};
+
+const getActivityHighlights = (activity, riskLevel) => {
+    const highlights = [];
+    const totalFlow = (activity.total_in || 0) + (activity.total_out || 0);
+    if ((activity.total_tx_count || 0) > 80) {
+        highlights.push('High transaction density between members');
+    } else if ((activity.total_tx_count || 0) > 20) {
+        highlights.push('Moderate internal transaction activity');
+    } else {
+        highlights.push('Low internal transaction activity');
+    }
+
+    if (totalFlow > 50) {
+        highlights.push('Large internal ETH movement');
+    } else if (totalFlow > 5) {
+        highlights.push('Moderate ETH activity inside the cluster');
+    }
+
+    if (riskLevel && riskLevel !== 'normal') {
+        highlights.push(`Risk level flagged: ${riskLevel}`);
+    }
+
+    return highlights;
+};
 
 export default function Clusters({ onAddressClick }) {
     const [clusters, setClusters] = useState([]);
     const [summary, setSummary] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [expanded, setExpanded] = useState(null);
-    const [filter, setFilter] = useState('All');
+    const [selectedCluster, setSelectedCluster] = useState(null);
+    const [running, setRunning] = useState(false);
+    const [showAllAddresses, setShowAllAddresses] = useState(false);
+    const [preview, setPreview] = useState({ nodes: [], edges: [] });
+    const [previewLoading, setPreviewLoading] = useState(false);
+    const [previewError, setPreviewError] = useState(null);
 
-    useEffect(() => {
+    const loadData = () => {
+        setLoading(true);
+        setError(null);
         Promise.all([getClusters(), getClustersSummary()])
             .then(([c, s]) => { setClusters(c); setSummary(s); setLoading(false); })
             .catch(err => { setError(err.message); setLoading(false); });
+    };
+
+    useEffect(() => {
+        loadData();
     }, []);
+
+    useEffect(() => {
+        if (!selectedCluster) {
+            setShowAllAddresses(false);
+            setPreview({ nodes: [], edges: [] });
+            setPreviewError(null);
+            return;
+        }
+
+        const centerAddress = selectedCluster.addresses?.[0]?.address || selectedCluster.addresses?.[0];
+        if (!centerAddress) {
+            setPreview({ nodes: [], edges: [] });
+            return;
+        }
+
+        setPreviewLoading(true);
+        setPreviewError(null);
+        getGraphData({ center: centerAddress, maxEdges: 80, minValue: 0 })
+            .then((data) => {
+                setPreview(buildPreviewGraph(data, centerAddress));
+            })
+            .catch((err) => {
+                setPreviewError(err.message || 'Unable to load cluster preview.');
+                setPreview({ nodes: [], edges: [] });
+            })
+            .finally(() => setPreviewLoading(false));
+    }, [selectedCluster]);
+
+    const handleRunClustering = async () => {
+        setRunning(true);
+        setError(null);
+        try {
+            await runClustering();
+            loadData();
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setRunning(false);
+        }
+    };
+
+    const closeDrawer = () => setSelectedCluster(null);
+    const openClusterDrawer = (cluster) => setSelectedCluster(cluster);
+
+    const evidenceHeaderText = selectedCluster
+        ? `Behavior observed from ${selectedCluster.addresses?.length ?? 0} cluster addresses.`
+        : '';
 
     if (loading) return <Loader />;
     if (error) return (
@@ -56,21 +202,9 @@ export default function Clusters({ onAddressClick }) {
             <div style={{ fontSize: '16px', marginBottom: '8px', color: '#ef4444' }}>
                 Could not load clusters.
             </div>
-            <div style={{ fontSize: '13px' }}>
-                Run the clustering engine first:
-            </div>
-            <pre style={{ background: '#f1f5f9', padding: '12px', borderRadius: '8px', marginTop: '8px', fontSize: '12px' }}>
-                cd AML{'\n'}
-                source venv/bin/activate{'\n'}
-                python -m aml_pipeline.clustering.run_clustering --persist
-            </pre>
+            <div style={{ fontSize: '13px' }}>{error}</div>
         </div>
     );
-
-    const FILTERS = ['All', 'High', 'Medium', 'Low'];
-    const filtered = filter === 'All'
-        ? clusters
-        : clusters.filter(c => riskLabel(c.risk_score) === filter);
 
     const th = {
         textAlign: 'left', padding: '10px 14px',
@@ -81,142 +215,280 @@ export default function Clusters({ onAddressClick }) {
     const td = { padding: '10px 14px', borderBottom: '1px solid #f1f5f9', fontSize: '12px', color: '#334155' };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+
+            {/* Header + actions */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                <div>
+                    <div style={{ fontSize: '18px', fontWeight: '700', color: '#0f172a' }}>Wallet Clusters</div>
+                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                        {clusters.length} clusters · behavioral ownership grouping
+                    </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={loadData} style={{
+                        padding: '8px 14px', borderRadius: '8px', border: '1px solid #e2e8f0',
+                        background: '#fff', color: '#334155', fontSize: '12px', fontWeight: '600',
+                        cursor: 'pointer',
+                    }}>Refresh</button>
+                    <button onClick={handleRunClustering} disabled={running} style={{
+                        padding: '8px 16px', borderRadius: '8px', border: 'none',
+                        background: running ? '#94a3b8' : '#0d1b2e', color: '#fff',
+                        fontSize: '12px', fontWeight: '600', cursor: running ? 'not-allowed' : 'pointer',
+                    }}>{running ? 'Clustering…' : 'Run Clustering'}</button>
+                </div>
+            </div>
 
             {/* Summary cards */}
             {summary && (
                 <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
                     <StatCard label="Total Clusters" value={summary.total} />
-                    <StatCard label="High Risk" value={summary.high_risk} color="#dc2626" />
-                    <StatCard label="Medium Risk" value={summary.medium_risk} color="#d97706" />
-                    <StatCard label="Low Risk" value={summary.low_risk} color="#16a34a" />
+                    <StatCard label="Top Internal Flow" value={summary.top_by_balance?.[0]?.cluster_id || '—'}
+                        sub={summary.top_by_balance?.[0] ? `${formatEth(summary.top_by_balance[0].total_balance)} ETH` : ''} />
+                    <StatCard label="Top Size" value={summary.top_by_size?.[0]?.cluster_id || '—'}
+                        sub={summary.top_by_size?.[0] ? `${summary.top_by_size[0].cluster_size} addresses` : ''} />
                 </div>
             )}
 
-            {/* Filter tabs */}
-            <div style={{ display: 'flex', gap: '8px' }}>
-                {FILTERS.map(f => (
-                    <button key={f} onClick={() => setFilter(f)} style={{
-                        padding: '6px 16px', borderRadius: '999px', border: '1px solid #e2e8f0',
-                        background: filter === f ? '#0d1b2e' : '#fff',
-                        color: filter === f ? '#fff' : '#475569',
-                        cursor: 'pointer', fontSize: '12px', fontWeight: '500',
-                    }}>{f}</button>
-                ))}
-            </div>
-
             {/* Clusters table */}
             <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-                {filtered.length === 0
-                    ? <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
-                        No clusters found.
+                {clusters.length === 0 ? (
+                    <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+                        No clusters available yet. Run clustering to generate ownership groups.
                     </div>
-                    : <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+                ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                         <thead>
                             <tr style={{ background: '#e2e8f0' }}>
-                                <th style={{ ...th, width: '16%' }}>Cluster ID</th>
-                                <th style={{ ...th, width: '8%' }}>Size</th>
-                                <th style={{ ...th, width: '10%' }}>Risk</th>
-                                <th style={{ ...th, width: '28%' }}>Labels</th>
-                                <th style={{ ...th, width: '10%' }}>ETH Vol.</th>
-                                <th style={{ ...th, width: '28%' }}>Explanation</th>
+                                <th style={{ ...th, width: '20%' }}>Cluster ID</th>
+                                <th style={{ ...th, width: '18%' }}>Owner</th>
+                                <th style={{ ...th, width: '28%' }}>Location</th>
+                                <th style={{ ...th, width: '12%' }}>Members</th>
+                                <th style={{ ...th, width: '22%' }}>Total Balance</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map((c) => {
-                                const rc = riskColor(c.risk_score);
-                                const isOpen = expanded === c.cluster_id;
-                                return [
+                            {clusters.map((c) => {
+                                const memberCount = c.addresses?.length ?? c.cluster_size ?? 0;
+                                return (
                                     <tr key={c.cluster_id}
-                                        onClick={() => setExpanded(isOpen ? null : c.cluster_id)}
+                                        onClick={() => openClusterDrawer(c)}
                                         style={{ cursor: 'pointer' }}
-                                        onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                                        onMouseLeave={e => e.currentTarget.style.background = ''}>
-                                        <td style={{ ...td, fontFamily: 'monospace', fontSize: '11px' }}>
-                                            {isOpen ? '▼ ' : '▶ '}{c.cluster_id}
-                                        </td>
-                                        <td style={td}>{c.addresses?.length ?? 0}</td>
-                                        <td style={td}>
-                                            <span style={{ ...rc, padding: '2px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: '600', fontFamily: 'sans-serif' }}>
-                                                {c.risk_score} {riskLabel(c.risk_score)}
-                                            </span>
+                                        onMouseEnter={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+                                        onMouseLeave={(e) => { e.currentTarget.style.background = ''; }}>
+                                        <td style={{ ...td, fontFamily: 'monospace', fontSize: '11px' }} title={c.cluster_id}>
+                                            {`${c.cluster_id.slice(0, 10)}...${c.cluster_id.slice(-6)}`}
                                         </td>
                                         <td style={td}>
-                                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                                                {(c.labels || []).map(l => {
-                                                    const lc = LABEL_COLORS[l] || LABEL_COLORS.normal;
-                                                    return (
-                                                        <span key={l} style={{
-                                                            background: lc.bg, color: lc.text, border: `1px solid ${lc.border}`,
-                                                            padding: '1px 7px', borderRadius: '999px', fontSize: '10px', fontWeight: '600',
-                                                        }}>{l.replace(/_/g, ' ')}</span>
-                                                    );
-                                                })}
-                                            </div>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); openClusterDrawer(c); }}
+                                                style={{
+                                                    background: 'transparent', border: 'none', padding: 0, margin: 0,
+                                                    color: '#1d4ed8', fontWeight: '600', cursor: 'pointer',
+                                                    textAlign: 'left', fontSize: '12px'
+                                                }}
+                                                title={formatLocation(c.owner)}
+                                            >
+                                                {formatOwner(c.owner)}
+                                            </button>
                                         </td>
-                                        <td style={{ ...td, color: '#16a34a' }}>
-                                            {c.indicators?.total_eth_volume ?? '—'}
+                                        <td style={{ ...td, fontSize: '11px', color: '#64748b' }} title={formatLocation(c.owner)}>
+                                            {truncate(formatLocation(c.owner), 45)}
                                         </td>
-                                        <td style={{ ...td, fontSize: '11px', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            {c.explanation}
+                                        <td style={td}>{memberCount}</td>
+                                        <td style={{ ...td, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <span style={{ fontWeight: '700', color: '#0f172a' }}>{formatEth(c.total_balance)} ETH</span>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); openClusterDrawer(c); }}
+                                                style={{
+                                                    border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px 10px',
+                                                    background: '#fff', color: '#334155', fontSize: '11px', fontWeight: '600',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                View
+                                            </button>
                                         </td>
-                                    </tr>,
-                                    isOpen && (
-                                        <tr key={`${c.cluster_id}-detail`}>
-                                            <td colSpan={6} style={{ padding: '0 14px 14px 14px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', paddingTop: '12px' }}>
-                                                    {/* Addresses */}
-                                                    <div>
-                                                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#475569', marginBottom: '6px', textTransform: 'uppercase' }}>
-                                                            Member Addresses ({c.addresses?.length})
-                                                        </div>
-                                                        <div style={{ maxHeight: '160px', overflowY: 'auto' }}>
-                                                            {(c.addresses || []).map(addr => (
-                                                                <div key={addr} style={{ fontFamily: 'monospace', fontSize: '11px', padding: '3px 0', borderBottom: '1px solid #f1f5f9' }}>
-                                                                    <span
-                                                                        onClick={(e) => { e.stopPropagation(); onAddressClick && onAddressClick(addr); }}
-                                                                        style={{ cursor: 'pointer', color: '#3b82f6' }}
-                                                                        title="Click to view in graph"
-                                                                    >{addr}</span>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                    {/* Indicators */}
-                                                    <div>
-                                                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#475569', marginBottom: '6px', textTransform: 'uppercase' }}>
-                                                            Behavioural Indicators
-                                                        </div>
-                                                        {Object.entries(c.indicators || {}).map(([k, v]) => (
-                                                            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '3px 0', borderBottom: '1px solid #f1f5f9' }}>
-                                                                <span style={{ color: '#64748b' }}>{k.replace(/_/g, ' ')}</span>
-                                                                <span style={{ fontWeight: '600', color: '#0f172a' }}>{String(v)}</span>
-                                                            </div>
-                                                        ))}
-                                                        <div style={{ marginTop: '10px', fontSize: '11px', fontWeight: '600', color: '#475569', textTransform: 'uppercase' }}>
-                                                            Heuristics Fired
-                                                        </div>
-                                                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
-                                                            {(c.heuristics_fired || []).map(h => (
-                                                                <span key={h} style={{ background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '999px', fontSize: '10px', fontWeight: '600' }}>
-                                                                    {h.replace(/_/g, ' ')}
-                                                                </span>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div style={{ marginTop: '10px', fontSize: '12px', color: '#475569', fontStyle: 'italic' }}>
-                                                    {c.explanation}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    )
-                                ];
+                                    </tr>
+                                );
                             })}
                         </tbody>
                     </table>
-                }
+                )}
             </div>
+
+            {selectedCluster && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', justifyContent: 'flex-end', pointerEvents: 'auto' }}>
+                    <div
+                        onClick={closeDrawer}
+                        style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.26)' }}
+                    />
+                    <aside style={{ position: 'relative', width: 'min(560px,100%)', maxWidth: '560px', height: '100%', background: '#fff', boxShadow: '-24px 0 80px rgba(15, 23, 42, 0.18)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '16px' }}>
+                            <div>
+                                <div style={{ fontSize: '18px', fontWeight: '700', color: '#0f172a' }}>Cluster details</div>
+                                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>Cluster ID: {selectedCluster.cluster_id}</div>
+                            </div>
+                            <button onClick={closeDrawer} style={{ border: 'none', background: 'transparent', color: '#475569', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}>Close</button>
+                        </div>
+                        <div style={{ padding: '24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                            <section style={{ display: 'grid', gap: '14px' }}>
+                                <div style={{ fontSize: '12px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Owner Profile</div>
+                                <div>
+                                    <div style={{ fontSize: '18px', fontWeight: '700', color: '#0f172a' }}>{formatOwner(selectedCluster.owner)}</div>
+                                    <div style={{ marginTop: '8px', color: '#64748b', fontSize: '13px', lineHeight: '1.6' }}>
+                                        {formatLocation(selectedCluster.owner)}
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                    <div style={{ padding: '12px 14px', borderRadius: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', minWidth: '140px' }}>
+                                        <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '6px' }}>Members</div>
+                                        <div style={{ fontSize: '16px', fontWeight: '700', color: '#0f172a' }}>{selectedCluster.addresses?.length ?? selectedCluster.cluster_size}</div>
+                                    </div>
+                                    <div style={{ padding: '12px 14px', borderRadius: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', minWidth: '140px' }}>
+                                        <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '6px' }}>Total Balance</div>
+                                        <div style={{ fontSize: '16px', fontWeight: '700', color: '#0f172a' }}>{formatEth(selectedCluster.total_balance)} ETH</div>
+                                    </div>
+                                    <div style={{ padding: '12px 14px', borderRadius: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', minWidth: '140px' }}>
+                                        <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '6px' }}>Internal Flow</div>
+                                        <div style={{ fontSize: '16px', fontWeight: '700', color: '#0f172a' }}>{formatEth(selectedCluster.activity.total_in)} in / {formatEth(selectedCluster.activity.total_out)} out</div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section style={{ display: 'grid', gap: '12px' }}>
+                                <div style={{ fontSize: '12px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Activity / Behavior</div>
+                                <div style={{ display: 'grid', gap: '10px', padding: '16px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                                    {getActivityHighlights(selectedCluster.activity, selectedCluster.risk_level).map((line, idx) => (
+                                        <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                                            <div style={{ width: '6px', height: '6px', marginTop: '8px', borderRadius: '50%', background: '#0f172a' }} />
+                                            <div style={{ fontSize: '13px', color: '#334155', lineHeight: '1.5' }}>{line}</div>
+                                        </div>
+                                    ))}
+                                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>Total transactions: {selectedCluster.activity.total_tx_count}</div>
+                                </div>
+                            </section>
+
+                            <section style={{ display: 'grid', gap: '14px' }}>
+                                <div style={{ fontSize: '12px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Address List</div>
+                                {selectedCluster.addresses?.length ? (
+                                    <div style={{ display: 'grid', gap: '10px' }}>
+                                        {(showAllAddresses ? selectedCluster.addresses : selectedCluster.addresses.slice(0, 5)).map((item) => (
+                                            <div key={item.address} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#fff' }}>
+                                                <div>
+                                                    <div style={{ fontFamily: 'monospace', fontSize: '12px', color: '#0f172a' }} title={item.address}>{truncate(item.address, 28)}</div>
+                                                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                                                        {formatEth(item.total_in)} in · {formatEth(item.total_out)} out
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => onAddressClick && onAddressClick(item.address)}
+                                                    style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '8px 12px', background: '#f8fafc', color: '#0f172a', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+                                                >
+                                                    Graph
+                                                </button>
+                                            </div>
+                                        ))}
+                                        {selectedCluster.addresses.length > 5 && (
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                                                <div style={{ fontSize: '11px', color: '#64748b' }}>
+                                                    {showAllAddresses
+                                                        ? `Showing all ${selectedCluster.addresses.length} addresses`
+                                                        : `Showing 5 of ${selectedCluster.addresses.length} addresses`}
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.stopPropagation(); setShowAllAddresses((prev) => !prev); }}
+                                                    style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px 10px', background: '#fff', color: '#334155', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+                                                >
+                                                    {showAllAddresses ? 'Show less' : `Show all ${selectedCluster.addresses.length}`}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div style={{ padding: '16px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#64748b' }}>
+                                        No addresses are attached to this cluster yet.
+                                    </div>
+                                )}
+                            </section>
+
+                            <section style={{ display: 'grid', gap: '14px' }}>
+                                <div style={{ fontSize: '12px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Graph Preview</div>
+                                <div style={{ padding: '18px', borderRadius: '18px', border: '1px solid #e2e8f0', background: '#f8fafc', minHeight: '260px', position: 'relative' }}>
+                                    {previewLoading ? (
+                                        <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: '#64748b', fontSize: '13px' }}>
+                                            Loading cluster preview…
+                                        </div>
+                                    ) : previewError ? (
+                                        <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: '#ef4444', fontSize: '13px', padding: '12px', textAlign: 'center' }}>
+                                            {previewError}
+                                        </div>
+                                    ) : preview.nodes.length ? (
+                                        <ReactFlowProvider>
+                                            <div style={{ width: '100%', height: '260px', borderRadius: '18px', overflow: 'hidden' }}>
+                                                <ReactFlow
+                                                    nodes={preview.nodes}
+                                                    edges={preview.edges}
+                                                    nodesDraggable={false}
+                                                    nodesConnectable={false}
+                                                    elementsSelectable={false}
+                                                    zoomOnScroll={false}
+                                                    panOnScroll={false}
+                                                    fitView
+                                                    fitViewOptions={{ padding: 0.12 }}
+                                                    style={{ width: '100%', height: '100%', background: '#ffffff' }}
+                                                >
+                                                    <Background gap={20} color="#e2e8f0" />
+                                                    <Controls showInteractive={false} />
+                                                </ReactFlow>
+                                            </div>
+                                        </ReactFlowProvider>
+                                    ) : (
+                                        <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: '#64748b', fontSize: '13px' }}>
+                                            No preview available for this cluster yet.
+                                        </div>
+                                    )}
+                                </div>
+                                {selectedCluster.addresses?.[0] && (
+                                    <button
+                                        type="button"
+                                        onClick={() => onAddressClick && onAddressClick(selectedCluster.addresses[0].address)}
+                                        style={{ marginTop: '8px', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 14px', background: '#fff', color: '#0f172a', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                                    >
+                                        Open full graph around {truncate(selectedCluster.addresses[0].address, 20)}
+                                    </button>
+                                )}
+                            </section>
+
+                            <section style={{ display: 'grid', gap: '14px' }}>
+                                <div style={{ fontSize: '12px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Evidence</div>
+                                <div style={{ fontSize: '11px', color: '#64748b' }}>{evidenceHeaderText}</div>
+                                {selectedCluster.evidence?.length ? (
+                                    <div style={{ display: 'grid', gap: '12px' }}>
+                                        {selectedCluster.evidence.map((item, idx) => (
+                                            <div key={`${item.heuristic_name}-${idx}`} style={{ padding: '16px', borderRadius: '16px', background: '#fff', border: '1px solid #e2e8f0' }}>
+                                                <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>{item.heuristic_name.replace(/_/g, ' ')}</div>
+                                                <div style={{ fontSize: '12px', color: '#475569', marginTop: '6px' }}>{item.evidence_text}</div>
+                                                {item.observed_address_sample?.length ? (
+                                                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '8px' }}>
+                                                        {`Sample addresses: ${item.observed_address_sample.map((a) => `${a.slice(0, 8)}...${a.slice(-6)}`).join(', ')}`}
+                                                    </div>
+                                                ) : null}
+                                                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '8px' }}>Confidence: {item.confidence.toFixed(2)}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div style={{ padding: '16px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#64748b' }}>
+                                        No behavioral evidence detected for this cluster.
+                                    </div>
+                                )}
+                            </section>
+                        </div>
+                    </aside>
+                </div>
+            )}
         </div>
     );
 }

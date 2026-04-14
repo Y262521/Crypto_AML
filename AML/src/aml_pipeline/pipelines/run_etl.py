@@ -6,13 +6,13 @@ from .daily_pipeline import run_daily_pipeline
 
 def main():
     """CLI entrypoint for the ETL pipeline."""
-    parser = argparse.ArgumentParser(description="Run the AML ETL pipeline")
+    parser = argparse.ArgumentParser(description="Run the ETL pipeline")
     parser.add_argument("--start-block", type=int, help="Ethereum block number to start extraction from")
     parser.add_argument("--batch", type=int, help="Number of blocks to extract in this run")
     parser.add_argument(
         "--skip-mongo-backup",
         action="store_true",
-        help="Skip backing up processed transactions into MongoDB",
+        help="Deprecated: processed transactions are no longer stored in MongoDB",
     )
     parser.add_argument("--skip-neo4j", action="store_true", help="Skip loading to Neo4j")
     parser.add_argument(

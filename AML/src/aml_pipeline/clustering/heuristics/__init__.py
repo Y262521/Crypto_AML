@@ -1,31 +1,23 @@
-"""Pluggable clustering heuristics — basic through advanced."""
+"""Pluggable behavioral clustering heuristics."""
 
 from .behavioral import BehavioralSimilarityHeuristic
+from .cashout import CoordinatedCashoutHeuristic
+from .common_funder import CommonFunderHeuristic
 from .contract import ContractInteractionHeuristic
+from .deposit_reuse import DepositAddressReuseHeuristic
 from .fan import FanPatternHeuristic
 from .loop import LoopDetectionHeuristic
 from .temporal import TemporalHeuristic
 from .token_flow import TokenFlowHeuristic
 
-# Advanced heuristics
-from .peel_chain import PeelChainHeuristic
-from .dusting import DustingAttackHeuristic
-from .address_poisoning import AddressPoisoningHeuristic
-from .layering import LayeringHeuristic
-from .community import CommunityDetectionHeuristic
-
 __all__ = [
-    # Intermediate
     "BehavioralSimilarityHeuristic",
+    "CoordinatedCashoutHeuristic",
+    "CommonFunderHeuristic",
     "ContractInteractionHeuristic",
+    "DepositAddressReuseHeuristic",
     "FanPatternHeuristic",
     "LoopDetectionHeuristic",
     "TemporalHeuristic",
     "TokenFlowHeuristic",
-    # Advanced
-    "PeelChainHeuristic",
-    "DustingAttackHeuristic",
-    "AddressPoisoningHeuristic",
-    "LayeringHeuristic",
-    "CommunityDetectionHeuristic",
 ]

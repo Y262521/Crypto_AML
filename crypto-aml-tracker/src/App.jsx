@@ -2,35 +2,71 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
 import GraphExplorer from './pages/GraphExplorer'
-import Alerts from './pages/Alerts'
 import Analytics from './pages/Analytics'
 import Clusters from './pages/Clusters'
 import { getLatestTransactions } from './services/transactionService'
+import {
+  DEFAULT_PAGE,
+  buildPathForPage,
+  getGraphAddressFromSearch,
+  getPageFromPathname,
+} from './utils/navigation'
 
 const POLL_INTERVAL_MS = 30 * 60 * 1000  // 30 minutes
+const TX_BATCH_SIZE = 200
+
+const getInitialPage = () => (
+  typeof window === 'undefined'
+    ? DEFAULT_PAGE
+    : getPageFromPathname(window.location.pathname)
+)
+
+const getInitialInvestigateAddress = () => (
+  typeof window === 'undefined'
+    ? ''
+    : getGraphAddressFromSearch(window.location.search)
+)
 
 function App() {
-  const [activePage, setActivePage]         = useState('feed')
+  const [activePage, setActivePage]         = useState(getInitialPage)
   const [transactions, setTransactions]     = useState([])
   const [txLoading, setTxLoading]           = useState(true)
+  const [txLoadingMore, setTxLoadingMore]   = useState(false)
   const [txError, setTxError]               = useState(null)
+  const [txTotal, setTxTotal]               = useState(0)
   const [graphVersion, setGraphVersion]     = useState(0)
-  const [investigateAddress, setInvestigate] = useState('')  // address to pre-load in graph
+  const [investigateAddress, setInvestigate] = useState(getInitialInvestigateAddress)
   const [lastUpdated, setLastUpdated]       = useState(null)
   const intervalRef = useRef(null)
 
-  const fetchTransactions = useCallback(async () => {
-    setTxLoading(true)
-    setTxError(null)
+  const fetchTransactions = useCallback(async ({ append = false, offset = 0 } = {}) => {
+    if (append) {
+      setTxLoadingMore(true)
+    } else {
+      setTxLoading(true)
+      setTxError(null)
+    }
     try {
-      const data = await getLatestTransactions()
-      setTransactions(data)
-      setGraphVersion(v => v + 1)
+      const data = await getLatestTransactions({
+        limit: TX_BATCH_SIZE,
+        offset,
+        sortBy: 'amount_desc',
+      })
+      const nextItems = data.items || []
+      setTransactions(prev => append ? [...prev, ...nextItems] : nextItems)
+      setTxTotal(data.total || nextItems.length)
+      if (!append) {
+        setGraphVersion(v => v + 1)
+      }
       setLastUpdated(new Date())
     } catch (err) {
       setTxError(err.message)
     } finally {
-      setTxLoading(false)
+      if (append) {
+        setTxLoadingMore(false)
+      } else {
+        setTxLoading(false)
+      }
     }
   }, [])
 
@@ -41,16 +77,42 @@ function App() {
     return () => clearInterval(intervalRef.current)
   }, [fetchTransactions])
 
+  useEffect(() => {
+    const syncFromLocation = () => {
+      setActivePage(getPageFromPathname(window.location.pathname))
+      setInvestigate(getGraphAddressFromSearch(window.location.search))
+    }
+
+    window.addEventListener('popstate', syncFromLocation)
+    return () => window.removeEventListener('popstate', syncFromLocation)
+  }, [])
+
+  const navigate = useCallback((page, { address = '' } = {}) => {
+    const nextAddress = page === 'graph' ? address : ''
+    const nextUrl = buildPathForPage(page, nextAddress)
+    const currentUrl = `${window.location.pathname}${window.location.search}`
+
+    if (currentUrl !== nextUrl) {
+      window.history.pushState({}, '', nextUrl)
+    }
+
+    setActivePage(getPageFromPathname(window.location.pathname))
+    setInvestigate(nextAddress)
+  }, [])
+
+  const handleLoadMoreTransactions = useCallback(() => {
+    if (txLoadingMore || transactions.length >= txTotal) return
+    fetchTransactions({ append: true, offset: transactions.length })
+  }, [fetchTransactions, transactions.length, txLoadingMore, txTotal])
+
   // Called when user clicks "Investigate" on a transaction row
   const handleInvestigate = (address) => {
-    setInvestigate(address)
-    setActivePage('graph')
+    navigate('graph', { address })
   }
 
-  // Called when user clicks an address in Alerts/Clusters
+  // Called when user clicks an address in Clusters
   const handleAddressClick = (address) => {
-    setInvestigate(address)
-    setActivePage('graph')
+    navigate('graph', { address })
   }
 
   return (
@@ -61,7 +123,10 @@ function App() {
       overflow: 'hidden',
       background: '#f8fafc',
     }}>
-      <Sidebar activePage={activePage} onNavigate={setActivePage} />
+      <Sidebar
+        activePage={activePage}
+        onNavigate={(page) => navigate(page, { address: page === 'graph' ? investigateAddress : '' })}
+      />
       <main style={{
         flex: 1,
         padding: '24px',
@@ -77,9 +142,12 @@ function App() {
           ? <Dashboard
               transactions={transactions}
               loading={txLoading}
+              loadingMore={txLoadingMore}
               error={txError}
               onInvestigate={handleInvestigate}
+              onLoadMore={handleLoadMoreTransactions}
               lastUpdated={lastUpdated}
+              totalTransactions={txTotal}
             />
           : activePage === 'graph'
             ? <GraphExplorer
@@ -87,9 +155,7 @@ function App() {
                 graphVersion={graphVersion}
                 lastUpdated={lastUpdated}
               />
-            : activePage === 'alerts'
-              ? <Alerts onAddressClick={handleAddressClick} />
-              : activePage === 'analytics'
+            : activePage === 'analytics'
                 ? <Analytics />
                 : activePage === 'clusters'
                   ? <Clusters onAddressClick={handleAddressClick} />

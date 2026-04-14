@@ -31,7 +31,6 @@ def _verify(cfg):
     with engine.connect() as conn:
         mysql_tx   = conn.execute(text("SELECT COUNT(*) FROM transactions")).scalar()
         mysql_addr = conn.execute(text("SELECT COUNT(*) FROM addresses")).scalar()
-        mysql_edge = conn.execute(text("SELECT COUNT(*) FROM graph_edges")).scalar()
     engine.dispose()
 
     driver = get_neo4j_driver(cfg)
@@ -46,7 +45,6 @@ def _verify(cfg):
     print(f"  Neo4j  TRANSFER rels: {neo4j_tx:>8}  {'✅ in sync' if mysql_tx == neo4j_tx else '⚠️  out of sync'}")
     print(f"  MySQL  addresses    : {mysql_addr:>8}")
     print(f"  Neo4j  Address nodes: {neo4j_addr:>8}  {'✅ in sync' if mysql_addr == neo4j_addr else '⚠️  out of sync'}")
-    print(f"  MySQL  graph_edges  : {mysql_edge:>8}")
     print("────────────────────────────────────────────────────────\n")
 
 

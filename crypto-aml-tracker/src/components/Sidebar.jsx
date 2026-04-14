@@ -2,9 +2,8 @@ import React from 'react';
 
 const navItems = [
     { id: 'feed', label: 'Transaction Table', icon: '▦' },
-    { id: 'alerts', label: 'AML Alerts', icon: '⚠' },
     { id: 'analytics', label: 'Analytics', icon: '◉' },
-    { id: 'clusters', label: 'Address Clusters', icon: '⬡' },
+    { id: 'clusters', label: 'Wallet Clusters', icon: '⬡' },
     { id: 'graph', label: 'Transaction Network', icon: '❋' },
 ];
 
@@ -36,7 +35,7 @@ const Sidebar = ({ activePage, onNavigate }) => {
                     onError={e => { e.target.style.display = 'none'; }}
                 />
                 <div style={{ color: '#f7fff5ff', fontSize: '20px', textAlign: 'center', lineHeight: 1.4 }}>
-                    Crypto AML Tracker
+                    Wallet Cluster Tracker
                 </div>
             </div>
 

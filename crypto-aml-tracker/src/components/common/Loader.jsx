@@ -9,7 +9,7 @@ const Loader = () => (
     }} />
     <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     <p style={{ marginTop: '16px', color: '#64748b', fontWeight: '500', fontSize: '14px' }}>
-      Scanning blockchain for suspicious activity...
+      Loading blockchain data...
     </p>
   </div>
 );

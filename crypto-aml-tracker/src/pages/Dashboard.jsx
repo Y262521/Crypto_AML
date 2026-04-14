@@ -4,13 +4,14 @@
  * Features:
  *  - Full-width paginated table (20 rows/page)
  *  - Search by address or tx hash
- *  - Filter by risk level
+ *  - Filter by value tier
  *  - "Investigate →" button on each row → opens graph page for that address
  */
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Loader from '../components/common/Loader';
 
 const PAGE_SIZE = 20;
+const HIGH_VALUE_THRESHOLD = Number(import.meta.env.VITE_HIGH_VALUE_THRESHOLD_ETH || 10);
 
 const th = {
   textAlign: 'left', padding: '11px 16px',
@@ -30,6 +31,23 @@ const riskColor = (label) => {
   return { color: '#16a34a', background: '#dcfce7', border: '1px solid #86efac' };
 };
 
+const scoreFromAmount = (amount) => {
+  const value = Number(amount || 0);
+  if (!Number.isFinite(value) || HIGH_VALUE_THRESHOLD <= 0) return 0;
+
+  const ratio = value / HIGH_VALUE_THRESHOLD;
+  if (ratio >= 2) return 100;
+  if (ratio >= 1) return Math.round((75 + 25 * (ratio - 1)) * 10) / 10;
+  return Math.round(Math.min(75, 75 * ratio) * 10) / 10;
+};
+
+const labelFromAmount = (amount) => {
+  const score = scoreFromAmount(amount);
+  if (score > 75) return 'High';
+  if (score > 40) return 'Medium';
+  return 'Low';
+};
+
 const navBtn = (disabled) => ({
   padding: '7px 18px',
   background: disabled ? '#f1f5f9' : '#0d1b2e',
@@ -42,20 +60,27 @@ const navBtn = (disabled) => ({
 
 const RISK_FILTERS = ['All', 'High', 'Medium', 'Low'];
 
-export default function Dashboard({ transactions, loading, error, onInvestigate, lastUpdated }) {
+export default function Dashboard({
+  transactions,
+  loading,
+  loadingMore,
+  error,
+  onInvestigate,
+  onLoadMore,
+  lastUpdated,
+  totalTransactions = 0,
+}) {
   const [page, setPage]         = useState(0);
   const [search, setSearch]     = useState('');
   const [riskFilter, setRisk]   = useState('All');
 
-  // Reset page when data or filters change
-  useEffect(() => { setPage(0); }, [transactions, search, riskFilter]);
-
   if (loading) return <Loader />;
   if (error)   return <div style={{ color: '#ef4444', padding: '1.5rem' }}>Error: {error}</div>;
 
-  // Filter
+  // Filter by amount-based risk label only
   const filtered = transactions.filter(tx => {
-    const matchRisk   = riskFilter === 'All' || tx.riskLabel === riskFilter;
+    const derived = labelFromAmount(tx.amount);
+    const matchRisk   = riskFilter === 'All' || derived === riskFilter;
     const q           = search.toLowerCase();
     const matchSearch = !q || tx.hash?.toLowerCase().includes(q)
       || tx.sender?.toLowerCase().includes(q)
@@ -64,7 +89,8 @@ export default function Dashboard({ transactions, loading, error, onInvestigate,
   });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageTxs    = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const visiblePage = Math.min(page, totalPages - 1);
+  const pageTxs    = filtered.slice(visiblePage * PAGE_SIZE, (visiblePage + 1) * PAGE_SIZE);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -74,8 +100,10 @@ export default function Dashboard({ transactions, loading, error, onInvestigate,
         <div>
           <div style={{ fontSize: '18px', fontWeight: '700', color: '#0f172a' }}>Transaction Ledger</div>
           <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
-            {filtered.length} transactions
-            {riskFilter !== 'All' && ` · filtered by ${riskFilter} risk`}
+            Loaded {transactions.length.toLocaleString()} of {totalTransactions.toLocaleString() || transactions.length.toLocaleString()} transactions
+            {' · ordered by highest ETH amount'}
+            {filtered.length !== transactions.length && ` · ${filtered.length.toLocaleString()} visible`}
+            {riskFilter !== 'All' && ` · filtered by ${riskFilter} tier`}
             {search && ` · matching "${search}"`}
           </div>
         </div>
@@ -92,7 +120,10 @@ export default function Dashboard({ transactions, loading, error, onInvestigate,
           type="text"
           placeholder="Search by address or tx hash..."
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={e => {
+            setSearch(e.target.value);
+            setPage(0);
+          }}
           style={{
             flex: 1, minWidth: '240px', padding: '8px 12px',
             border: '1px solid #e2e8f0', borderRadius: '8px',
@@ -101,7 +132,10 @@ export default function Dashboard({ transactions, loading, error, onInvestigate,
         />
         <div style={{ display: 'flex', gap: '6px' }}>
           {RISK_FILTERS.map(f => (
-            <button key={f} onClick={() => setRisk(f)} style={{
+            <button key={f} onClick={() => {
+              setRisk(f);
+              setPage(0);
+            }} style={{
               padding: '7px 14px', borderRadius: '7px', fontSize: '12px', fontWeight: '600',
               cursor: 'pointer',
               background: riskFilter === f ? '#0d1b2e' : '#fff',
@@ -132,8 +166,8 @@ export default function Dashboard({ transactions, loading, error, onInvestigate,
                   No transactions match your filters.
                 </td></tr>
               : pageTxs.map(tx => {
-                const label = tx.riskLabel || 'Low';
-                const score = tx.riskScore ?? 0;
+                const score = scoreFromAmount(tx.amount);
+                const label = labelFromAmount(tx.amount);
                 const rc    = riskColor(label);
                 return (
                   <tr key={tx.hash}
@@ -146,9 +180,21 @@ export default function Dashboard({ transactions, loading, error, onInvestigate,
                       </a>
                     </td>
                     <td style={{ ...td, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                      title={tx.sender}>{tx.sender}</td>
+                      title={tx.sender}>
+                      <span
+                        onClick={() => onInvestigate(tx.sender)}
+                        style={{ color: '#2563eb', textDecoration: 'underline', cursor: 'pointer' }}>
+                        {tx.sender}
+                      </span>
+                    </td>
                     <td style={{ ...td, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                      title={tx.receiver}>{tx.receiver}</td>
+                      title={tx.receiver}>
+                      <span
+                        onClick={() => onInvestigate(tx.receiver)}
+                        style={{ color: '#2563eb', textDecoration: 'underline', cursor: 'pointer' }}>
+                        {tx.receiver}
+                      </span>
+                    </td>
                     <td style={{ ...td, color: '#16a34a', fontWeight: '600' }}>{tx.amount} ETH</td>
                     <td style={{ ...td, fontSize: '11px' }}>{tx.timestamp}</td>
                     <td style={td}>
@@ -182,17 +228,40 @@ export default function Dashboard({ transactions, loading, error, onInvestigate,
 
       {/* ── Pagination ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <button style={navBtn(page === 0)} disabled={page === 0} onClick={() => setPage(p => p - 1)}>
+        <button style={navBtn(visiblePage === 0)} disabled={visiblePage === 0} onClick={() => setPage(p => p - 1)}>
           ← Back
         </button>
         <span style={{ fontSize: '13px', color: '#64748b' }}>
-          Page <strong>{page + 1}</strong> of <strong>{totalPages}</strong>
+          Page <strong>{visiblePage + 1}</strong> of <strong>{totalPages}</strong>
           <span style={{ marginLeft: '10px', color: '#94a3b8', fontSize: '12px' }}>
-            ({page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length})
+            ({visiblePage * PAGE_SIZE + 1}–{Math.min((visiblePage + 1) * PAGE_SIZE, filtered.length)} of {filtered.length})
           </span>
         </span>
-        <button style={navBtn(page >= totalPages - 1)} disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>
+        <button style={navBtn(visiblePage >= totalPages - 1)} disabled={visiblePage >= totalPages - 1} onClick={() => setPage(p => p + 1)}>
           Next →
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <button
+          onClick={onLoadMore}
+          disabled={loadingMore || transactions.length >= totalTransactions}
+          style={{
+            padding: '9px 18px',
+            background: loadingMore || transactions.length >= totalTransactions ? '#f1f5f9' : '#0d1b2e',
+            color: loadingMore || transactions.length >= totalTransactions ? '#94a3b8' : '#fff',
+            border: '1px solid ' + (loadingMore || transactions.length >= totalTransactions ? '#e2e8f0' : '#0d1b2e'),
+            borderRadius: '8px',
+            cursor: loadingMore || transactions.length >= totalTransactions ? 'not-allowed' : 'pointer',
+            fontSize: '12px',
+            fontWeight: '600',
+          }}
+        >
+          {transactions.length >= totalTransactions
+            ? 'All transactions loaded'
+            : loadingMore
+              ? 'Loading more...'
+              : 'Load More From Database'}
         </button>
       </div>
 

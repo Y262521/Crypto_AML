@@ -11,7 +11,7 @@ CREATE INDEX transfer_block_number IF NOT EXISTS
 FOR ()-[r:TRANSFER]-()
 ON (r.block_number);
 
-// Top suspicious hubs by degree.
+// Top hubs by degree.
 MATCH (a:Address)
 WITH a, size((a)-[:TRANSFER]-()) AS degree
 RETURN a.address AS address, degree
@@ -29,7 +29,7 @@ RETURN s.address AS from_address,
 ORDER BY r.value_eth DESC
 LIMIT 50;
 
-// Money-path exploration starting from a suspicious wallet.
+// Money-path exploration starting from a wallet.
 MATCH path = (start:Address {address: $address})-[:TRANSFER*1..4]->(target:Address)
 RETURN path
 LIMIT 20;

@@ -53,8 +53,14 @@ def get_maria_engine(
         host=cfg.mysql_host,
         port=cfg.mysql_port,
         database=database,
+        query={"charset": "utf8mb4"},
     )
-    return create_engine(url, pool_pre_ping=True, future=True)
+    return create_engine(
+        url,
+        pool_pre_ping=True,
+        future=True,
+        connect_args={"charset": "utf8mb4"},
+    )
 
 
 def get_neo4j_driver(cfg: Config | None = None) -> "Driver":

@@ -16,10 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 def _prepare_datetime(series: pd.Series) -> pd.Series:
-    parsed = pd.to_datetime(series, errors="coerce", utc=True)
-    # FIX: use np.array() to suppress FutureWarning from pandas
-    import numpy as np
-    return np.array(parsed.dt.to_pydatetime(), dtype=object)
+    parsed = pd.to_datetime(series, errors="coerce", utc=True).dt.tz_localize(None)
+    return parsed.apply(lambda value: value.to_pydatetime() if pd.notna(value) else None)
 
 
 def _replace_nan_with_none(df: pd.DataFrame) -> pd.DataFrame:
@@ -34,8 +32,8 @@ def _prepare_chunk(chunk: pd.DataFrame) -> tuple[list[dict], int]:
         raise ValueError(f"transactions.csv is missing columns: {missing_columns}")
 
     df = chunk[TRANSACTION_COLUMNS].copy()
-    df["timestamp"] = _prepare_datetime(df["timestamp"])
-    df["fetched_at"] = _prepare_datetime(df["fetched_at"])
+    df.loc[:, "timestamp"] = _prepare_datetime(df["timestamp"])
+    df.loc[:, "fetched_at"] = _prepare_datetime(df["fetched_at"])
 
     valid_mask = df["tx_hash"].notna() & (df["tx_hash"].astype(str).str.strip() != "")
     skipped = int((~valid_mask).sum())

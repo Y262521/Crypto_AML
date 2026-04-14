@@ -21,7 +21,7 @@ def run_daily_extract(start_block=None, batch=None):
 def run_daily_pipeline(
     start_block=None,
     batch=None,
-    skip_mongo_backup: bool = False,
+    skip_mongo_backup: bool = True,
     skip_neo4j: bool = False,
     strict_neo4j: bool = False,
     run_clustering: bool = True,
@@ -32,7 +32,12 @@ def run_daily_pipeline(
     setup_logging(cfg.log_level)
 
     extract_summary = fetch_and_store_raw(start_block=start_block, batch=batch, cfg=cfg)
-    transform_summary = transform_raw_to_aml(cfg=cfg)
+    extract_start_block, extract_end_block = extract_summary
+    transform_summary = transform_raw_to_aml(
+        start_block=extract_start_block,
+        end_block=extract_end_block,
+        cfg=cfg,
+    )
     if transform_summary["transactions_created"] == 0:
         logger.info("No transformed transactions were produced. Load stage skipped.")
         return {
@@ -59,16 +64,16 @@ def run_daily_pipeline(
         try:
             from ..clustering.engine import ClusteringEngine
             engine = ClusteringEngine(cfg=cfg)
-            results = engine.run(persist=True)
+            results = engine.run(
+                persist=True,
+                min_cluster_size=cfg.clustering_min_cluster_size,
+            )
             clustering_summary = {
                 "clusters_found": len(results),
-                "high_risk": sum(1 for r in results if r.risk_score >= 70),
-                "medium_risk": sum(1 for r in results if 40 <= r.risk_score < 70),
             }
             logger.info(
-                "Clustering complete: %d clusters (%d high-risk)",
+                "Clustering complete: %d clusters",
                 clustering_summary["clusters_found"],
-                clustering_summary["high_risk"],
             )
         except Exception as exc:
             logger.warning("Clustering stage failed (non-fatal): %s", exc)
@@ -78,7 +83,7 @@ def run_daily_pipeline(
         "Load stage complete | MariaDB transactions: %s | Neo4j edges: %s | Mongo backup: %s",
         0 if mariadb_summary is None else mariadb_summary["transactions_loaded"],
         0 if neo4j_summary is None else neo4j_summary["rows_loaded"],
-        0 if mongo_summary is None else mongo_summary["rows_loaded"],
+        0 if mongo_summary is None else mongo_summary.get("rows_loaded", 0),
     )
     return {
         "extract": extract_summary,

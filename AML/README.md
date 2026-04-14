@@ -1,14 +1,14 @@
-# AML ETL Pipeline (MongoDB -> MariaDB -> Neo4j)
+# Wallet Clustering ETL Pipeline (MongoDB -> MySQL -> Neo4j -> MySQL)
 
-This project extracts raw Ethereum blocks into MongoDB, stores a flattened raw-transaction collection for fast lookups, transforms the data into clean CSVs, and loads the transformed outputs into MariaDB and Neo4j for AML demos.
+This project extracts raw Ethereum blocks into MongoDB, stores a flattened raw-transaction collection for fast lookups, transforms the data into clean CSVs, loads the transformed outputs into MySQL, syncs relationships into Neo4j, and persists wallet-clustering results (clusters + owners + evidence) back into MySQL.
 
 ## Architecture
 
 1. **Extract**: fetch raw blocks, store them in MongoDB and `data/raw/`, and explode each block into a MongoDB `raw_transactions` collection.
-2. **Transform**: read pending blocks, prefer the flattened `raw_transactions` documents, and fall back to raw blocks only when needed.
-3. **Load**: back up processed rows to MongoDB, upsert them into MariaDB, and merge graph edges into Neo4j.
+2. **Transform**: read only the newly fetched or otherwise untransformed blocks, prefer the flattened `raw_transactions` documents, and fall back to raw blocks only when needed.
+3. **Load**: upsert the current transform run's processed rows into MySQL, sync relationships into Neo4j, and run clustering to populate wallet ownership groups.
 
-Raw Ethereum blocks are stored idempotently by `block_number`. The extractor also maintains a query-friendly `raw_transactions` collection keyed by `tx_hash`, so MongoDB address and transaction lookups do not need to scan nested block arrays.
+Raw Ethereum blocks are stored idempotently by `block_number`. The extractor also maintains a query-friendly `raw_transactions` collection keyed by `tx_hash`, so MongoDB address and transaction lookups do not need to scan nested block arrays. The live extractor now caps each fetch run at 3 blocks.
 
 ## Folder Structure
 
@@ -29,7 +29,6 @@ aml_pipeline/
     aml_pipeline/
       config.py
       logging_config.py
-      analytics/
       db/
         mongo.py
       etl/
@@ -112,7 +111,7 @@ python run_extraction.py
 
 ### Transform Only
 
-This rebuilds `data/processed/transactions.csv` and `data/processed/graph_edges.csv` from the raw MongoDB data. Old processed and staging CSVs are cleared at the start of the transform so repeated runs do not keep appending duplicates.
+This processes only pending / newly fetched raw blocks into `data/processed/transactions.csv` and `data/processed/graph_edges.csv` for the current run. Old processed and staging CSVs are cleared at the start of the transform so each run produces a clean delta for the load stage.
 
 ```bash
 python run_transform.py
@@ -142,7 +141,7 @@ python -m aml_pipeline.pipelines.run_etl
 Optional flags:
 
 - `--start-block 21000000`
-- `--batch 50`
+- `--batch 3` (the extractor now caps any request to 3 blocks per run)
 - `--skip-mongo-backup`
 - `--skip-neo4j`
 - `--strict-neo4j`

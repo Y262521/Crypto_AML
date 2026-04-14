@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# Crypto AML Tracker — start all services
+# Wallet Cluster Tracker — start all services
 # Usage:
-#   ./start.sh          → start backend + frontend (assumes AML pipeline already ran)
-#   ./start.sh --etl    → also run the AML ETL pipeline first
+#   ./start.sh          → start backend + frontend (assumes ETL pipeline already ran)
+#   ./start.sh --etl    → also run the ETL pipeline first
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -e
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
+BACKEND_PORT="${BACKEND_PORT:-4001}"
 
 run_etl() {
   echo ""
-  echo "=== Running AML ETL Pipeline ==="
+  echo "=== Running ETL Pipeline ==="
   cd "$ROOT/AML"
   if [ ! -d "venv" ]; then
     python3 -m venv venv
@@ -29,7 +30,7 @@ run_etl() {
 
 start_backend() {
   echo ""
-  echo "=== Starting FastAPI Backend (port 4000) ==="
+  echo "=== Starting FastAPI Backend (port $BACKEND_PORT) ==="
   cd "$ROOT/crypto-aml-tracker/backend-py"
   if [ ! -d "venv" ]; then
     python3 -m venv venv
@@ -38,7 +39,7 @@ start_backend() {
   else
     source venv/bin/activate
   fi
-  python main.py &
+  PORT="$BACKEND_PORT" python main.py &
   BACKEND_PID=$!
   echo "Backend PID: $BACKEND_PID"
   deactivate
@@ -52,7 +53,7 @@ start_frontend() {
   if [ ! -d "node_modules" ]; then
     npm install -q
   fi
-  npm run dev &
+  VITE_API_BASE_URL="http://localhost:$BACKEND_PORT/api" npm run dev &
   FRONTEND_PID=$!
   echo "Frontend PID: $FRONTEND_PID"
   cd "$ROOT"
@@ -70,7 +71,7 @@ start_frontend
 
 echo ""
 echo "─────────────────────────────────────────────────────────────────────────"
-echo "  Backend  → http://localhost:4000"
+echo "  Backend  → http://localhost:$BACKEND_PORT"
 echo "  Frontend → http://localhost:5173" 
 echo "─────────────────────────────────────────────────────────────────────────"
 echo "Press Ctrl+C to stop all services."

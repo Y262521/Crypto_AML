@@ -24,6 +24,7 @@ class TxRecord:
     is_contract_call: bool = False
     input_method_id: str = ""  # first 4 bytes of calldata, e.g. "0xa9059cbb"
     gas_used: int = 0
+    status: int = 0
 
 
 @dataclass
@@ -38,7 +39,7 @@ class BlockchainAdapter(ABC):
     """
     Interface every blockchain type must implement.
 
-    Ethereum: reads from MongoDB raw_transactions / processed_transactions.
+    Ethereum: reads from MariaDB processed transactions or MongoDB raw transactions.
     Bitcoin (future): reads from UTXO set / raw block store.
     """
 
