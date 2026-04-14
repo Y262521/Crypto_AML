@@ -1,2 +1,1 @@
-"""Top-level package for the AML pipeline project."""
-
+"""Top-level package for the wallet clustering pipeline."""

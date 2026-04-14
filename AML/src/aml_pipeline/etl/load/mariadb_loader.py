@@ -25,66 +25,18 @@ TRANSACTION_COLUMNS = [
     "gas_used",
     "status",
     "is_contract_call",
-    "input_data",
-    "risk_flag_high_value",
-    "risk_flag_contract",
-    "is_suspicious_basic",
-    "tx_type",
-    "fetched_at",
-]
-GRAPH_EDGE_COLUMNS = [
-    "tx_hash",
-    "from_address",
-    "to_address",
-    "value_eth",
-    "block_number",
-    "timestamp",
 ]
 BOOLEAN_COLUMNS = [
     "is_contract_call",
-    "risk_flag_high_value",
-    "risk_flag_contract",
-    "is_suspicious_basic",
 ]
-ADDRESS_INSERT_SQL = """
-INSERT INTO addresses (
-    address,
-    first_seen_block,
-    last_seen_block,
-    first_seen_at,
-    last_seen_at,
-    total_in_tx_count,
-    total_out_tx_count
+UTF8MB4_COLLATION = "utf8mb4_unicode_ci"
+UTF8MB4_TABLES = (
+    "owners",
+    "wallet_clusters",
+    "transactions",
+    "addresses",
+    "cluster_evidence",
 )
-SELECT
-    address,
-    MIN(block_number) AS first_seen_block,
-    MAX(block_number) AS last_seen_block,
-    MIN(timestamp) AS first_seen_at,
-    MAX(timestamp) AS last_seen_at,
-    SUM(total_in_tx_count) AS total_in_tx_count,
-    SUM(total_out_tx_count) AS total_out_tx_count
-FROM (
-    SELECT
-        from_address AS address,
-        block_number,
-        timestamp,
-        0 AS total_in_tx_count,
-        1 AS total_out_tx_count
-    FROM transactions
-    WHERE from_address IS NOT NULL AND from_address <> ''
-    UNION ALL
-    SELECT
-        to_address AS address,
-        block_number,
-        timestamp,
-        1 AS total_in_tx_count,
-        0 AS total_out_tx_count
-    FROM transactions
-    WHERE to_address IS NOT NULL AND to_address <> ''
-) AS address_flows
-GROUP BY address;
-"""
 
 
 def _schema_path(cfg: Config) -> Path:
@@ -95,10 +47,6 @@ def _transactions_csv_path(cfg: Config) -> Path:
     return cfg.processed_dir / "transactions.csv"
 
 
-def _graph_edges_csv_path(cfg: Config) -> Path:
-    return cfg.processed_dir / "graph_edges.csv"
-
-
 def _run_sql_file(engine: Engine, sql_path: Path) -> None:
     """
     Execute a SQL schema file statement by statement.
@@ -107,7 +55,7 @@ def _run_sql_file(engine: Engine, sql_path: Path) -> None:
     CREATE TABLE blocks) to avoid splitting on KEY definitions.
     Uses IF NOT EXISTS so re-runs are safe.
     """
-    raw = sql_path.read_text()
+    raw = sql_path.read_text(encoding="utf-8")
     # Split on semicolons followed by optional whitespace + newline
     # This correctly handles multi-line CREATE TABLE statements
     import re
@@ -128,8 +76,88 @@ def _ensure_database_exists(cfg: Config) -> None:
     try:
         with engine.begin() as conn:
             conn.exec_driver_sql(f"CREATE DATABASE IF NOT EXISTS `{cfg.mysql_db}`")
+            conn.exec_driver_sql(
+                f"ALTER DATABASE `{cfg.mysql_db}` "
+                f"CHARACTER SET utf8mb4 COLLATE {UTF8MB4_COLLATION}"
+            )
     finally:
         engine.dispose()
+
+
+def _ensure_utf8mb4_tables(engine: Engine, cfg: Config) -> None:
+    table_names = ", ".join(f"'{table}'" for table in UTF8MB4_TABLES)
+    query = text(
+        f"""
+        SELECT table_name, table_collation
+        FROM information_schema.tables
+        WHERE table_schema = :db
+          AND table_name IN ({table_names})
+        """
+    )
+
+    with engine.connect() as conn:
+        rows = conn.execute(query, {"db": cfg.mysql_db}).mappings().all()
+
+    collations = {
+        row["table_name"]: row.get("table_collation")
+        for row in rows
+    }
+
+    for table_name, table_collation in collations.items():
+        if (table_collation or "").startswith("utf8mb4_"):
+            continue
+        try:
+            with engine.begin() as conn:
+                conn.exec_driver_sql(
+                    f"ALTER TABLE `{table_name}` "
+                    f"CONVERT TO CHARACTER SET utf8mb4 COLLATE {UTF8MB4_COLLATION}"
+                )
+            logger.info(
+                "Migrated %s to utf8mb4 (%s)",
+                table_name,
+                UTF8MB4_COLLATION,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Skipped utf8mb4 migration for %s: %s",
+                table_name,
+                exc,
+            )
+
+
+def _ensure_owner_columns(engine: Engine, cfg: Config) -> None:
+    """Add missing owner address fields to legacy owners tables."""
+    required = {
+        "full_name": "VARCHAR(255) NOT NULL",
+        "specifics": "VARCHAR(255) NULL",
+        "street_address": "VARCHAR(255) NULL",
+        "locality": "VARCHAR(128) NULL",
+        "city": "VARCHAR(128) NOT NULL",
+        "administrative_area": "VARCHAR(128) NULL",
+        "postal_code": "VARCHAR(32) NULL",
+        "country": "VARCHAR(128) NOT NULL",
+    }
+
+    with engine.begin() as conn:
+        rows = conn.execute(
+            text(
+                """
+                SELECT COLUMN_NAME
+                FROM information_schema.columns
+                WHERE table_schema = :db
+                  AND table_name = 'owners'
+                """
+            ),
+            {"db": cfg.mysql_db},
+        ).all()
+        existing = {row[0] for row in rows}
+
+        for column, definition in required.items():
+            if column in existing:
+                continue
+            conn.exec_driver_sql(
+                f"ALTER TABLE `owners` ADD COLUMN `{column}` {definition}"
+            )
 
 
 def create_tables_if_not_exist(cfg: Config | None = None) -> None:
@@ -144,6 +172,8 @@ def create_tables_if_not_exist(cfg: Config | None = None) -> None:
     engine = get_maria_engine(cfg)
     try:
         _run_sql_file(engine, schema_path)
+        _ensure_owner_columns(engine, cfg)
+        _ensure_utf8mb4_tables(engine, cfg)
     finally:
         engine.dispose()
 
@@ -175,34 +205,15 @@ def _prepare_transaction_chunk(chunk: pd.DataFrame) -> tuple[pd.DataFrame, int]:
     if missing_columns:
         raise ValueError(f"transactions.csv is missing columns: {missing_columns}")
 
-    df = chunk[TRANSACTION_COLUMNS].copy()
-    df["timestamp"] = _prepare_datetime(df["timestamp"])
-    df["fetched_at"] = _prepare_datetime(df["fetched_at"])
+    df = chunk[TRANSACTION_COLUMNS].copy().astype(object)
+    df.loc[:, "timestamp"] = _prepare_datetime(df["timestamp"])
     for column in BOOLEAN_COLUMNS:
-        df[column] = pd.to_numeric(df[column], errors="coerce").fillna(0).astype(int)
+        df.loc[:, column] = pd.to_numeric(df[column], errors="coerce").fillna(0).astype(int)
 
     # FIX: convert scientific notation (e.g. 2.385e-11) to fixed decimal string
     # MySQL DECIMAL(38,18) rejects scientific notation
-    df["value_eth"] = pd.to_numeric(df["value_eth"], errors="coerce").fillna(0)
-    df["value_eth"] = df["value_eth"].apply(lambda x: f"{x:.18f}")
-
-    valid_mask = df["tx_hash"].notna() & (df["tx_hash"].astype(str).str.strip() != "")
-    skipped = int((~valid_mask).sum())
-    df = df.loc[valid_mask].drop_duplicates(subset=["tx_hash"], keep="last")
-    return _replace_nan_with_none(df), skipped
-
-
-def _prepare_graph_edge_chunk(chunk: pd.DataFrame) -> tuple[pd.DataFrame, int]:
-    missing_columns = [column for column in GRAPH_EDGE_COLUMNS if column not in chunk.columns]
-    if missing_columns:
-        raise ValueError(f"graph_edges.csv is missing columns: {missing_columns}")
-
-    df = chunk[GRAPH_EDGE_COLUMNS].copy()
-    df["timestamp"] = _prepare_datetime(df["timestamp"])
-
-    # FIX: same scientific notation fix for graph_edges
-    df["value_eth"] = pd.to_numeric(df["value_eth"], errors="coerce").fillna(0)
-    df["value_eth"] = df["value_eth"].apply(lambda x: f"{x:.18f}")
+    df.loc[:, "value_eth"] = pd.to_numeric(df["value_eth"], errors="coerce").fillna(0)
+    df.loc[:, "value_eth"] = df["value_eth"].apply(lambda x: f"{x:.18f}")
 
     valid_mask = df["tx_hash"].notna() & (df["tx_hash"].astype(str).str.strip() != "")
     skipped = int((~valid_mask).sum())
@@ -237,7 +248,39 @@ def _upsert_rows(table_name: str, engine: Engine, rows: Iterable[dict]) -> int:
     return len(records)
 
 
-def _refresh_addresses(engine: Engine) -> None:
+def _ensure_address_columns(engine: Engine, cfg: Config) -> None:
+    """Add missing columns to legacy addresses tables (safe migration)."""
+    required = {
+        "is_contract": "TINYINT(1) NOT NULL DEFAULT 0",
+        "first_seen": "DATETIME NULL",
+        "last_seen": "DATETIME NULL",
+        "total_in": "DECIMAL(38,18) NOT NULL DEFAULT 0",
+        "total_out": "DECIMAL(38,18) NOT NULL DEFAULT 0",
+        "tx_count": "BIGINT NOT NULL DEFAULT 0",
+        "cluster_id": "VARCHAR(64) NULL",
+    }
+
+    with engine.begin() as conn:
+        rows = conn.execute(
+            text(
+                """
+                SELECT COLUMN_NAME
+                FROM information_schema.columns
+                WHERE table_schema = :db
+                  AND table_name = 'addresses'
+                """
+            ),
+            {"db": cfg.mysql_db},
+        ).all()
+        existing = {row[0] for row in rows}
+
+        for column, ddl in required.items():
+            if column in existing:
+                continue
+            conn.exec_driver_sql(f"ALTER TABLE addresses ADD COLUMN {column} {ddl}")
+
+
+def _refresh_addresses(engine: Engine, cfg: Config) -> None:
     """
     Rebuild the addresses table from the transactions table using upsert.
 
@@ -248,41 +291,54 @@ def _refresh_addresses(engine: Engine) -> None:
     upsert_sql = """
     INSERT INTO addresses (
         address,
-        first_seen_block,
-        last_seen_block,
-        first_seen_at,
-        last_seen_at,
-        total_in_tx_count,
-        total_out_tx_count
+        is_contract,
+        first_seen,
+        last_seen,
+        total_in,
+        total_out,
+        tx_count
     )
     SELECT
         address,
-        MIN(block_number)          AS first_seen_block,
-        MAX(block_number)          AS last_seen_block,
-        MIN(timestamp)             AS first_seen_at,
-        MAX(timestamp)             AS last_seen_at,
-        SUM(total_in_tx_count)     AS total_in_tx_count,
-        SUM(total_out_tx_count)    AS total_out_tx_count
+        MAX(is_contract)                       AS is_contract,
+        MIN(first_seen)                        AS first_seen,
+        MAX(last_seen)                         AS last_seen,
+        SUM(total_in)                          AS total_in,
+        SUM(total_out)                         AS total_out,
+        SUM(tx_count)                          AS tx_count
     FROM (
-        SELECT from_address AS address, block_number, timestamp,
-               0 AS total_in_tx_count, 1 AS total_out_tx_count
+        SELECT
+            from_address AS address,
+            0 AS is_contract,
+            MIN(timestamp) AS first_seen,
+            MAX(timestamp) AS last_seen,
+            0 AS total_in,
+            SUM(value_eth) AS total_out,
+            COUNT(*) AS tx_count
         FROM transactions
         WHERE from_address IS NOT NULL AND from_address <> ''
+        GROUP BY from_address
         UNION ALL
-        SELECT to_address AS address, block_number, timestamp,
-               1 AS total_in_tx_count, 0 AS total_out_tx_count
+        SELECT
+            to_address AS address,
+            MAX(CASE WHEN is_contract_call = 1 THEN 1 ELSE 0 END) AS is_contract,
+            MIN(timestamp) AS first_seen,
+            MAX(timestamp) AS last_seen,
+            SUM(value_eth) AS total_in,
+            0 AS total_out,
+            COUNT(*) AS tx_count
         FROM transactions
         WHERE to_address IS NOT NULL AND to_address <> ''
+        GROUP BY to_address
     ) AS flows
     GROUP BY address
     ON DUPLICATE KEY UPDATE
-        first_seen_block    = LEAST(first_seen_block, VALUES(first_seen_block)),
-        last_seen_block     = GREATEST(last_seen_block, VALUES(last_seen_block)),
-        first_seen_at       = LEAST(first_seen_at, VALUES(first_seen_at)),
-        last_seen_at        = GREATEST(last_seen_at, VALUES(last_seen_at)),
-        total_in_tx_count   = VALUES(total_in_tx_count),
-        total_out_tx_count  = VALUES(total_out_tx_count),
-        updated_at          = CURRENT_TIMESTAMP
+        is_contract = GREATEST(is_contract, VALUES(is_contract)),
+        first_seen  = LEAST(first_seen, VALUES(first_seen)),
+        last_seen   = GREATEST(last_seen, VALUES(last_seen)),
+        total_in    = VALUES(total_in),
+        total_out   = VALUES(total_out),
+        tx_count    = VALUES(tx_count)
     """
     with engine.begin() as conn:
         conn.exec_driver_sql(upsert_sql)
@@ -304,15 +360,12 @@ def load_to_mariadb(
     create_tables_if_not_exist(cfg)
 
     transactions_path = _transactions_csv_path(cfg)
-    graph_edges_path = _graph_edges_csv_path(cfg)
     _ensure_csv_exists(transactions_path)
-    _ensure_csv_exists(graph_edges_path)
 
     chunk_size = chunk_size or cfg.batch_size
     engine = get_maria_engine(cfg)
     summary = {
         "transactions_loaded": 0,
-        "graph_edges_loaded": 0,
         "rows_skipped": 0,
     }
 
@@ -332,32 +385,16 @@ def load_to_mariadb(
                 if tx_rows_remaining <= 0:
                     break
 
-        edge_rows_remaining = limit
-        for chunk in pd.read_csv(graph_edges_path, chunksize=chunk_size):
-            chunk = _trim_to_limit(chunk, edge_rows_remaining)
-            if chunk.empty:
-                break
-            prepared_chunk, skipped = _prepare_graph_edge_chunk(chunk)
-            summary["rows_skipped"] += skipped
-            summary["graph_edges_loaded"] += _upsert_rows(
-                "graph_edges", engine, prepared_chunk.to_dict(orient="records")
-            )
-            if edge_rows_remaining is not None:
-                edge_rows_remaining -= len(chunk)
-                if edge_rows_remaining <= 0:
-                    break
-
-        _refresh_addresses(engine)
+        _ensure_address_columns(engine, cfg)
+        _refresh_addresses(engine, cfg)
         summary["transactions_total"] = _count_rows(engine, "transactions")
-        summary["graph_edges_total"] = _count_rows(engine, "graph_edges")
         summary["addresses_total"] = _count_rows(engine, "addresses")
     finally:
         engine.dispose()
 
     logger.info(
-        "Loaded %s transactions to MariaDB | %s graph edges | skipped %s rows",
+        "Loaded %s transactions to MariaDB | skipped %s rows",
         summary["transactions_loaded"],
-        summary["graph_edges_loaded"],
         summary["rows_skipped"],
     )
     return summary

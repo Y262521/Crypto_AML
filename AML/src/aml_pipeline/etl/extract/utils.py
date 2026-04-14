@@ -221,7 +221,7 @@ def build_flat_transaction_documents(raw_document: dict, network: str) -> list[d
                     "fetched_at": fetched_at,
                     "processed": False,
                     "processed_at": None,
-                    "risk_level": "PENDING",
+                    "label_status": "PENDING",
                 },
             }
         )

@@ -1,13 +1,13 @@
 """
 Smart Contract Interaction Heuristic
 ======================================
-Addresses that interact with the same smart contracts (DeFi, mixers, bridges)
-are grouped together.
+Addresses that interact with the same smart contracts (DeFi apps, bridges,
+or shared services) are grouped together.
 
 Additionally detects Deposit → Contract → Withdraw cycles:
   addr_A  →  contract  →  addr_B
 where addr_A and addr_B are linked because they use the same contract
-as an intermediary (classic mixer / tumbler pattern).
+as an intermediary.
 """
 
 from __future__ import annotations
@@ -22,13 +22,15 @@ from .base_heuristic import BaseHeuristic, ClusterEdge
 
 # Minimum number of addresses that must share a contract before we link them
 _MIN_SHARED_CONTRACT_USERS = 2
+_MIN_CALLS_PER_CALLER = 2
+_MAX_SHARED_CONTRACT_USERS = 12
 
 
 class ContractInteractionHeuristic(BaseHeuristic):
     name = "contract_interaction"
     description = (
         "Addresses interacting with the same smart contracts are grouped. "
-        "Deposit→Contract→Withdraw cycles are flagged as mixer-like behaviour."
+        "Deposit→Contract→Withdraw cycles are linked as shared contract usage."
     )
 
     def __init__(self, cfg: Config):
@@ -44,14 +46,22 @@ class ContractInteractionHeuristic(BaseHeuristic):
                 contract_nodes.add(v)
 
         # Group addresses by which contracts they call
-        contract_callers: dict[str, set] = defaultdict(set)
+        contract_callers: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
         for u, v, data in G.edges(data=True):
             if v in contract_nodes and data.get("is_contract_call"):
-                contract_callers[v].add(u)
+                contract_callers[v][u] += 1
 
         # Link all callers of the same contract
         for contract, callers in contract_callers.items():
-            caller_list = sorted(callers)
+            caller_list = sorted(
+                caller
+                for caller, count in callers.items()
+                if count >= _MIN_CALLS_PER_CALLER
+            )
+            if len(caller_list) < _MIN_SHARED_CONTRACT_USERS:
+                continue
+            if len(caller_list) > _MAX_SHARED_CONTRACT_USERS:
+                continue
             for i in range(len(caller_list)):
                 for j in range(i + 1, len(caller_list)):
                     links.append((caller_list[i], caller_list[j]))
@@ -64,6 +74,10 @@ class ContractInteractionHeuristic(BaseHeuristic):
             # Addresses that only deposit (not withdraw) paired with those that only withdraw
             pure_depositors = depositors - withdrawers
             pure_withdrawers = withdrawers - depositors
+            if len(pure_depositors) > _MAX_SHARED_CONTRACT_USERS:
+                continue
+            if len(pure_withdrawers) > _MAX_SHARED_CONTRACT_USERS:
+                continue
             for dep in pure_depositors:
                 for wit in pure_withdrawers:
                     if dep != wit:

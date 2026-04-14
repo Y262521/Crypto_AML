@@ -18,6 +18,8 @@ from .utils import build_flat_transaction_documents, rpc_call_with_retry, to_jso
 
 logger = logging.getLogger(__name__)
 
+_MAX_FETCH_BLOCKS_PER_RUN = 30
+
 
 class EthereumExtractor(BaseExtractor):
     """Ethereum-specific extractor that pulls blocks, txs, receipts, and logs."""
@@ -112,12 +114,25 @@ class EthereumExtractor(BaseExtractor):
             start_block = (latest_saved + 1) if latest_saved is not None else self.cfg.eth_start_block
 
         batch_size = batch or self.cfg.eth_batch_size
-        if batch_size > 100:
-            logger.warning("Batch size capped at 100 (requested %s)", batch_size)
-            batch_size = 100
+        if batch_size > _MAX_FETCH_BLOCKS_PER_RUN:
+            logger.warning(
+                "Batch size capped at %s blocks per run (requested %s)",
+                _MAX_FETCH_BLOCKS_PER_RUN,
+                batch_size,
+            )
+            batch_size = _MAX_FETCH_BLOCKS_PER_RUN
+
+        latest_available = self.get_latest_block()
+        if start_block > latest_available:
+            logger.info(
+                "No new blocks available to fetch (start_block=%s, latest=%s)",
+                start_block,
+                latest_available,
+            )
+            return start_block, latest_available
 
         from_block = start_block
-        to_block = from_block + batch_size - 1
+        to_block = min(from_block + batch_size - 1, latest_available)
 
         logger.info("Fetching blocks %s -> %s", from_block, to_block)
 
@@ -135,7 +150,8 @@ class EthereumExtractor(BaseExtractor):
                 flattened_count,
             )
 
-        message = f"Saved blocks {from_block} -> {to_block} ({batch_size} blocks)"
+        fetched_blocks = (to_block - from_block) + 1
+        message = f"Saved blocks {from_block} -> {to_block} ({fetched_blocks} blocks)"
         print(message)
         logger.info(message)
         logger.info("Saved %s flattened transaction documents", total_transactions)

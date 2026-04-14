@@ -1,10 +1,9 @@
 """
 Ethereum blockchain adapter.
 
-Reads from the AML pipeline's MongoDB collections in priority order:
-  1. processed_transactions  (richest data, post-transform)
-  2. raw_transactions        (flat pre-transform docs)
-Falls back to the processed CSV on disk when MongoDB is unavailable.
+Reads processed transactions from MariaDB first so clustering uses the same
+dataset exposed to the backend/frontend. Falls back to raw MongoDB docs or the
+processed CSV only when needed.
 """
 
 from __future__ import annotations
@@ -15,11 +14,14 @@ from typing import Iterator, Optional
 
 import pandas as pd
 from pymongo import MongoClient
+from sqlalchemy import text
 
 from ..config import Config, load_config
+from ..utils.connections import get_maria_engine
 from .base import BlockchainAdapter, TxRecord
 
 logger = logging.getLogger(__name__)
+_MONGO_TIMEOUT_MS = 2000
 
 # ERC-20 transfer / transferFrom method IDs
 _ERC20_METHOD_IDS = {"0xa9059cbb", "0x23b872dd"}
@@ -70,7 +72,7 @@ def _to_ts(value) -> float:
 
 
 class EthereumAdapter(BlockchainAdapter):
-    """Reads Ethereum transactions from MongoDB and yields TxRecord objects."""
+    """Reads Ethereum transactions from MariaDB / raw MongoDB and yields TxRecord objects."""
 
     def __init__(self, cfg: Optional[Config] = None):
         self.cfg = cfg or load_config()
@@ -81,31 +83,82 @@ class EthereumAdapter(BlockchainAdapter):
 
     # ── internal readers ────────────────────────────────────────────────────
 
-    def _iter_from_processed_mongo(self) -> Iterator[TxRecord]:
-        client = MongoClient(self.cfg.mongo_uri)
-        col = client[self.cfg.mongo_processed_db][self.cfg.mongo_processed_collection]
-        for doc in col.find({}, {"_id": 0}).sort("block_number", 1):
-            frm = (doc.get("from_address") or "").lower().strip()
-            to = (doc.get("to_address") or "").lower().strip()
-            if not frm and not to:
-                continue
-            inp = (doc.get("input_data") or "")
-            method_id = inp[:10] if inp.startswith("0x") and len(inp) >= 10 else ""
-            yield TxRecord(
-                tx_hash=doc.get("tx_hash", ""),
-                block_number=_to_int(doc.get("block_number")),
-                timestamp=_to_ts(doc.get("timestamp")),
-                from_address=frm,
-                to_address=to,
-                value_eth=_to_float(doc.get("value_eth")),
-                is_contract_call=bool(doc.get("is_contract_call")),
-                input_method_id=method_id,
-                gas_used=_to_int(doc.get("gas_used")),
-            )
-        client.close()
+    def _get_mongo_client(self) -> MongoClient:
+        return MongoClient(
+            self.cfg.mongo_uri,
+            serverSelectionTimeoutMS=_MONGO_TIMEOUT_MS,
+            connectTimeoutMS=_MONGO_TIMEOUT_MS,
+            socketTimeoutMS=_MONGO_TIMEOUT_MS,
+        )
+
+    def _count_mariadb_transactions(self) -> int:
+        try:
+            engine = get_maria_engine(self.cfg)
+            with engine.connect() as conn:
+                return int(
+                    conn.execute(text("SELECT COUNT(*) FROM transactions")).scalar_one()
+                )
+        except Exception as exc:
+            logger.warning("EthereumAdapter: MariaDB unavailable, falling back: %s", exc)
+            return 0
+        finally:
+            if "engine" in locals():
+                engine.dispose()
+
+    def _count_raw_mongo_transactions(self) -> int:
+        client = self._get_mongo_client()
+        try:
+            return client[self.cfg.mongo_flat_tx_db][
+                self.cfg.mongo_flat_tx_collection
+            ].estimated_document_count()
+        except Exception as exc:
+            logger.warning("EthereumAdapter: MongoDB unavailable, falling back: %s", exc)
+            return 0
+        finally:
+            client.close()
+
+    def _iter_from_mariadb(self) -> Iterator[TxRecord]:
+        engine = get_maria_engine(self.cfg)
+        query = text(
+            """
+            SELECT
+                tx_hash,
+                block_number,
+                timestamp,
+                from_address,
+                to_address,
+                value_eth,
+                is_contract_call,
+                gas_used,
+                status
+            FROM transactions
+            ORDER BY block_number ASC, tx_hash ASC
+            """
+        )
+        try:
+            with engine.connect() as conn:
+                for row in conn.execute(query).mappings():
+                    frm = (row.get("from_address") or "").lower().strip()
+                    to = (row.get("to_address") or "").lower().strip()
+                    if not frm and not to:
+                        continue
+                    yield TxRecord(
+                        tx_hash=row.get("tx_hash", ""),
+                        block_number=_to_int(row.get("block_number")),
+                        timestamp=_to_ts(row.get("timestamp")),
+                        from_address=frm,
+                        to_address=to,
+                        value_eth=_to_float(row.get("value_eth")),
+                        is_contract_call=bool(row.get("is_contract_call")),
+                        input_method_id="",
+                        gas_used=_to_int(row.get("gas_used")),
+                        status=_to_int(row.get("status")),
+                    )
+        finally:
+            engine.dispose()
 
     def _iter_from_raw_mongo(self) -> Iterator[TxRecord]:
-        client = MongoClient(self.cfg.mongo_uri)
+        client = self._get_mongo_client()
         col = client[self.cfg.mongo_flat_tx_db][self.cfg.mongo_flat_tx_collection]
         for doc in col.find({}, {"_id": 0}).sort("block.number", 1):
             block = doc.get("block", {})
@@ -116,8 +169,6 @@ class EthereumAdapter(BlockchainAdapter):
             to = (ap.get("to") or "").lower().strip()
             if not frm and not to:
                 continue
-            inp = (forensics.get("input_data") or "")
-            method_id = inp[:10] if inp.startswith("0x") and len(inp) >= 10 else ""
             yield TxRecord(
                 tx_hash=doc.get("tx_hash", ""),
                 block_number=_to_int(block.get("number")),
@@ -126,7 +177,7 @@ class EthereumAdapter(BlockchainAdapter):
                 to_address=to,
                 value_eth=_to_float(val.get("eth")),
                 is_contract_call=bool(forensics.get("is_contract")),
-                input_method_id=method_id,
+                input_method_id="",
                 gas_used=_to_int(doc.get("gas", {}).get("gas_used")),
             )
         client.close()
@@ -143,8 +194,6 @@ class EthereumAdapter(BlockchainAdapter):
                 to = str(getattr(row, "to_address", "") or "").lower().strip()
                 if not frm and not to:
                     continue
-                inp = str(getattr(row, "input_data", "") or "")
-                method_id = inp[:10] if inp.startswith("0x") and len(inp) >= 10 else ""
                 yield TxRecord(
                     tx_hash=str(getattr(row, "tx_hash", "")),
                     block_number=int(getattr(row, "block_number", 0) or 0),
@@ -153,8 +202,9 @@ class EthereumAdapter(BlockchainAdapter):
                     to_address=to,
                     value_eth=_to_float(getattr(row, "value_eth", 0.0)),
                     is_contract_call=bool(getattr(row, "is_contract_call", False)),
-                    input_method_id=method_id,
+                    input_method_id="",
                     gas_used=int(getattr(row, "gas_used", 0) or 0),
+                    status=int(getattr(row, "status", 0) or 0),
                 )
 
     # ── public interface ─────────────────────────────────────────────────────
@@ -163,11 +213,11 @@ class EthereumAdapter(BlockchainAdapter):
         """
         Yield TxRecord objects.
 
-        source: 'auto' | 'processed' | 'raw' | 'csv'
-          auto → tries processed_mongo → raw_mongo → csv
+        source: 'auto' | 'mariadb' | 'processed' | 'raw' | 'csv'
+          auto → tries mariadb → raw_mongo → csv
         """
-        if source == "processed":
-            yield from self._iter_from_processed_mongo()
+        if source in {"mariadb", "processed"}:
+            yield from self._iter_from_mariadb()
             return
         if source == "raw":
             yield from self._iter_from_raw_mongo()
@@ -177,21 +227,15 @@ class EthereumAdapter(BlockchainAdapter):
             return
 
         # auto: try each source in order, fall back on empty
-        client = MongoClient(self.cfg.mongo_uri)
-        try:
-            processed_count = client[self.cfg.mongo_processed_db][
-                self.cfg.mongo_processed_collection
-            ].estimated_document_count()
-            raw_count = client[self.cfg.mongo_flat_tx_db][
-                self.cfg.mongo_flat_tx_collection
-            ].estimated_document_count()
-        finally:
-            client.close()
+        mariadb_count = self._count_mariadb_transactions()
 
-        if processed_count > 0:
-            logger.info("EthereumAdapter: reading %d processed transactions", processed_count)
-            yield from self._iter_from_processed_mongo()
-        elif raw_count > 0:
+        if mariadb_count > 0:
+            logger.info("EthereumAdapter: reading %d transactions from MariaDB", mariadb_count)
+            yield from self._iter_from_mariadb()
+            return
+
+        raw_count = self._count_raw_mongo_transactions()
+        if raw_count > 0:
             logger.info("EthereumAdapter: reading %d raw transactions", raw_count)
             yield from self._iter_from_raw_mongo()
         else:

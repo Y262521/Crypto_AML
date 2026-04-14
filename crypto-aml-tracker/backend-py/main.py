@@ -1,18 +1,15 @@
-import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-load_dotenv()
-
-from db.mongo import connect_mongo
-from db.neo4j import connect_neo4j
-from db.mysql import connect_mysql
+from db.mongo import close_mongo, connect_mongo
+from db.neo4j import close_neo4j, connect_neo4j
+from db.mysql import close_mysql, connect_mysql
 from routes.transactions import router as tx_router
 from routes.clusters import router as cluster_router
 from scheduler import create_scheduler, get_next_run_time, pipeline_status
+from settings import get_env
 
 
 @asynccontextmanager
@@ -23,12 +20,12 @@ async def lifespan(app: FastAPI):
     try:
         await connect_neo4j()
     except Exception as e:
-        print(f"Neo4j not available — graph features disabled: {e}")
+        print(f"Neo4j not available - graph features disabled: {e}")
 
     try:
         await connect_mysql()
     except Exception as e:
-        print(f"MySQL not available — falling back to MongoDB: {e}")
+        print(f"MariaDB not available - processed transaction features disabled: {e}")
 
     # Start the ETL + clustering scheduler
     scheduler = create_scheduler()
@@ -39,9 +36,12 @@ async def lifespan(app: FastAPI):
 
     # ── shutdown ──────────────────────────────────────────────────────────────
     scheduler.shutdown(wait=False)
+    await close_neo4j()
+    await close_mysql()
+    await close_mongo()
 
 
-app = FastAPI(title="Crypto AML Tracker", lifespan=lifespan)
+app = FastAPI(title="Wallet Cluster Tracker", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -66,12 +66,12 @@ async def get_status():
             "last_run_summary": pipeline_status["last_run_summary"],
             "runs_today":       pipeline_status["runs_today"],
             "total_runs":       pipeline_status["total_runs"],
-            "schedule":         os.getenv("PIPELINE_SCHEDULE_HOURS", "8,20") + ":00 UTC daily",
+            "schedule":         get_env("PIPELINE_SCHEDULE_HOURS", default="8,20") + ":00 UTC daily",
         }
     }
 
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("PORT", 4000))
+    port = int(get_env("PORT", default="4000"))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

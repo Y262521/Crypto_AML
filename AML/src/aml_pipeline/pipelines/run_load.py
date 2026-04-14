@@ -1,11 +1,11 @@
 """
-CLI: Load processed CSVs → MySQL → Neo4j
+CLI: Load processed CSVs -> MySQL -> Neo4j
 
 Usage:
     # Load CSVs into MySQL only
     python -m aml_pipeline.pipelines.run_load
 
-    # Load MySQL → Neo4j sync after
+    # Load MySQL -> Neo4j sync after
     python -m aml_pipeline.pipelines.run_load --sync-neo4j
 
     # Load CSVs into MySQL + sync to Neo4j + run clustering
@@ -14,7 +14,7 @@ Usage:
     # Skip MySQL, only sync Neo4j from existing MySQL data
     python -m aml_pipeline.pipelines.run_load --neo4j-only
 
-    # Verify counts in all three databases
+    # Verify counts in MongoDB raw storage, MySQL, and Neo4j
     python -m aml_pipeline.pipelines.run_load --verify
 """
 
@@ -39,14 +39,12 @@ def _verify(cfg):
     with engine.connect() as conn:
         mysql_tx   = conn.execute(text("SELECT COUNT(*) FROM transactions")).scalar()
         mysql_addr = conn.execute(text("SELECT COUNT(*) FROM addresses")).scalar()
-        mysql_edge = conn.execute(text("SELECT COUNT(*) FROM graph_edges")).scalar()
     engine.dispose()
 
-    # MongoDB
+    # MongoDB raw-only
     client = MongoClient(cfg.mongo_uri)
     mongo_raw   = client[cfg.mongo_raw_db][cfg.mongo_raw_collection].count_documents({})
     mongo_flat  = client[cfg.mongo_flat_tx_db][cfg.mongo_flat_tx_collection].count_documents({})
-    mongo_proc  = client[cfg.mongo_processed_db][cfg.mongo_processed_collection].count_documents({})
     client.close()
 
     # Neo4j
@@ -64,9 +62,7 @@ def _verify(cfg):
     print("\n── Database Verification ────────────────────────────────")
     print(f"  MongoDB  raw_blocks          : {mongo_raw:>8}")
     print(f"  MongoDB  raw_transactions    : {mongo_flat:>8}")
-    print(f"  MongoDB  processed_tx        : {mongo_proc:>8}")
     print(f"  MySQL    transactions        : {mysql_tx:>8}")
-    print(f"  MySQL    graph_edges         : {mysql_edge:>8}")
     print(f"  MySQL    addresses           : {mysql_addr:>8}")
     print(f"  Neo4j    TRANSFER rels       : {str(neo4j_tx):>8}")
     print(f"  Neo4j    Address nodes       : {str(neo4j_addr):>8}")
@@ -84,7 +80,7 @@ def main():
     parser.add_argument("--cluster", action="store_true",
                         help="Run clustering after load")
     parser.add_argument("--verify", action="store_true",
-                        help="Print row counts from all databases and exit")
+                        help="Print raw MongoDB, MariaDB, and Neo4j counts and exit")
     args = parser.parse_args()
 
     cfg = load_config()
@@ -102,10 +98,8 @@ def main():
             summary = load_to_mariadb(cfg=cfg)
             print("\n── MySQL Load Complete ──────────────────────────────────")
             print(f"  Transactions loaded : {summary['transactions_loaded']}")
-            print(f"  Graph edges loaded  : {summary['graph_edges_loaded']}")
             print(f"  Rows skipped        : {summary['rows_skipped']}")
             print(f"  Total transactions  : {summary.get('transactions_total', '?')}")
-            print(f"  Total graph edges   : {summary.get('graph_edges_total', '?')}")
             print(f"  Total addresses     : {summary.get('addresses_total', '?')}")
             print("─────────────────────────────────────────────────────────\n")
         except Exception as e:
@@ -133,13 +127,12 @@ def main():
         try:
             from ..clustering.engine import ClusteringEngine
             engine = ClusteringEngine(cfg=cfg)
-            results = engine.run(persist=True)
-            high = sum(1 for r in results if r.risk_score >= 70)
-            med  = sum(1 for r in results if 40 <= r.risk_score < 70)
+            results = engine.run(
+                persist=True,
+                min_cluster_size=cfg.clustering_min_cluster_size,
+            )
             print(f"\n── Clustering Complete ──────────────────────────────────")
             print(f"  Total clusters  : {len(results)}")
-            print(f"  High risk (≥70) : {high}")
-            print(f"  Medium risk     : {med}")
             print("─────────────────────────────────────────────────────────\n")
         except Exception as e:
             logger.warning("Clustering failed (non-fatal): %s", e)

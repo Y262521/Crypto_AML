@@ -1,3 +1,4 @@
+-r ../../AML/requirements.txt
 fastapi
 uvicorn[standard]
 motor

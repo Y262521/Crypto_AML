@@ -4,13 +4,8 @@ Fan-In / Fan-Out Heuristic
 Fan-out: one address distributes funds to many addresses.
 Fan-in:  many addresses consolidate funds into one.
 
-Both patterns are common in:
-  - Exchange hot wallets (fan-out to users)
-  - Mixer outputs (fan-out from tumbler)
-  - Consolidation wallets (fan-in before mixing)
-
-Addresses on the "many" side of a fan are linked together because
-they likely belong to the same entity or campaign.
+Addresses on the "many" side of a fan are linked together because they
+often share a common controller, campaign, or operational purpose.
 """
 
 from __future__ import annotations
@@ -37,10 +32,18 @@ class FanPatternHeuristic(BaseHeuristic):
     def find_links(self, G: nx.MultiDiGraph) -> List[ClusterEdge]:
         links: List[ClusterEdge] = []
         seen: set = set()
+        meaningful_successors: dict[str, set[str]] = {}
+        meaningful_predecessors: dict[str, set[str]] = {}
+
+        for u, v, data in G.edges(data=True):
+            if not self.is_meaningful_edge(data):
+                continue
+            meaningful_successors.setdefault(u, set()).add(v)
+            meaningful_predecessors.setdefault(v, set()).add(u)
 
         # Fan-out: node with out-degree >= threshold
         for node in G.nodes():
-            out_neighbours = list(set(G.successors(node)))
+            out_neighbours = list(meaningful_successors.get(node, set()))
             if len(out_neighbours) >= self.threshold:
                 # Link all receivers together
                 out_neighbours.sort()
@@ -53,7 +56,7 @@ class FanPatternHeuristic(BaseHeuristic):
 
         # Fan-in: node with in-degree >= threshold
         for node in G.nodes():
-            in_neighbours = list(set(G.predecessors(node)))
+            in_neighbours = list(meaningful_predecessors.get(node, set()))
             if len(in_neighbours) >= self.threshold:
                 # Link all senders together
                 in_neighbours.sort()

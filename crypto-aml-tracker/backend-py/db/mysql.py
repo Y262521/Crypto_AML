@@ -1,6 +1,6 @@
 """
 MySQL connection for the FastAPI backend.
-Reads from the aml_db database populated by the AML ETL pipeline.
+Reads from the clean MySQL database populated by the ETL pipeline.
 Uses aiomysql for async access.
 """
 
@@ -18,11 +18,20 @@ async def connect_mysql():
         user=os.getenv("MYSQL_USER", "root"),
         password=os.getenv("MYSQL_PASSWORD", "1216mysql"),
         db=os.getenv("MYSQL_DB", "aml_db"),
+        charset="utf8mb4",
+        use_unicode=True,
         autocommit=True,
         minsize=1,
         maxsize=10,
     )
     print(f"MySQL connected → {os.getenv('MYSQL_DB', 'aml_db')}")
+
+async def close_mysql():
+    global pool
+    if pool is not None:
+        pool.close()
+        await pool.wait_closed()
+        pool = None
 
 
 def get_pool():

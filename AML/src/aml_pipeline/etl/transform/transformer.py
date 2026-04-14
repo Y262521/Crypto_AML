@@ -1,4 +1,4 @@
-"""Transform raw Ethereum block docs into clean AML-ready CSV outputs."""
+"""Transform raw Ethereum block docs into clean CSV outputs."""
 
 import logging
 from datetime import datetime, timezone
@@ -74,15 +74,6 @@ def _normalize_address(value: Optional[str]) -> Optional[str]:
     return value.lower()
 
 
-def _shorten_input(data: Optional[str], limit: int = 120) -> str:
-    """Shorten long input data blobs for storage readability."""
-    if not data:
-        return ""
-    if len(data) <= limit:
-        return data
-    return f"{data[:limit]}..."
-
-
 def _decimal_to_float(value) -> float:
     """Convert Decimal128 and related numeric values to floats for CSV output."""
     if value is None:
@@ -93,15 +84,6 @@ def _decimal_to_float(value) -> float:
         return float(value)
     except (TypeError, ValueError):
         return 0.0
-
-
-def _classify_tx_type(input_data: str, is_contract_call: bool) -> str:
-    """Infer a transaction category from input data and contract behavior."""
-    if input_data.startswith("0xa9059cbb") or input_data.startswith("0x23b872dd"):
-        return "Token Transfer"
-    if is_contract_call:
-        return "Contract Call"
-    return "ETH Transfer"
 
 
 def load_raw_batch(from_block: int, to_block: int, cfg: Optional[Config] = None) -> List[dict]:
@@ -181,8 +163,8 @@ def clean_single_tx(
     fetched_at: Optional[str],
     receipt: Optional[dict],
     cfg: Config,
-) -> Tuple[dict, dict]:
-    """Clean a single raw transaction into AML-ready row formats."""
+) -> dict:
+    """Clean a single raw transaction into a transaction row."""
     tx_hash = normalize_hex_id(raw_tx.get("hash"))
     from_address = _normalize_address(raw_tx.get("from"))
     to_address = _normalize_address(raw_tx.get("to"))
@@ -191,13 +173,7 @@ def clean_single_tx(
     value_eth = value_wei / 1e18
 
     input_data = normalize_hex_data(raw_tx.get("input"))
-    input_short = _shorten_input(input_data)
-
     is_contract_call = bool(input_data and input_data != "0x") or to_address is None
-    risk_flag_contract = is_contract_call
-    risk_flag_high_value = value_eth > cfg.aml_high_value_threshold
-
-    tx_type = _classify_tx_type(input_data, is_contract_call)
 
     gas_used = None
     status = None
@@ -205,7 +181,7 @@ def clean_single_tx(
         gas_used = _to_int(receipt.get("gasUsed"))
         status = receipt.get("status")
 
-    tx_row = {
+    return {
         "block_number": block_number,
         "timestamp": block_timestamp,
         "tx_hash": tx_hash,
@@ -215,28 +191,11 @@ def clean_single_tx(
         "gas_used": gas_used,
         "status": status,
         "is_contract_call": is_contract_call,
-        "input_data": input_short,
-        "risk_flag_high_value": risk_flag_high_value,
-        "risk_flag_contract": risk_flag_contract,
-        "is_suspicious_basic": False,
-        "tx_type": tx_type,
-        "fetched_at": fetched_at,
     }
 
-    edge_row = {
-        "from_address": from_address,
-        "to_address": to_address,
-        "value_eth": value_eth,
-        "block_number": block_number,
-        "tx_hash": tx_hash,
-        "timestamp": block_timestamp,
-    }
 
-    return tx_row, edge_row
-
-
-def clean_flat_tx(tx_doc: dict, cfg: Config) -> Tuple[dict, dict]:
-    """Convert a flattened raw transaction document into transform output rows."""
+def clean_flat_tx(tx_doc: dict, cfg: Config) -> dict:
+    """Convert a flattened raw transaction document into a transaction row."""
     block = tx_doc.get("block", {})
     address_pair = tx_doc.get("address_pair", {})
     value = tx_doc.get("value", {})
@@ -251,7 +210,7 @@ def clean_flat_tx(tx_doc: dict, cfg: Config) -> Tuple[dict, dict]:
     is_contract_call = bool(forensics.get("is_contract")) or to_address is None
     value_eth = _decimal_to_float(value.get("eth"))
 
-    tx_row = {
+    return {
         "block_number": _to_int(block.get("number")),
         "timestamp": _to_datetime(block.get("timestamp")),
         "tx_hash": tx_hash,
@@ -261,24 +220,7 @@ def clean_flat_tx(tx_doc: dict, cfg: Config) -> Tuple[dict, dict]:
         "gas_used": _to_int(gas.get("gas_used")) if gas.get("gas_used") is not None else None,
         "status": _to_int(forensics.get("receipt_status")) if forensics.get("receipt_status") is not None else None,
         "is_contract_call": is_contract_call,
-        "input_data": _shorten_input(input_data),
-        "risk_flag_high_value": value_eth > cfg.aml_high_value_threshold,
-        "risk_flag_contract": is_contract_call,
-        "is_suspicious_basic": False,
-        "tx_type": _classify_tx_type(input_data, is_contract_call),
-        "fetched_at": _to_datetime(metadata.get("fetched_at")),
     }
-
-    edge_row = {
-        "from_address": from_address,
-        "to_address": to_address,
-        "value_eth": value_eth,
-        "block_number": _to_int(block.get("number")),
-        "tx_hash": tx_hash,
-        "timestamp": _to_datetime(block.get("timestamp")),
-    }
-
-    return tx_row, edge_row
 
 
 def _backfill_flat_transactions(flat_collection, raw_blocks: List[dict], cfg: Config) -> int:
@@ -302,10 +244,9 @@ def _backfill_flat_transactions(flat_collection, raw_blocks: List[dict], cfg: Co
     return backfilled
 
 
-def _build_rows_from_raw_blocks(raw_blocks: List[dict], cfg: Config) -> Tuple[List[dict], List[dict]]:
-    """Transform raw block documents into transaction and edge row dictionaries."""
+def _build_rows_from_raw_blocks(raw_blocks: List[dict], cfg: Config) -> List[dict]:
+    """Transform raw block documents into transaction row dictionaries."""
     transactions_rows: List[dict] = []
-    edges_rows: List[dict] = []
 
     for raw_block in raw_blocks:
         block_number = raw_block.get("block_number")
@@ -327,7 +268,7 @@ def _build_rows_from_raw_blocks(raw_blocks: List[dict], cfg: Config) -> Tuple[Li
             seen_hashes.add(tx_hash)
 
             receipt = receipts_map.get(tx_hash)
-            tx_row, edge_row = clean_single_tx(
+            tx_row = clean_single_tx(
                 raw_tx,
                 block_timestamp,
                 block_number,
@@ -336,20 +277,16 @@ def _build_rows_from_raw_blocks(raw_blocks: List[dict], cfg: Config) -> Tuple[Li
                 cfg,
             )
             transactions_rows.append(tx_row)
-            edges_rows.append(edge_row)
-
-    return transactions_rows, edges_rows
+    return transactions_rows
 
 
-def _build_rows_from_flat_transactions(flat_transactions: List[dict], cfg: Config) -> Tuple[List[dict], List[dict]]:
+def _build_rows_from_flat_transactions(flat_transactions: List[dict], cfg: Config) -> List[dict]:
     """Transform flattened raw transaction documents into output rows."""
     transactions_rows: List[dict] = []
-    edges_rows: List[dict] = []
     for tx_doc in flat_transactions:
-        tx_row, edge_row = clean_flat_tx(tx_doc, cfg)
+        tx_row = clean_flat_tx(tx_doc, cfg)
         transactions_rows.append(tx_row)
-        edges_rows.append(edge_row)
-    return transactions_rows, edges_rows
+    return transactions_rows
 
 
 def save_staging_and_processed(
@@ -382,7 +319,6 @@ def _reset_transform_outputs(cfg: Config) -> None:
 
     for path in (
         cfg.processed_dir / "transactions.csv",
-        cfg.processed_dir / "graph_edges.csv",
     ):
         path.unlink(missing_ok=True)
 
@@ -404,20 +340,17 @@ def transform_raw_to_aml(
     include_transformed: bool = False,
     cfg: Optional[Config] = None,
 ) -> dict:
-    """Transform raw MongoDB blocks into AML-ready CSV outputs."""
+    """Transform raw MongoDB blocks into clean CSV outputs."""
     cfg = cfg or load_config()
     raw_collection = _get_raw_collection(cfg)
     flat_collection = _get_flat_transaction_collection(cfg)
     prepare_flat_transaction_collection(cfg)
     batch_size = batch_size or cfg.batch_size_transform
-    if reset_outputs:
-        _reset_transform_outputs(cfg)
 
     summary = {
         "batches": 0,
         "blocks_processed": 0,
         "transactions_created": 0,
-        "graph_edges_created": 0,
         "duplicate_raw_blocks_skipped": 0,
         "flat_transactions_used": 0,
         "raw_transactions_used": 0,
@@ -426,6 +359,7 @@ def transform_raw_to_aml(
 
     batch_number = 0
     last_processed_block = None
+    outputs_reset = False
     while True:
         block_headers = _load_pending_block_headers(
             raw_collection,
@@ -438,6 +372,10 @@ def transform_raw_to_aml(
         if not block_headers:
             logger.info("No raw blocks found for transformation")
             break
+
+        if reset_outputs and not outputs_reset:
+            _reset_transform_outputs(cfg)
+            outputs_reset = True
 
         block_headers, duplicate_docs = _dedupe_raw_blocks(block_headers)
         if duplicate_docs > 0:
@@ -508,26 +446,22 @@ def transform_raw_to_aml(
         else:
             backfilled = 0
 
-        flat_transactions_rows, flat_edges_rows = _build_rows_from_flat_transactions(flat_transactions, cfg)
-        raw_transactions_rows, raw_edges_rows = _build_rows_from_raw_blocks(raw_blocks, cfg)
+        flat_transactions_rows = _build_rows_from_flat_transactions(flat_transactions, cfg)
+        raw_transactions_rows = _build_rows_from_raw_blocks(raw_blocks, cfg)
         transactions_rows = flat_transactions_rows + raw_transactions_rows
-        edges_rows = flat_edges_rows + raw_edges_rows
 
         summary["flat_transactions_used"] += len(flat_transactions_rows)
         summary["raw_transactions_used"] += len(raw_transactions_rows)
 
         transactions_df = pd.DataFrame(transactions_rows)
-        graph_edges_df = pd.DataFrame(edges_rows)
-
         save_staging_and_processed(
-            {"transactions": transactions_df, "graph_edges": graph_edges_df},
+            {"transactions": transactions_df},
             batch_number,
             cfg,
         )
         summary["batches"] += 1
         summary["blocks_processed"] += len(processed_block_numbers)
         summary["transactions_created"] += len(transactions_df)
-        summary["graph_edges_created"] += len(graph_edges_df)
 
         print(
             f"Transformed {len(processed_block_numbers)} blocks -> "

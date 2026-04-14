@@ -1,1 +1,1 @@
-"""Address clustering engine for AML analysis."""
+"""Address clustering engine for wallet ownership analysis."""

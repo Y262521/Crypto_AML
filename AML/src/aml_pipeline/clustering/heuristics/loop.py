@@ -3,12 +3,9 @@ Loop / Circular Transaction Heuristic
 ========================================
 Detects circular fund flows: A → B → C → ... → A
 
-Circular flows are a strong indicator of:
-  - Wash trading
-  - Layering (AML stage 2)
-  - Self-controlled wallet networks
-
-All addresses participating in a detected cycle are linked together.
+Circular flows often indicate a shared controller, automated routing,
+or tightly-coupled wallet behavior. All addresses participating in a
+detected cycle are linked together.
 """
 
 from __future__ import annotations
@@ -25,7 +22,7 @@ class LoopDetectionHeuristic(BaseHeuristic):
     name = "loop_detection"
     description = (
         "Addresses forming circular transaction flows are grouped as "
-        "likely part of a layering or wash-trading scheme."
+        "likely coordinated or jointly controlled."
     )
 
     def __init__(self, cfg: Config):
@@ -34,7 +31,11 @@ class LoopDetectionHeuristic(BaseHeuristic):
 
     def find_links(self, G: nx.MultiDiGraph) -> List[ClusterEdge]:
         # Work on a simple DiGraph (collapse parallel edges) for cycle detection
-        simple = nx.DiGraph(G)
+        simple = nx.DiGraph()
+        for u, v, data in G.edges(data=True):
+            if not self.is_meaningful_edge(data):
+                continue
+            simple.add_edge(u, v)
 
         links: List[ClusterEdge] = []
         seen_pairs: set = set()

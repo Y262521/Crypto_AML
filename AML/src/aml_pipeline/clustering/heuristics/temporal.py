@@ -39,6 +39,8 @@ class TemporalHeuristic(BaseHeuristic):
         # Collect all edges with timestamps
         edges_ts: list[tuple[float, str, str]] = []
         for u, v, data in G.edges(data=True):
+            if not self.is_meaningful_edge(data):
+                continue
             ts = data.get("timestamp", 0) or 0
             edges_ts.append((float(ts), u, v))
 
