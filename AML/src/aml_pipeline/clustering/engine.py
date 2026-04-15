@@ -8,7 +8,7 @@ Orchestrates the full clustering pipeline:
   3. Run all enabled heuristics to find address links
   4. Merge links with Union-Find into clusters
   5. Compile cluster evidence and indicators
-  6. Persist results to MySQL (clusters + owners + evidence)
+  6. Persist results to MySQL (clusters + owner list labels + evidence)
 
 Designed for incremental updates: pass `incremental=True` and only
 new transactions are processed; existing clusters are updated in-place.
@@ -260,7 +260,7 @@ class ClusteringEngine:
 
         Args:
             source:           data source hint passed to the adapter
-            persist:          if True, save results to MySQL (clusters + owners + evidence)
+            persist:          if True, save results to MySQL (clusters + owner labels + evidence)
             min_cluster_size: skip clusters smaller than this value
         """
         logger.info("ClusteringEngine: loading transactions (source=%s)", source)
@@ -308,41 +308,20 @@ class ClusteringEngine:
     # ── persistence ──────────────────────────────────────────────────────────
 
     def _persist(self, results: List[ClusterResult]) -> None:
-        """Save cluster results to MySQL (clusters + owners + evidence)."""
+        """Save cluster results to MySQL (clusters + owner labels + evidence)."""
         persist_min_size = max(2, int(self.cfg.clustering_min_cluster_size or 2))
         persisted = [result for result in results if len(result.addresses) >= persist_min_size]
         self._save_to_mysql(persisted)
 
     def _save_to_mysql(self, results: List[ClusterResult]) -> None:
         from sqlalchemy import text
-        from faker import Faker
-        from faker.exceptions import UniquenessException
 
         from ..utils.connections import get_maria_engine
         from ..etl.load.mariadb_loader import create_tables_if_not_exist
+        from .owner_registry import LABEL_STATUS_UNLABELED, relabel_clusters_in_connection
 
         persist_min_size = max(2, int(self.cfg.clustering_min_cluster_size or 2))
         heuristic_descriptions = {h.name: h.description for h in self.heuristics}
-
-        fake = Faker()
-        fake.seed_instance(self.cfg.mock_owner_seed)
-
-        def _make_owner() -> dict:
-            try:
-                full_name = fake.unique.name()
-            except UniquenessException:
-                fake.unique.clear()
-                full_name = fake.name()
-            return {
-                "full_name": full_name,
-                "specifics": fake.secondary_address(),
-                "street_address": f"{fake.building_number()} {fake.street_name()}",
-                "locality": fake.neighborhood(),
-                "city": fake.city(),
-                "administrative_area": fake.state(),
-                "postal_code": fake.postcode(),
-                "country": fake.country(),
-            }
 
         create_tables_if_not_exist(self.cfg)
         engine = get_maria_engine(self.cfg)
@@ -355,66 +334,6 @@ class ClusteringEngine:
                 current_cluster_ids = set(cluster_ids)
                 stale_cluster_ids = sorted(existing_cluster_ids - current_cluster_ids)
 
-                # Fetch existing owner mappings
-                owner_map: dict[str, int] = {}
-                if cluster_ids:
-                    for cluster_batch in _chunked(cluster_ids):
-                        placeholders = ", ".join(
-                            [f":cid{i}" for i in range(len(cluster_batch))]
-                        )
-                        params = {
-                            f"cid{i}": cid
-                            for i, cid in enumerate(cluster_batch)
-                        }
-                        rows = conn.execute(
-                            text(
-                                f"SELECT id, owner_id FROM wallet_clusters "
-                                f"WHERE id IN ({placeholders})"
-                            ),
-                            params,
-                        ).mappings().all()
-                        owner_map.update(
-                            {
-                                row["id"]: row["owner_id"]
-                                for row in rows
-                                if row.get("owner_id")
-                            }
-                        )
-
-                # Create owners for clusters without an owner
-                for cid in cluster_ids:
-                    if cid in owner_map:
-                        continue
-                    owner = _make_owner()
-                    result = conn.execute(
-                        text(
-                            """
-                            INSERT INTO owners (
-                                full_name,
-                                specifics,
-                                street_address,
-                                locality,
-                                city,
-                                administrative_area,
-                                postal_code,
-                                country
-                            )
-                            VALUES (
-                                :full_name,
-                                :specifics,
-                                :street_address,
-                                :locality,
-                                :city,
-                                :administrative_area,
-                                :postal_code,
-                                :country
-                            )
-                            """
-                        ),
-                        owner,
-                    )
-                    owner_map[cid] = int(result.lastrowid)
-
                 if cluster_ids:
                     cluster_rows = []
                     for r in results:
@@ -423,22 +342,42 @@ class ClusteringEngine:
                         )
                         cluster_rows.append({
                             "id": r.cluster_id,
-                            "owner_id": owner_map.get(r.cluster_id),
+                            "owner_id": None,
                             "cluster_size": len(r.addresses),
                             "total_balance": total_balance,
                             "risk_level": "normal",
+                            "label_status": LABEL_STATUS_UNLABELED,
+                            "matched_owner_address": None,
                         })
 
                     conn.execute(
                         text(
                             """
-                            INSERT INTO wallet_clusters (id, owner_id, cluster_size, total_balance, risk_level)
-                            VALUES (:id, :owner_id, :cluster_size, :total_balance, :risk_level)
+                            INSERT INTO wallet_clusters (
+                                id,
+                                owner_id,
+                                cluster_size,
+                                total_balance,
+                                risk_level,
+                                label_status,
+                                matched_owner_address
+                            )
+                            VALUES (
+                                :id,
+                                :owner_id,
+                                :cluster_size,
+                                :total_balance,
+                                :risk_level,
+                                :label_status,
+                                :matched_owner_address
+                            )
                             ON DUPLICATE KEY UPDATE
-                                owner_id = IFNULL(wallet_clusters.owner_id, VALUES(owner_id)),
+                                owner_id = VALUES(owner_id),
                                 cluster_size = VALUES(cluster_size),
                                 total_balance = VALUES(total_balance),
-                                risk_level = VALUES(risk_level)
+                                risk_level = VALUES(risk_level),
+                                label_status = VALUES(label_status),
+                                matched_owner_address = VALUES(matched_owner_address)
                             """
                         ),
                         cluster_rows,
@@ -538,6 +477,11 @@ class ClusteringEngine:
                                 text(f"UPDATE addresses SET cluster_id = NULL WHERE cluster_id IN ({placeholders})"),
                                 params,
                             )
+
+                relabel_clusters_in_connection(
+                    conn,
+                    cluster_ids=sorted(retained_cluster_ids),
+                )
 
                 # Replace evidence
                 retained_cluster_list = sorted(retained_cluster_ids)

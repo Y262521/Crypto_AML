@@ -9,4 +9,3 @@ neo4j==5.24.0
 web3==6.19.0
 networkx>=3.2
 reportlab==4.4.10
-Faker==37.1.0

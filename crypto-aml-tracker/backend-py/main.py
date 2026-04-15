@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from fastapi import FastAPI
@@ -8,6 +9,7 @@ from db.neo4j import close_neo4j, connect_neo4j
 from db.mysql import close_mysql, connect_mysql
 from routes.transactions import router as tx_router
 from routes.clusters import router as cluster_router
+from routes.placement import ensure_placement_schema, router as placement_router
 from scheduler import create_scheduler, get_next_run_time, pipeline_status
 from settings import get_env
 
@@ -24,8 +26,9 @@ async def lifespan(app: FastAPI):
 
     try:
         await connect_mysql()
+        await asyncio.to_thread(ensure_placement_schema)
     except Exception as e:
-        print(f"MariaDB not available - processed transaction features disabled: {e}")
+        print(f"MariaDB schema bootstrap failed - processed transaction features may be unavailable: {e}")
 
     # Start the ETL + clustering scheduler
     scheduler = create_scheduler()
@@ -52,6 +55,7 @@ app.add_middleware(
 
 app.include_router(tx_router, prefix="/api/transactions")
 app.include_router(cluster_router, prefix="/api/clusters")
+app.include_router(placement_router, prefix="/api/placement")
 
 
 @app.get("/api/status")

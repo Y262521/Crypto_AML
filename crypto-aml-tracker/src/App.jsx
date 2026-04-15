@@ -3,6 +3,7 @@ import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
 import GraphExplorer from './pages/GraphExplorer'
 import Analytics from './pages/Analytics'
+import Placement from './pages/Placement'
 import Clusters from './pages/Clusters'
 import { getLatestTransactions } from './services/transactionService'
 import {
@@ -157,6 +158,8 @@ function App() {
               />
             : activePage === 'analytics'
                 ? <Analytics />
+                : activePage === 'placement'
+                  ? <Placement />
                 : activePage === 'clusters'
                   ? <Clusters onAddressClick={handleAddressClick} />
                   : null

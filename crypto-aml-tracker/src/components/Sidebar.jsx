@@ -3,6 +3,7 @@ import React from 'react';
 const navItems = [
     { id: 'feed', label: 'Transaction Table', icon: '▦' },
     { id: 'analytics', label: 'Analytics', icon: '◉' },
+    { id: 'placement', label: 'Placement Alerts', icon: '⟁' },
     { id: 'clusters', label: 'Wallet Clusters', icon: '⬡' },
     { id: 'graph', label: 'Transaction Network', icon: '❋' },
 ];

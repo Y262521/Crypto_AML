@@ -1,6 +1,7 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001/api';
 const BACKEND_URL = `${API_BASE_URL}/transactions`;
 const CLUSTER_URL = `${API_BASE_URL}/clusters`;
+const PLACEMENT_URL = `${API_BASE_URL}/placement`;
 
 export const getLatestTransactions = async ({ limit = 200, offset = 0, sortBy = 'amount_desc' } = {}) => {
   const params = new URLSearchParams({
@@ -64,6 +65,59 @@ export const getClustersSummary = async () => {
 
 export const runClustering = async () => {
   const res = await fetch(`${CLUSTER_URL}/run`, { method: 'POST' });
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};
+
+export const createOwnerListEntry = async (payload) => {
+  const res = await fetch(`${CLUSTER_URL}/owner-list`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    let message = `Backend error: ${res.status}`;
+    try {
+      const error = await res.json();
+      if (error?.detail) {
+        message = typeof error.detail === 'string' ? error.detail : JSON.stringify(error.detail);
+      }
+    } catch {
+      // Ignore non-JSON failures and keep the HTTP status message.
+    }
+    throw new Error(message);
+  }
+
+  return await res.json();
+};
+
+export const getPlacements = async ({ limit = 50, minConfidence = 0 } = {}) => {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    min_confidence: String(minConfidence),
+  });
+  const res = await fetch(`${PLACEMENT_URL}?${params.toString()}`);
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};
+
+export const getPlacementSummary = async () => {
+  const res = await fetch(`${PLACEMENT_URL}/summary`);
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};
+
+export const getPlacementDetail = async (entityId) => {
+  const res = await fetch(`${PLACEMENT_URL}/${encodeURIComponent(entityId)}`);
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};
+
+export const runPlacementAnalysis = async () => {
+  const res = await fetch(`${PLACEMENT_URL}/run`, { method: 'POST' });
   if (!res.ok) throw new Error(`Backend error: ${res.status}`);
   return await res.json();
 };

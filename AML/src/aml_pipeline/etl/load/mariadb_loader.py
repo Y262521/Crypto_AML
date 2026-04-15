@@ -31,11 +31,20 @@ BOOLEAN_COLUMNS = [
 ]
 UTF8MB4_COLLATION = "utf8mb4_unicode_ci"
 UTF8MB4_TABLES = (
-    "owners",
+    "owner_list",
+    "owner_list_addresses",
     "wallet_clusters",
     "transactions",
     "addresses",
     "cluster_evidence",
+    "placement_runs",
+    "placement_entities",
+    "placement_entity_addresses",
+    "placement_behaviors",
+    "placement_traces",
+    "placement_detections",
+    "placement_labels",
+    "placement_pois",
 )
 
 
@@ -118,6 +127,14 @@ def _ensure_utf8mb4_tables(engine: Engine, cfg: Config) -> None:
                 UTF8MB4_COLLATION,
             )
         except Exception as exc:
+            message = str(exc)
+            if "used in a foreign key constraint" in message:
+                logger.debug(
+                    "Deferred utf8mb4 migration for %s because of foreign keys: %s",
+                    table_name,
+                    exc,
+                )
+                continue
             logger.warning(
                 "Skipped utf8mb4 migration for %s: %s",
                 table_name,
@@ -125,10 +142,28 @@ def _ensure_utf8mb4_tables(engine: Engine, cfg: Config) -> None:
             )
 
 
-def _ensure_owner_columns(engine: Engine, cfg: Config) -> None:
-    """Add missing owner address fields to legacy owners tables."""
-    required = {
+def _table_exists(engine: Engine, cfg: Config, table_name: str) -> bool:
+    with engine.connect() as conn:
+        value = conn.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM information_schema.tables
+                WHERE table_schema = :db
+                  AND table_name = :table_name
+                """
+            ),
+            {"db": cfg.mysql_db, "table_name": table_name},
+        ).scalar_one()
+    return bool(value)
+
+
+def _ensure_owner_registry_columns(engine: Engine, cfg: Config) -> None:
+    """Add missing columns to owner-list tables on legacy databases."""
+    owner_list_required = {
         "full_name": "VARCHAR(255) NOT NULL",
+        "entity_type": "VARCHAR(64) NOT NULL DEFAULT 'individual'",
+        "list_category": "VARCHAR(64) NOT NULL DEFAULT 'watchlist'",
         "specifics": "VARCHAR(255) NULL",
         "street_address": "VARCHAR(255) NULL",
         "locality": "VARCHAR(128) NULL",
@@ -136,6 +171,101 @@ def _ensure_owner_columns(engine: Engine, cfg: Config) -> None:
         "administrative_area": "VARCHAR(128) NULL",
         "postal_code": "VARCHAR(32) NULL",
         "country": "VARCHAR(128) NOT NULL",
+        "source_reference": "VARCHAR(255) NULL",
+        "notes": "TEXT NULL",
+        "updated_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+    }
+    owner_address_required = {
+        "owner_list_id": "BIGINT NOT NULL",
+        "blockchain_network": "VARCHAR(64) NOT NULL DEFAULT 'ethereum'",
+        "address": "VARCHAR(64) NOT NULL",
+        "is_primary": "TINYINT(1) NOT NULL DEFAULT 0",
+        "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+    }
+
+    with engine.begin() as conn:
+        owner_rows = conn.execute(
+            text(
+                """
+                SELECT COLUMN_NAME
+                FROM information_schema.columns
+                WHERE table_schema = :db
+                  AND table_name = 'owner_list'
+                """
+            ),
+            {"db": cfg.mysql_db},
+        ).all()
+        owner_existing = {row[0] for row in owner_rows}
+        for column, definition in owner_list_required.items():
+            if column in owner_existing:
+                continue
+            conn.exec_driver_sql(
+                f"ALTER TABLE `owner_list` ADD COLUMN `{column}` {definition}"
+            )
+
+        address_rows = conn.execute(
+            text(
+                """
+                SELECT COLUMN_NAME
+                FROM information_schema.columns
+                WHERE table_schema = :db
+                  AND table_name = 'owner_list_addresses'
+                """
+            ),
+            {"db": cfg.mysql_db},
+        ).all()
+        address_existing = {row[0] for row in address_rows}
+        for column, definition in owner_address_required.items():
+            if column in address_existing:
+                continue
+            conn.exec_driver_sql(
+                f"ALTER TABLE `owner_list_addresses` ADD COLUMN `{column}` {definition}"
+            )
+
+
+def _ensure_owner_address_indexes(engine: Engine, cfg: Config) -> None:
+    with engine.begin() as conn:
+        indexes = conn.execute(
+            text(
+                """
+                SELECT index_name
+                FROM information_schema.statistics
+                WHERE table_schema = :db
+                  AND table_name = 'owner_list_addresses'
+                """
+            ),
+            {"db": cfg.mysql_db},
+        ).scalars().all()
+        index_names = set(indexes)
+
+        if "uq_owner_list_addresses_address" not in index_names:
+            conn.exec_driver_sql(
+                """
+                ALTER TABLE `owner_list_addresses`
+                ADD UNIQUE KEY `uq_owner_list_addresses_address` (`address`)
+                """
+            )
+        if "idx_owner_list_addresses_owner_id" not in index_names:
+            conn.exec_driver_sql(
+                """
+                ALTER TABLE `owner_list_addresses`
+                ADD KEY `idx_owner_list_addresses_owner_id` (`owner_list_id`)
+                """
+            )
+        if "idx_owner_list_addresses_network" not in index_names:
+            conn.exec_driver_sql(
+                """
+                ALTER TABLE `owner_list_addresses`
+                ADD KEY `idx_owner_list_addresses_network` (`blockchain_network`)
+                """
+            )
+
+
+def _ensure_wallet_cluster_label_columns(engine: Engine, cfg: Config) -> None:
+    required = {
+        "label_status": "VARCHAR(32) NOT NULL DEFAULT 'unlabeled'",
+        "matched_owner_address": "VARCHAR(64) NULL",
+        "last_labeled_at": "DATETIME NULL",
     }
 
     with engine.begin() as conn:
@@ -145,7 +275,7 @@ def _ensure_owner_columns(engine: Engine, cfg: Config) -> None:
                 SELECT COLUMN_NAME
                 FROM information_schema.columns
                 WHERE table_schema = :db
-                  AND table_name = 'owners'
+                  AND table_name = 'wallet_clusters'
                 """
             ),
             {"db": cfg.mysql_db},
@@ -156,8 +286,135 @@ def _ensure_owner_columns(engine: Engine, cfg: Config) -> None:
             if column in existing:
                 continue
             conn.exec_driver_sql(
-                f"ALTER TABLE `owners` ADD COLUMN `{column}` {definition}"
+                f"ALTER TABLE `wallet_clusters` ADD COLUMN `{column}` {definition}"
             )
+
+        indexes = conn.execute(
+            text(
+                """
+                SELECT index_name
+                FROM information_schema.statistics
+                WHERE table_schema = :db
+                  AND table_name = 'wallet_clusters'
+                """
+            ),
+            {"db": cfg.mysql_db},
+        ).scalars().all()
+        if "idx_wallet_clusters_label_status" not in set(indexes):
+            conn.exec_driver_sql(
+                """
+                ALTER TABLE `wallet_clusters`
+                ADD KEY `idx_wallet_clusters_label_status` (`label_status`)
+                """
+            )
+
+
+def _drop_legacy_wallet_cluster_owner_foreign_keys(engine: Engine, cfg: Config) -> bool:
+    """Drop owner_id foreign keys that still point at the legacy owners table."""
+    with engine.begin() as conn:
+        rows = conn.execute(
+            text(
+                """
+                SELECT constraint_name, referenced_table_name
+                FROM information_schema.key_column_usage
+                WHERE table_schema = :db
+                  AND table_name = 'wallet_clusters'
+                  AND column_name = 'owner_id'
+                  AND referenced_table_name IS NOT NULL
+                """
+            ),
+            {"db": cfg.mysql_db},
+        ).mappings().all()
+
+        legacy_found = False
+        for row in rows:
+            if row["referenced_table_name"] == "owner_list":
+                continue
+            legacy_found = True
+            conn.exec_driver_sql(
+                f"ALTER TABLE `wallet_clusters` DROP FOREIGN KEY `{row['constraint_name']}`"
+            )
+        return legacy_found
+
+
+def _ensure_wallet_cluster_owner_fk(engine: Engine, cfg: Config) -> None:
+    with engine.begin() as conn:
+        rows = conn.execute(
+            text(
+                """
+                SELECT constraint_name, referenced_table_name
+                FROM information_schema.key_column_usage
+                WHERE table_schema = :db
+                  AND table_name = 'wallet_clusters'
+                  AND column_name = 'owner_id'
+                  AND referenced_table_name IS NOT NULL
+                """
+            ),
+            {"db": cfg.mysql_db},
+        ).mappings().all()
+        if any(row["referenced_table_name"] == "owner_list" for row in rows):
+            return
+
+        conn.exec_driver_sql(
+            """
+            ALTER TABLE `wallet_clusters`
+            ADD CONSTRAINT `fk_wallet_clusters_owner`
+            FOREIGN KEY (`owner_id`) REFERENCES `owner_list`(`id`)
+            ON DELETE SET NULL
+            """
+        )
+
+
+def _ensure_owner_list_address_fk(engine: Engine, cfg: Config) -> None:
+    with engine.begin() as conn:
+        rows = conn.execute(
+            text(
+                """
+                SELECT constraint_name
+                FROM information_schema.key_column_usage
+                WHERE table_schema = :db
+                  AND table_name = 'owner_list_addresses'
+                  AND column_name = 'owner_list_id'
+                  AND referenced_table_name = 'owner_list'
+                """
+            ),
+            {"db": cfg.mysql_db},
+        ).mappings().all()
+        if rows:
+            return
+        conn.exec_driver_sql(
+            """
+            ALTER TABLE `owner_list_addresses`
+            ADD CONSTRAINT `fk_owner_list_addresses_owner`
+            FOREIGN KEY (`owner_list_id`) REFERENCES `owner_list`(`id`)
+            ON DELETE CASCADE
+            """
+        )
+
+
+def _migrate_legacy_owner_schema(engine: Engine, cfg: Config) -> None:
+    """Remove legacy fake-owner links and swap cluster ownership to owner_list."""
+    legacy_fk_found = _drop_legacy_wallet_cluster_owner_foreign_keys(engine, cfg)
+
+    with engine.begin() as conn:
+        if legacy_fk_found:
+            conn.execute(
+                text(
+                    """
+                    UPDATE wallet_clusters
+                    SET owner_id = NULL,
+                        label_status = 'unlabeled',
+                        matched_owner_address = NULL,
+                        last_labeled_at = NULL
+                    """
+                )
+            )
+
+        if _table_exists(engine, cfg, "owners"):
+            conn.exec_driver_sql("DROP TABLE `owners`")
+
+    _ensure_owner_list_address_fk(engine, cfg)
+    _ensure_wallet_cluster_owner_fk(engine, cfg)
 
 
 def create_tables_if_not_exist(cfg: Config | None = None) -> None:
@@ -172,7 +429,10 @@ def create_tables_if_not_exist(cfg: Config | None = None) -> None:
     engine = get_maria_engine(cfg)
     try:
         _run_sql_file(engine, schema_path)
-        _ensure_owner_columns(engine, cfg)
+        _ensure_owner_registry_columns(engine, cfg)
+        _ensure_owner_address_indexes(engine, cfg)
+        _ensure_wallet_cluster_label_columns(engine, cfg)
+        _migrate_legacy_owner_schema(engine, cfg)
         _ensure_utf8mb4_tables(engine, cfg)
     finally:
         engine.dispose()

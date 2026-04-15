@@ -1,6 +1,6 @@
 # Wallet Clustering ETL Pipeline (MongoDB -> MySQL -> Neo4j -> MySQL)
 
-This project extracts raw Ethereum blocks into MongoDB, stores a flattened raw-transaction collection for fast lookups, transforms the data into clean CSVs, loads the transformed outputs into MySQL, syncs relationships into Neo4j, and persists wallet-clustering results (clusters + owners + evidence) back into MySQL.
+This project extracts raw Ethereum blocks into MongoDB, stores a flattened raw-transaction collection for fast lookups, transforms the data into clean CSVs, loads the transformed outputs into MySQL, syncs relationships into Neo4j, and persists wallet-clustering results (clusters + owner-list labels + evidence) back into MySQL.
 
 ## Architecture
 
