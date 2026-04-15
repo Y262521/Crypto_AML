@@ -33,7 +33,7 @@ def main() -> None:
     parser.add_argument(
         "--persist",
         action="store_true",
-        help="Save cluster results to MySQL (clusters + owners + evidence)",
+        help="Save cluster results to MySQL (clusters + owner labels + evidence)",
     )
     parser.add_argument(
         "--min-size",

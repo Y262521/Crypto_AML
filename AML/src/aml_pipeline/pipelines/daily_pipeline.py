@@ -25,9 +25,10 @@ def run_daily_pipeline(
     skip_neo4j: bool = False,
     strict_neo4j: bool = False,
     run_clustering: bool = True,
+    run_placement: bool = True,
     cfg: Config | None = None,
 ) -> dict:
-    """Run extract, transform, load, and clustering for the daily pipeline."""
+    """Run extract, transform, load, clustering, and placement analytics."""
     cfg = cfg or load_config()
     setup_logging(cfg.log_level)
 
@@ -47,6 +48,7 @@ def run_daily_pipeline(
             "mariadb": None,
             "neo4j": None,
             "clustering": None,
+            "placement": None,
         }
 
     load_summary = run_load_stage(
@@ -79,6 +81,30 @@ def run_daily_pipeline(
             logger.warning("Clustering stage failed (non-fatal): %s", exc)
             clustering_summary = {"error": str(exc)}
 
+    placement_summary = None
+    if run_placement:
+        try:
+            from ..analytics.placement import PlacementAnalysisEngine
+
+            placement_engine = PlacementAnalysisEngine(cfg=cfg)
+            placement_result = placement_engine.run(
+                source="mariadb",
+                persist=True,
+            )
+            placement_summary = {
+                "run_id": placement_result.run_id,
+                "placements_found": len(placement_result.placements),
+                "pois_created": len(placement_result.pois),
+            }
+            logger.info(
+                "Placement analytics complete: %d placements, %d POIs",
+                placement_summary["placements_found"],
+                placement_summary["pois_created"],
+            )
+        except Exception as exc:
+            logger.warning("Placement stage failed (non-fatal): %s", exc)
+            placement_summary = {"error": str(exc)}
+
     logger.info(
         "Load stage complete | MariaDB transactions: %s | Neo4j edges: %s | Mongo backup: %s",
         0 if mariadb_summary is None else mariadb_summary["transactions_loaded"],
@@ -92,4 +118,5 @@ def run_daily_pipeline(
         "mariadb": mariadb_summary,
         "neo4j": neo4j_summary,
         "clustering": clustering_summary,
+        "placement": placement_summary,
     }

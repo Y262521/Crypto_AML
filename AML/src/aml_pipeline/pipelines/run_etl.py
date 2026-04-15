@@ -25,6 +25,11 @@ def main():
         action="store_true",
         help="Skip the address clustering stage",
     )
+    parser.add_argument(
+        "--skip-placement",
+        action="store_true",
+        help="Skip the placement analytics stage",
+    )
 
     args = parser.parse_args()
     run_daily_pipeline(
@@ -34,6 +39,7 @@ def main():
         skip_neo4j=args.skip_neo4j,
         strict_neo4j=args.strict_neo4j,
         run_clustering=not args.skip_clustering,
+        run_placement=not args.skip_placement,
     )
 
 

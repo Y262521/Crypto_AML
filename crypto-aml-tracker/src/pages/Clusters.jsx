@@ -1,8 +1,37 @@
-import { useEffect, useState } from 'react';
+import { startTransition, useEffect, useState } from 'react';
 import { ReactFlow, ReactFlowProvider, Background, Controls } from '@xyflow/react';
-import { getClusters, getClustersSummary, getGraphData, runClustering } from '../services/transactionService';
+import {
+    createOwnerListEntry,
+    getClusters,
+    getClustersSummary,
+    getGraphData,
+    runClustering,
+} from '../services/transactionService';
 import { filterEdgesData, applyRadialLayout } from '../utils/graphUtils';
 import Loader from '../components/common/Loader';
+
+const EMPTY_OWNER_FORM = {
+    full_name: '',
+    entity_type: 'individual',
+    list_category: 'watchlist',
+    known_addresses: '',
+    blockchain_network: 'ethereum',
+    specifics: '',
+    street_address: '',
+    locality: '',
+    city: '',
+    administrative_area: '',
+    postal_code: '',
+    country: 'Ethiopia',
+    source_reference: 'Owner Registry Intake',
+    notes: '',
+};
+
+const LABEL_STYLES = {
+    matched: { color: '#166534', background: '#dcfce7', border: '1px solid #86efac' },
+    unlabeled: { color: '#475569', background: '#e2e8f0', border: '1px solid #cbd5e1' },
+    conflict: { color: '#92400e', background: '#fef3c7', border: '1px solid #fcd34d' },
+};
 
 const StatCard = ({ label, value, sub, color }) => (
     <div style={{
@@ -15,29 +44,80 @@ const StatCard = ({ label, value, sub, color }) => (
     </div>
 );
 
+const StatusPill = ({ status }) => {
+    const safeStatus = status || 'unlabeled';
+    const style = LABEL_STYLES[safeStatus] || LABEL_STYLES.unlabeled;
+    const label = safeStatus === 'matched'
+        ? 'Matched'
+        : safeStatus === 'conflict'
+            ? 'Conflict'
+            : 'Unknown / Unlabeled';
+
+    return (
+        <span style={{
+            ...style,
+            borderRadius: '999px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            padding: '4px 10px',
+            fontSize: '10px',
+            fontWeight: '700',
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+        }}>
+            {label}
+        </span>
+    );
+};
+
+const FormField = ({ label, children, hint }) => (
+    <label style={{ display: 'grid', gap: '8px' }}>
+        <span style={{ fontSize: '12px', fontWeight: '700', color: '#334155' }}>{label}</span>
+        {children}
+        {hint ? <span style={{ fontSize: '11px', color: '#64748b' }}>{hint}</span> : null}
+    </label>
+);
+
+const inputStyle = {
+    width: '100%',
+    borderRadius: '12px',
+    border: '1px solid #cbd5e1',
+    background: '#fff',
+    color: '#0f172a',
+    padding: '12px 14px',
+    fontSize: '13px',
+    boxSizing: 'border-box',
+};
+
 const formatEth = (value) => {
     const num = Number(value || 0);
     if (!Number.isFinite(num)) return '0';
     return num.toLocaleString(undefined, { maximumFractionDigits: 6 });
 };
 
-const formatOwner = (owner) => {
-    if (!owner) return '—';
-    return owner.full_name || '—';
+const formatOwner = (owner, labelStatus) => {
+    if (owner?.full_name) return owner.full_name;
+    if (labelStatus === 'conflict') return 'Owner match conflict';
+    return 'Unknown / Unlabeled';
 };
 
-const formatLocation = (owner) => {
-    if (!owner) return '—';
-    const parts = [
-        owner.specifics,
-        owner.street_address,
-        owner.locality,
-        owner.city,
-        owner.administrative_area,
-        owner.postal_code,
-        owner.country
-    ].filter(Boolean);
-    return parts.length ? parts.join(', ') : '—';
+const formatLocation = (owner, labelStatus) => {
+    if (owner) {
+        const parts = [
+            owner.specifics,
+            owner.street_address,
+            owner.locality,
+            owner.city,
+            owner.administrative_area,
+            owner.postal_code,
+            owner.country,
+        ].filter(Boolean);
+        return parts.length ? parts.join(', ') : 'Address not recorded';
+    }
+    if (labelStatus === 'conflict') {
+        return 'Multiple owner-list matches found for this cluster.';
+    }
+    return 'No owner-list address match yet.';
 };
 
 const truncate = (value, maxLength = 24) => {
@@ -97,7 +177,9 @@ const buildPreviewGraph = (edgesData, centerId) => {
     });
 
     const nodes = Array.from(nodesMap.values());
-    const positioned = nodes.length ? applyRadialLayout(nodes, edges, centerId, { ringSpacing: 180, minRadius: 80 }) : nodes;
+    const positioned = nodes.length
+        ? applyRadialLayout(nodes, edges, centerId, { ringSpacing: 180, minRadius: 80 })
+        : nodes;
     return { nodes: positioned, edges };
 };
 
@@ -125,6 +207,254 @@ const getActivityHighlights = (activity, riskLevel) => {
     return highlights;
 };
 
+function OwnerListModal({
+    open,
+    form,
+    submitting,
+    error,
+    onClose,
+    onChange,
+    onSubmit,
+}) {
+    if (!open) return null;
+
+    return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'grid', placeItems: 'center', padding: '24px' }}>
+            <div
+                onClick={onClose}
+                style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.56)' }}
+            />
+            <div style={{
+                position: 'relative',
+                width: 'min(760px, 100%)',
+                maxHeight: 'calc(100vh - 48px)',
+                overflow: 'hidden',
+                borderRadius: '28px',
+                background: '#f8fafc',
+                boxShadow: '0 30px 120px rgba(15, 23, 42, 0.35)',
+                border: '1px solid rgba(148, 163, 184, 0.24)',
+            }}>
+                <div style={{
+                    padding: '24px 28px',
+                    background: 'linear-gradient(135deg, #0f172a 0%, #1d4ed8 52%, #38bdf8 100%)',
+                    color: '#fff',
+                }}>
+                    <div style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.85 }}>
+                        Owner Registry
+                    </div>
+                    <div style={{ fontSize: '26px', fontWeight: '700', marginTop: '10px' }}>
+                        Add Entity / Owner
+                    </div>
+                    <div style={{ fontSize: '13px', marginTop: '8px', maxWidth: '560px', lineHeight: '1.6', color: 'rgba(255,255,255,0.88)' }}>
+                        Save a verified address owner into the MySQL owner list and relabel any cluster that contains the supplied blockchain address.
+                    </div>
+                </div>
+
+                <form onSubmit={onSubmit} style={{ padding: '26px 28px 28px', overflowY: 'auto', maxHeight: 'calc(100vh - 210px)' }}>
+                    <div style={{ display: 'grid', gap: '18px' }}>
+                        {error ? (
+                            <div style={{
+                                borderRadius: '16px',
+                                background: '#fef2f2',
+                                border: '1px solid #fecaca',
+                                color: '#b91c1c',
+                                padding: '14px 16px',
+                                fontSize: '13px',
+                            }}>
+                                {error}
+                            </div>
+                        ) : null}
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                            <FormField label="Owner / Entity Name">
+                                <input
+                                    value={form.full_name}
+                                    onChange={(e) => onChange('full_name', e.target.value)}
+                                    style={inputStyle}
+                                    placeholder="e.g. Dawit Alemu"
+                                    required
+                                />
+                            </FormField>
+                            <FormField label="Entity Type">
+                                <select
+                                    value={form.entity_type}
+                                    onChange={(e) => onChange('entity_type', e.target.value)}
+                                    style={inputStyle}
+                                >
+                                    <option value="individual">Individual</option>
+                                    <option value="organization">Organization</option>
+                                </select>
+                            </FormField>
+                            <FormField label="List Category">
+                                <select
+                                    value={form.list_category}
+                                    onChange={(e) => onChange('list_category', e.target.value)}
+                                    style={inputStyle}
+                                >
+                                    <option value="watchlist">Watchlist</option>
+                                    <option value="sanction">Sanction</option>
+                                    <option value="exchange">Exchange</option>
+                                    <option value="merchant">Merchant</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </FormField>
+                            <FormField label="Blockchain Network">
+                                <input
+                                    value={form.blockchain_network}
+                                    onChange={(e) => onChange('blockchain_network', e.target.value)}
+                                    style={inputStyle}
+                                    placeholder="ethereum"
+                                    required
+                                />
+                            </FormField>
+                        </div>
+
+                        <FormField label="Known Blockchain Addresses" hint="Use one address per line or separate them with commas.">
+                            <textarea
+                                value={form.known_addresses}
+                                onChange={(e) => onChange('known_addresses', e.target.value)}
+                                rows={4}
+                                style={{ ...inputStyle, resize: 'vertical' }}
+                                placeholder={'0x...\n0x...'}
+                                required
+                            />
+                        </FormField>
+
+                        <div style={{
+                            display: 'grid',
+                            gap: '16px',
+                            padding: '18px',
+                            borderRadius: '20px',
+                            background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+                            border: '1px solid #e2e8f0',
+                        }}>
+                            <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>International Address</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                                <FormField label="Specifics">
+                                    <input
+                                        value={form.specifics}
+                                        onChange={(e) => onChange('specifics', e.target.value)}
+                                        style={inputStyle}
+                                        placeholder="Apartment, suite, compound, office"
+                                    />
+                                </FormField>
+                                <FormField label="Street Address">
+                                    <input
+                                        value={form.street_address}
+                                        onChange={(e) => onChange('street_address', e.target.value)}
+                                        style={inputStyle}
+                                        placeholder="Street and number"
+                                    />
+                                </FormField>
+                                <FormField label="Locality / District">
+                                    <input
+                                        value={form.locality}
+                                        onChange={(e) => onChange('locality', e.target.value)}
+                                        style={inputStyle}
+                                        placeholder="District or sub-city"
+                                    />
+                                </FormField>
+                                <FormField label="City">
+                                    <input
+                                        value={form.city}
+                                        onChange={(e) => onChange('city', e.target.value)}
+                                        style={inputStyle}
+                                        placeholder="City"
+                                        required
+                                    />
+                                </FormField>
+                                <FormField label="Administrative Area">
+                                    <input
+                                        value={form.administrative_area}
+                                        onChange={(e) => onChange('administrative_area', e.target.value)}
+                                        style={inputStyle}
+                                        placeholder="State, region, province"
+                                    />
+                                </FormField>
+                                <FormField label="Postal Code">
+                                    <input
+                                        value={form.postal_code}
+                                        onChange={(e) => onChange('postal_code', e.target.value)}
+                                        style={inputStyle}
+                                        placeholder="Postal code"
+                                    />
+                                </FormField>
+                                <FormField label="Country">
+                                    <input
+                                        value={form.country}
+                                        onChange={(e) => onChange('country', e.target.value)}
+                                        style={inputStyle}
+                                        placeholder="Country"
+                                        required
+                                    />
+                                </FormField>
+                                <FormField label="Source Reference">
+                                    <input
+                                        value={form.source_reference}
+                                        onChange={(e) => onChange('source_reference', e.target.value)}
+                                        style={inputStyle}
+                                        placeholder="List source, case file, sanction entry"
+                                    />
+                                </FormField>
+                            </div>
+                        </div>
+
+                        <FormField label="Notes">
+                            <textarea
+                                value={form.notes}
+                                onChange={(e) => onChange('notes', e.target.value)}
+                                rows={3}
+                                style={{ ...inputStyle, resize: 'vertical' }}
+                                placeholder="Additional context about the owner, entity, or case."
+                            />
+                        </FormField>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <div style={{ fontSize: '11px', color: '#64748b', lineHeight: '1.5' }}>
+                                Saving a record will immediately run the labeling function against any cluster containing the submitted address.
+                            </div>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <button
+                                    type="button"
+                                    onClick={onClose}
+                                    style={{
+                                        padding: '11px 16px',
+                                        borderRadius: '12px',
+                                        border: '1px solid #cbd5e1',
+                                        background: '#fff',
+                                        color: '#334155',
+                                        fontSize: '13px',
+                                        fontWeight: '700',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={submitting}
+                                    style={{
+                                        padding: '11px 18px',
+                                        borderRadius: '12px',
+                                        border: 'none',
+                                        background: submitting ? '#94a3b8' : '#0f172a',
+                                        color: '#fff',
+                                        fontSize: '13px',
+                                        fontWeight: '700',
+                                        cursor: submitting ? 'not-allowed' : 'pointer',
+                                    }}
+                                >
+                                    {submitting ? 'Saving…' : 'Save and Relabel'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
 export default function Clusters({ onAddressClick }) {
     const [clusters, setClusters] = useState([]);
     const [summary, setSummary] = useState(null);
@@ -136,13 +466,25 @@ export default function Clusters({ onAddressClick }) {
     const [preview, setPreview] = useState({ nodes: [], edges: [] });
     const [previewLoading, setPreviewLoading] = useState(false);
     const [previewError, setPreviewError] = useState(null);
+    const [ownerModalOpen, setOwnerModalOpen] = useState(false);
+    const [ownerSubmitting, setOwnerSubmitting] = useState(false);
+    const [ownerForm, setOwnerForm] = useState(EMPTY_OWNER_FORM);
+    const [ownerFormError, setOwnerFormError] = useState(null);
+    const [ownerSuccess, setOwnerSuccess] = useState(null);
 
     const loadData = () => {
         setLoading(true);
         setError(null);
         Promise.all([getClusters(), getClustersSummary()])
-            .then(([c, s]) => { setClusters(c); setSummary(s); setLoading(false); })
-            .catch(err => { setError(err.message); setLoading(false); });
+            .then(([clusterRows, summaryRow]) => {
+                setClusters(clusterRows);
+                setSummary(summaryRow);
+                setLoading(false);
+            })
+            .catch((err) => {
+                setError(err.message);
+                setLoading(false);
+            });
     };
 
     useEffect(() => {
@@ -179,13 +521,70 @@ export default function Clusters({ onAddressClick }) {
     const handleRunClustering = async () => {
         setRunning(true);
         setError(null);
+        setOwnerSuccess(null);
         try {
             await runClustering();
-            loadData();
+            setSelectedCluster(null);
+            startTransition(() => loadData());
         } catch (err) {
             setError(err.message);
         } finally {
             setRunning(false);
+        }
+    };
+
+    const openOwnerModal = (prefillAddress = '') => {
+        setOwnerForm({
+            ...EMPTY_OWNER_FORM,
+            known_addresses: prefillAddress || '',
+        });
+        setOwnerFormError(null);
+        setOwnerSuccess(null);
+        setOwnerModalOpen(true);
+    };
+
+    const closeOwnerModal = () => {
+        if (ownerSubmitting) return;
+        setOwnerModalOpen(false);
+        setOwnerForm(EMPTY_OWNER_FORM);
+        setOwnerFormError(null);
+    };
+
+    const handleOwnerFieldChange = (field, value) => {
+        setOwnerForm((current) => ({ ...current, [field]: value }));
+    };
+
+    const handleOwnerSubmit = async (event) => {
+        event.preventDefault();
+        setOwnerSubmitting(true);
+        setOwnerFormError(null);
+        setError(null);
+
+        const payload = {
+            ...ownerForm,
+            known_addresses: ownerForm.known_addresses
+                .split(/\n|,/)
+                .map((item) => item.trim())
+                .filter(Boolean),
+        };
+
+        try {
+            const result = await createOwnerListEntry(payload);
+            const relabelSummary = result.relabel_summary || {};
+            const matchedClusters = relabelSummary.matched_clusters || 0;
+            const relabelled = relabelSummary.clusters_relabelled || 0;
+
+            setOwnerModalOpen(false);
+            setOwnerForm(EMPTY_OWNER_FORM);
+            setSelectedCluster(null);
+            setOwnerSuccess(
+                `Owner list entry saved. Relabelled ${relabelled} cluster${relabelled === 1 ? '' : 's'}; ${matchedClusters} cluster${matchedClusters === 1 ? '' : 's'} matched the new address.`,
+            );
+            startTransition(() => loadData());
+        } catch (err) {
+            setOwnerFormError(err.message || 'Unable to save the owner record.');
+        } finally {
+            setOwnerSubmitting(false);
         }
     };
 
@@ -216,16 +615,29 @@ export default function Clusters({ onAddressClick }) {
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <OwnerListModal
+                open={ownerModalOpen}
+                form={ownerForm}
+                submitting={ownerSubmitting}
+                error={ownerFormError}
+                onClose={closeOwnerModal}
+                onChange={handleOwnerFieldChange}
+                onSubmit={handleOwnerSubmit}
+            />
 
-            {/* Header + actions */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                 <div>
                     <div style={{ fontSize: '18px', fontWeight: '700', color: '#0f172a' }}>Wallet Clusters</div>
                     <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
-                        {clusters.length} clusters · behavioral ownership grouping
+                        {clusters.length} clusters · owner-list driven labeling
                     </div>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button onClick={() => openOwnerModal()} style={{
+                        padding: '8px 14px', borderRadius: '8px', border: '1px solid #bfdbfe',
+                        background: '#eff6ff', color: '#1d4ed8', fontSize: '12px', fontWeight: '700',
+                        cursor: 'pointer',
+                    }}>Add Owner / Entity</button>
                     <button onClick={loadData} style={{
                         padding: '8px 14px', borderRadius: '8px', border: '1px solid #e2e8f0',
                         background: '#fff', color: '#334155', fontSize: '12px', fontWeight: '600',
@@ -239,10 +651,24 @@ export default function Clusters({ onAddressClick }) {
                 </div>
             </div>
 
-            {/* Summary cards */}
+            {ownerSuccess ? (
+                <div style={{
+                    borderRadius: '14px',
+                    background: '#ecfdf5',
+                    border: '1px solid #a7f3d0',
+                    color: '#166534',
+                    padding: '14px 16px',
+                    fontSize: '13px',
+                }}>
+                    {ownerSuccess}
+                </div>
+            ) : null}
+
             {summary && (
                 <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
                     <StatCard label="Total Clusters" value={summary.total} />
+                    <StatCard label="Matched Labels" value={summary.matched} color="#166534" />
+                    <StatCard label="Unknown / Unlabeled" value={summary.unlabeled} color="#475569" />
                     <StatCard label="Top Internal Flow" value={summary.top_by_balance?.[0]?.cluster_id || '—'}
                         sub={summary.top_by_balance?.[0] ? `${formatEth(summary.top_by_balance[0].total_balance)} ETH` : ''} />
                     <StatCard label="Top Size" value={summary.top_by_size?.[0]?.cluster_id || '—'}
@@ -250,7 +676,6 @@ export default function Clusters({ onAddressClick }) {
                 </div>
             )}
 
-            {/* Clusters table */}
             <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
                 {clusters.length === 0 ? (
                     <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
@@ -260,50 +685,56 @@ export default function Clusters({ onAddressClick }) {
                     <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                         <thead>
                             <tr style={{ background: '#e2e8f0' }}>
-                                <th style={{ ...th, width: '20%' }}>Cluster ID</th>
-                                <th style={{ ...th, width: '18%' }}>Owner</th>
-                                <th style={{ ...th, width: '28%' }}>Location</th>
+                                <th style={{ ...th, width: '18%' }}>Cluster ID</th>
+                                <th style={{ ...th, width: '22%' }}>Owner</th>
+                                <th style={{ ...th, width: '26%' }}>Location</th>
                                 <th style={{ ...th, width: '12%' }}>Members</th>
                                 <th style={{ ...th, width: '22%' }}>Total Balance</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {clusters.map((c) => {
-                                const memberCount = c.addresses?.length ?? c.cluster_size ?? 0;
+                            {clusters.map((cluster) => {
+                                const memberCount = cluster.addresses?.length ?? cluster.cluster_size ?? 0;
                                 return (
-                                    <tr key={c.cluster_id}
-                                        onClick={() => openClusterDrawer(c)}
+                                    <tr
+                                        key={cluster.cluster_id}
+                                        onClick={() => openClusterDrawer(cluster)}
                                         style={{ cursor: 'pointer' }}
-                                        onMouseEnter={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
-                                        onMouseLeave={(e) => { e.currentTarget.style.background = ''; }}>
-                                        <td style={{ ...td, fontFamily: 'monospace', fontSize: '11px' }} title={c.cluster_id}>
-                                            {`${c.cluster_id.slice(0, 10)}...${c.cluster_id.slice(-6)}`}
+                                        onMouseEnter={(event) => { event.currentTarget.style.background = '#f8fafc'; }}
+                                        onMouseLeave={(event) => { event.currentTarget.style.background = ''; }}
+                                    >
+                                        <td style={{ ...td, fontFamily: 'monospace', fontSize: '11px' }} title={cluster.cluster_id}>
+                                            {`${cluster.cluster_id.slice(0, 10)}...${cluster.cluster_id.slice(-6)}`}
                                         </td>
                                         <td style={td}>
                                             <button
-                                                onClick={(e) => { e.stopPropagation(); openClusterDrawer(c); }}
+                                                onClick={(event) => { event.stopPropagation(); openClusterDrawer(cluster); }}
                                                 style={{
                                                     background: 'transparent', border: 'none', padding: 0, margin: 0,
-                                                    color: '#1d4ed8', fontWeight: '600', cursor: 'pointer',
-                                                    textAlign: 'left', fontSize: '12px'
+                                                    color: cluster.label_status === 'matched' ? '#1d4ed8' : '#334155',
+                                                    fontWeight: '700', cursor: 'pointer',
+                                                    textAlign: 'left', fontSize: '12px',
                                                 }}
-                                                title={formatLocation(c.owner)}
+                                                title={formatLocation(cluster.owner, cluster.label_status)}
                                             >
-                                                {formatOwner(c.owner)}
+                                                {formatOwner(cluster.owner, cluster.label_status)}
                                             </button>
+                                            <div style={{ marginTop: '8px' }}>
+                                                <StatusPill status={cluster.label_status} />
+                                            </div>
                                         </td>
-                                        <td style={{ ...td, fontSize: '11px', color: '#64748b' }} title={formatLocation(c.owner)}>
-                                            {truncate(formatLocation(c.owner), 45)}
+                                        <td style={{ ...td, fontSize: '11px', color: '#64748b' }} title={formatLocation(cluster.owner, cluster.label_status)}>
+                                            {truncate(formatLocation(cluster.owner, cluster.label_status), 52)}
                                         </td>
                                         <td style={td}>{memberCount}</td>
                                         <td style={{ ...td, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <span style={{ fontWeight: '700', color: '#0f172a' }}>{formatEth(c.total_balance)} ETH</span>
+                                            <span style={{ fontWeight: '700', color: '#0f172a' }}>{formatEth(cluster.total_balance)} ETH</span>
                                             <button
-                                                onClick={(e) => { e.stopPropagation(); openClusterDrawer(c); }}
+                                                onClick={(event) => { event.stopPropagation(); openClusterDrawer(cluster); }}
                                                 style={{
                                                     border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px 10px',
                                                     background: '#fff', color: '#334155', fontSize: '11px', fontWeight: '600',
-                                                    cursor: 'pointer'
+                                                    cursor: 'pointer',
                                                 }}
                                             >
                                                 View
@@ -334,11 +765,16 @@ export default function Clusters({ onAddressClick }) {
                         <div style={{ padding: '24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '24px' }}>
                             <section style={{ display: 'grid', gap: '14px' }}>
                                 <div style={{ fontSize: '12px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Owner Profile</div>
-                                <div>
-                                    <div style={{ fontSize: '18px', fontWeight: '700', color: '#0f172a' }}>{formatOwner(selectedCluster.owner)}</div>
-                                    <div style={{ marginTop: '8px', color: '#64748b', fontSize: '13px', lineHeight: '1.6' }}>
-                                        {formatLocation(selectedCluster.owner)}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'start', flexWrap: 'wrap' }}>
+                                    <div>
+                                        <div style={{ fontSize: '18px', fontWeight: '700', color: '#0f172a' }}>
+                                            {formatOwner(selectedCluster.owner, selectedCluster.label_status)}
+                                        </div>
+                                        <div style={{ marginTop: '8px', color: '#64748b', fontSize: '13px', lineHeight: '1.6' }}>
+                                            {formatLocation(selectedCluster.owner, selectedCluster.label_status)}
+                                        </div>
                                     </div>
+                                    <StatusPill status={selectedCluster.label_status} />
                                 </div>
                                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
                                     <div style={{ padding: '12px 14px', borderRadius: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', minWidth: '140px' }}>
@@ -353,6 +789,43 @@ export default function Clusters({ onAddressClick }) {
                                         <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '6px' }}>Internal Flow</div>
                                         <div style={{ fontSize: '16px', fontWeight: '700', color: '#0f172a' }}>{formatEth(selectedCluster.activity.total_in)} in / {formatEth(selectedCluster.activity.total_out)} out</div>
                                     </div>
+                                </div>
+                                <div style={{ display: 'grid', gap: '10px', padding: '16px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                                    <div style={{ fontSize: '12px', color: '#334155' }}>
+                                        <strong>Matched address:</strong> {selectedCluster.matched_owner_address || 'No address match recorded'}
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: '#334155' }}>
+                                        <strong>Entity type:</strong> {selectedCluster.owner?.entity_type || 'Not assigned'}
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: '#334155' }}>
+                                        <strong>List category:</strong> {selectedCluster.owner?.list_category || 'Not assigned'}
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: '#334155' }}>
+                                        <strong>Source:</strong> {selectedCluster.owner?.source_reference || 'Not recorded'}
+                                    </div>
+                                    {selectedCluster.owner?.notes ? (
+                                        <div style={{ fontSize: '12px', color: '#334155', lineHeight: '1.6' }}>
+                                            <strong>Notes:</strong> {selectedCluster.owner.notes}
+                                        </div>
+                                    ) : null}
+                                </div>
+                                <div>
+                                    <button
+                                        type="button"
+                                        onClick={() => openOwnerModal(selectedCluster.addresses?.[0]?.address || '')}
+                                        style={{
+                                            border: '1px solid #bfdbfe',
+                                            borderRadius: '10px',
+                                            padding: '10px 14px',
+                                            background: '#eff6ff',
+                                            color: '#1d4ed8',
+                                            fontSize: '12px',
+                                            fontWeight: '700',
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        Add / Update Owner Record
+                                    </button>
                                 </div>
                             </section>
 
@@ -398,7 +871,7 @@ export default function Clusters({ onAddressClick }) {
                                                 </div>
                                                 <button
                                                     type="button"
-                                                    onClick={(e) => { e.stopPropagation(); setShowAllAddresses((prev) => !prev); }}
+                                                    onClick={(event) => { event.stopPropagation(); setShowAllAddresses((prev) => !prev); }}
                                                     style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px 10px', background: '#fff', color: '#334155', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
                                                 >
                                                     {showAllAddresses ? 'Show less' : `Show all ${selectedCluster.addresses.length}`}
@@ -450,7 +923,7 @@ export default function Clusters({ onAddressClick }) {
                                         </div>
                                     )}
                                 </div>
-                                {selectedCluster.addresses?.[0] && (
+                                {selectedCluster.addresses?.[0] ? (
                                     <button
                                         type="button"
                                         onClick={() => onAddressClick && onAddressClick(selectedCluster.addresses[0].address)}
@@ -458,7 +931,7 @@ export default function Clusters({ onAddressClick }) {
                                     >
                                         Open full graph around {truncate(selectedCluster.addresses[0].address, 20)}
                                     </button>
-                                )}
+                                ) : null}
                             </section>
 
                             <section style={{ display: 'grid', gap: '14px' }}>
@@ -472,7 +945,7 @@ export default function Clusters({ onAddressClick }) {
                                                 <div style={{ fontSize: '12px', color: '#475569', marginTop: '6px' }}>{item.evidence_text}</div>
                                                 {item.observed_address_sample?.length ? (
                                                     <div style={{ fontSize: '11px', color: '#64748b', marginTop: '8px' }}>
-                                                        {`Sample addresses: ${item.observed_address_sample.map((a) => `${a.slice(0, 8)}...${a.slice(-6)}`).join(', ')}`}
+                                                        {`Sample addresses: ${item.observed_address_sample.map((address) => `${address.slice(0, 8)}...${address.slice(-6)}`).join(', ')}`}
                                                     </div>
                                                 ) : null}
                                                 <div style={{ fontSize: '11px', color: '#64748b', marginTop: '8px' }}>Confidence: {item.confidence.toFixed(2)}</div>

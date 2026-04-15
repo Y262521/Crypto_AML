@@ -66,7 +66,6 @@ class Config:
     batch_size: int
     batch_size_transform: int
     high_value_threshold_eth: float
-    mock_owner_seed: int
 
     # Wallet clustering
     clustering_min_shared_counterparties: int
@@ -81,6 +80,24 @@ class Config:
     clustering_amount_similarity_ratio: float
     clustering_forwarding_value_tolerance_eth: float
     clustering_max_pattern_size: int
+
+    # Placement analytics
+    placement_structuring_window_minutes: int
+    placement_structuring_min_tx_count: int
+    placement_structuring_max_relative_variance: float
+    placement_smurfing_min_unique_senders: int
+    placement_smurfing_max_wallet_age_seconds: int
+    placement_micro_max_tx_eth: float
+    placement_micro_min_tx_count: int
+    placement_micro_min_total_eth: float
+    placement_funneling_min_in_degree: int
+    placement_funneling_min_in_out_ratio: float
+    placement_immediate_max_holding_seconds: int
+    placement_immediate_min_cycles: int
+    placement_origin_max_hops: int
+    placement_origin_branching_limit: int
+    placement_origin_service_tx_count: int
+    placement_origin_service_degree: int
 
 
 def load_config() -> Config:
@@ -147,7 +164,6 @@ def load_config() -> Config:
             "AML_THRESHOLD",
             default=10.0,
         ),
-        mock_owner_seed=_get_int("MOCK_OWNER_SEED", default=20260406),
 
         clustering_min_shared_counterparties=_get_int("CLUSTER_MIN_SHARED_COUNTERPARTIES", default=3),
         clustering_temporal_window_seconds=_get_int("CLUSTER_TEMPORAL_WINDOW_SECONDS", default=60),
@@ -164,4 +180,69 @@ def load_config() -> Config:
             default=0.01,
         ),
         clustering_max_pattern_size=_get_int("CLUSTER_MAX_PATTERN_SIZE", default=100),
+
+        placement_structuring_window_minutes=_get_int(
+            "PLACEMENT_STRUCTURING_WINDOW_MINUTES",
+            default=30,
+        ),
+        placement_structuring_min_tx_count=_get_int(
+            "PLACEMENT_STRUCTURING_MIN_TX_COUNT",
+            default=4,
+        ),
+        placement_structuring_max_relative_variance=_get_float(
+            "PLACEMENT_STRUCTURING_MAX_RELATIVE_VARIANCE",
+            default=0.05,
+        ),
+        placement_smurfing_min_unique_senders=_get_int(
+            "PLACEMENT_SMURFING_MIN_UNIQUE_SENDERS",
+            default=6,
+        ),
+        placement_smurfing_max_wallet_age_seconds=_get_int(
+            "PLACEMENT_SMURFING_MAX_WALLET_AGE_SECONDS",
+            default=604800,
+        ),
+        placement_micro_max_tx_eth=_get_float(
+            "PLACEMENT_MICRO_MAX_TX_ETH",
+            default=0.1,
+        ),
+        placement_micro_min_tx_count=_get_int(
+            "PLACEMENT_MICRO_MIN_TX_COUNT",
+            default=8,
+        ),
+        placement_micro_min_total_eth=_get_float(
+            "PLACEMENT_MICRO_MIN_TOTAL_ETH",
+            default=1.0,
+        ),
+        placement_funneling_min_in_degree=_get_int(
+            "PLACEMENT_FUNNELING_MIN_IN_DEGREE",
+            default=5,
+        ),
+        placement_funneling_min_in_out_ratio=_get_float(
+            "PLACEMENT_FUNNELING_MIN_IN_OUT_RATIO",
+            default=3.0,
+        ),
+        placement_immediate_max_holding_seconds=_get_int(
+            "PLACEMENT_IMMEDIATE_MAX_HOLDING_SECONDS",
+            default=3600,
+        ),
+        placement_immediate_min_cycles=_get_int(
+            "PLACEMENT_IMMEDIATE_MIN_CYCLES",
+            default=3,
+        ),
+        placement_origin_max_hops=_get_int(
+            "PLACEMENT_ORIGIN_MAX_HOPS",
+            default=3,
+        ),
+        placement_origin_branching_limit=_get_int(
+            "PLACEMENT_ORIGIN_BRANCHING_LIMIT",
+            default=3,
+        ),
+        placement_origin_service_tx_count=_get_int(
+            "PLACEMENT_ORIGIN_SERVICE_TX_COUNT",
+            default=200,
+        ),
+        placement_origin_service_degree=_get_int(
+            "PLACEMENT_ORIGIN_SERVICE_DEGREE",
+            default=25,
+        ),
     )

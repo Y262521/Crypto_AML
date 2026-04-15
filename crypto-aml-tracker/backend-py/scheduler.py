@@ -85,6 +85,8 @@ async def run_pipeline():
             "transactions_loaded": (summary.get("mariadb") or {}).get("transactions_loaded", 0),
             "neo4j_edges":         (summary.get("neo4j") or {}).get("rows_loaded", 0),
             "clusters_found":      (summary.get("clustering") or {}).get("clusters_found", 0),
+            "placements_found":    (summary.get("placement") or {}).get("placements_found", 0),
+            "pois_created":        (summary.get("placement") or {}).get("pois_created", 0),
         }
         logger.info("Scheduled pipeline run completed: %s", pipeline_status["last_run_summary"])
 
