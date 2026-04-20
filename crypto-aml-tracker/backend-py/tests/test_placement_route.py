@@ -20,10 +20,10 @@ class PlacementRouteHelpersTests(unittest.TestCase):
                 "graph_position_score": 0.78,
                 "temporal_score": 0.74,
                 "reasons_json": '["earliest traced entity", "no upstream suspicious history"]',
-                "behaviors_json": '["smurfing", "funneling"]',
+                "behaviors_json": '["smurfing", "structuring"]',
                 "linked_root_entities_json": '["C-COLLECTOR"]',
                 "supporting_tx_hashes_json": '["0xabc"]',
-                "metrics_json": '{"avg_trace_score": 0.9}',
+                "metrics_json": '{"avg_trace_score": 0.9, "behavior_profile": {"primary_behavior": "smurfing", "display_behaviors": ["smurfing"], "display_mode": "dominant", "ranked_behaviors": [{"behavior_type": "smurfing", "confidence_score": 0.88, "source": "origin"}]}}',
                 "validation_status": "validated",
                 "validation_confidence": 0.88,
                 "source_kind": "existing",
@@ -31,13 +31,14 @@ class PlacementRouteHelpersTests(unittest.TestCase):
                 "last_seen_at": "2026-01-01T00:10:00",
             },
             ["0xaaa", "0xbbb"],
-            {"poi_id": "POI-1", "risk_score": 79.0, "reason": "placement detection"},
         )
 
         self.assertEqual(payload["reason"], "earliest traced entity")
         self.assertEqual(payload["risk_score"], 79.0)
         self.assertEqual(payload["address_count"], 2)
-        self.assertEqual(payload["poi"]["poi_id"], "POI-1")
+        self.assertEqual(payload["primary_behavior"], "smurfing")
+        self.assertEqual(payload["behaviors"], ["smurfing"])
+        self.assertEqual(payload["all_behaviors"], ["smurfing", "structuring"])
 
     def test_build_trace_paths_reconstructs_node_order(self) -> None:
         trace_paths = _build_trace_paths(

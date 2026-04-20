@@ -240,21 +240,3 @@ CREATE TABLE IF NOT EXISTS placement_labels (
         FOREIGN KEY (run_id) REFERENCES placement_runs(id)
         ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS placement_pois (
-    poi_id VARCHAR(64) PRIMARY KEY,
-    run_id VARCHAR(64) NOT NULL,
-    entity_id VARCHAR(64) NOT NULL,
-    entity_type VARCHAR(16) NOT NULL,
-    risk_score DECIMAL(8,2) NOT NULL DEFAULT 0,
-    reason VARCHAR(255) NOT NULL,
-    linked_behaviors_json LONGTEXT NULL,
-    supporting_evidence_json LONGTEXT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    KEY idx_placement_pois_run_id (run_id),
-    KEY idx_placement_pois_entity_id (entity_id),
-    KEY idx_placement_pois_risk_score (risk_score),
-    CONSTRAINT fk_placement_pois_run
-        FOREIGN KEY (run_id) REFERENCES placement_runs(id)
-        ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

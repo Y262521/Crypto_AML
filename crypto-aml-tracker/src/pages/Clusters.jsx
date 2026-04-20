@@ -70,6 +70,24 @@ const StatusPill = ({ status }) => {
     );
 };
 
+const BLOCKCHAIN_NETWORKS = [
+    { value: 'ethereum', label: 'Ethereum (ETH)' },
+    { value: 'bitcoin', label: 'Bitcoin (BTC)' },
+    { value: 'tron', label: 'Tron (TRX)' },
+    { value: 'binance_smart_chain', label: 'BNB Smart Chain (BSC)' },
+    { value: 'solana', label: 'Solana (SOL)' },
+    { value: 'polygon', label: 'Polygon (MATIC)' },
+    { value: 'avalanche', label: 'Avalanche (AVAX)' },
+    { value: 'arbitrum', label: 'Arbitrum (ARB)' },
+    { value: 'optimism', label: 'Optimism (OP)' },
+    { value: 'litecoin', label: 'Litecoin (LTC)' },
+    { value: 'ripple', label: 'Ripple (XRP)' },
+    { value: 'cardano', label: 'Cardano (ADA)' },
+    { value: 'dogecoin', label: 'Dogecoin (DOGE)' },
+    { value: 'monero', label: 'Monero (XMR)' },
+    { value: 'other', label: 'Other' },
+];
+
 const FormField = ({ label, children, hint }) => (
     <label style={{ display: 'grid', gap: '8px' }}>
         <span style={{ fontSize: '12px', fontWeight: '700', color: '#334155' }}>{label}</span>
@@ -80,13 +98,14 @@ const FormField = ({ label, children, hint }) => (
 
 const inputStyle = {
     width: '100%',
-    borderRadius: '12px',
+    borderRadius: '10px',
     border: '1px solid #cbd5e1',
     background: '#fff',
     color: '#0f172a',
-    padding: '12px 14px',
+    padding: '11px 14px',
     fontSize: '13px',
     boxSizing: 'border-box',
+    outline: 'none',
 };
 
 const formatEth = (value) => {
@@ -207,6 +226,92 @@ const getActivityHighlights = (activity, riskLevel) => {
     return highlights;
 };
 
+function ConfirmationDialog({ conflicts, onConfirm, onCancel, submitting }) {
+    return (
+        <div style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 10,
+            display: 'grid',
+            placeItems: 'center',
+            background: 'rgba(5, 10, 20, 0.72)',
+            borderRadius: '20px',
+        }}>
+            <div style={{
+                background: '#fff',
+                borderRadius: '16px',
+                padding: '28px',
+                maxWidth: '440px',
+                width: '100%',
+                boxShadow: '0 16px 48px rgba(0,0,0,0.3)',
+                border: '1px solid #e2e8f0',
+                margin: '24px',
+            }}>
+                <div style={{ fontSize: '16px', fontWeight: '700', color: '#0f172a', marginBottom: '12px' }}>
+                    Address Already Assigned
+                </div>
+                <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6', marginBottom: '16px' }}>
+                    One or more addresses you entered are already assigned to an existing owner. Do you want to reassign them to this new entity?
+                </div>
+                {conflicts && conflicts.length > 0 && (
+                    <div style={{
+                        background: '#fef3c7',
+                        border: '1px solid #fcd34d',
+                        borderRadius: '10px',
+                        padding: '12px 14px',
+                        marginBottom: '20px',
+                        fontSize: '12px',
+                        color: '#92400e',
+                    }}>
+                        {conflicts.map((c, i) => (
+                            <div key={i} style={{ marginBottom: i < conflicts.length - 1 ? '6px' : 0 }}>
+                                <span style={{ fontFamily: 'monospace' }}>{c.address}</span>
+                                {' '}→ currently owned by <strong>{c.current_owner_name}</strong>
+                            </div>
+                        ))}
+                    </div>
+                )}
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        disabled={submitting}
+                        style={{
+                            padding: '10px 16px',
+                            borderRadius: '10px',
+                            border: '1px solid #cbd5e1',
+                            background: '#fff',
+                            color: '#334155',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            cursor: submitting ? 'not-allowed' : 'pointer',
+                        }}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onConfirm}
+                        disabled={submitting}
+                        style={{
+                            padding: '10px 20px',
+                            borderRadius: '10px',
+                            border: 'none',
+                            background: submitting ? '#94a3b8' : '#dc2626',
+                            color: '#fff',
+                            fontSize: '13px',
+                            fontWeight: '700',
+                            cursor: submitting ? 'not-allowed' : 'pointer',
+                        }}
+                    >
+                        {submitting ? 'Saving…' : 'Confirm'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function OwnerListModal({
     open,
     form,
@@ -215,6 +320,9 @@ function OwnerListModal({
     onClose,
     onChange,
     onSubmit,
+    conflictData,
+    onConfirmOverride,
+    onCancelOverride,
 }) {
     if (!open) return null;
 
@@ -222,39 +330,71 @@ function OwnerListModal({
         <div style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'grid', placeItems: 'center', padding: '24px' }}>
             <div
                 onClick={onClose}
-                style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.56)' }}
+                style={{ position: 'absolute', inset: 0, background: 'rgba(5, 10, 20, 0.72)' }}
             />
             <div style={{
                 position: 'relative',
-                width: 'min(760px, 100%)',
+                width: 'min(780px, 100%)',
                 maxHeight: 'calc(100vh - 48px)',
                 overflow: 'hidden',
-                borderRadius: '28px',
+                borderRadius: '20px',
                 background: '#f8fafc',
-                boxShadow: '0 30px 120px rgba(15, 23, 42, 0.35)',
-                border: '1px solid rgba(148, 163, 184, 0.24)',
+                boxShadow: '0 32px 100px rgba(0, 0, 0, 0.4)',
+                border: '1px solid #e2e8f0',
             }}>
+                {conflictData && (
+                    <ConfirmationDialog
+                        conflicts={conflictData}
+                        onConfirm={onConfirmOverride}
+                        onCancel={onCancelOverride}
+                        submitting={submitting}
+                    />
+                )}
+                {/* Header */}
                 <div style={{
                     padding: '24px 28px',
-                    background: 'linear-gradient(135deg, #0f172a 0%, #1d4ed8 52%, #38bdf8 100%)',
-                    color: '#fff',
+                    background: '#0d1b2e',
+                    borderBottom: '1px solid #1e2d45',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    gap: '16px',
                 }}>
-                    <div style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.85 }}>
-                        Owner Registry
+                    <div>
+                        <div style={{ fontSize: '11px', fontWeight: '700', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#64748b' }}>
+                            Owner Registry
+                        </div>
+                        <div style={{ fontSize: '22px', fontWeight: '700', color: '#f1f5f9', marginTop: '8px' }}>
+                            Add / Update Owner
+                        </div>
+                        <div style={{ fontSize: '13px', marginTop: '6px', color: '#94a3b8', maxWidth: '520px', lineHeight: '1.6' }}>
+                            Save a verified address owner into the owner list and relabel any cluster that contains the supplied blockchain address.
+                        </div>
                     </div>
-                    <div style={{ fontSize: '26px', fontWeight: '700', marginTop: '10px' }}>
-                        Add Entity / Owner
-                    </div>
-                    <div style={{ fontSize: '13px', marginTop: '8px', maxWidth: '560px', lineHeight: '1.6', color: 'rgba(255,255,255,0.88)' }}>
-                        Save a verified address owner into the MySQL owner list and relabel any cluster that contains the supplied blockchain address.
-                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        style={{
+                            background: 'rgba(255,255,255,0.1)',
+                            border: '1px solid rgba(255,255,255,0.2)',
+                            borderRadius: '8px',
+                            color: '#fff',
+                            fontSize: '18px',
+                            lineHeight: 1,
+                            cursor: 'pointer',
+                            padding: '6px 10px',
+                            flexShrink: 0,
+                        }}
+                    >
+                        ✕
+                    </button>
                 </div>
 
-                <form onSubmit={onSubmit} style={{ padding: '26px 28px 28px', overflowY: 'auto', maxHeight: 'calc(100vh - 210px)' }}>
-                    <div style={{ display: 'grid', gap: '18px' }}>
+                <form onSubmit={onSubmit} style={{ padding: '24px 28px 28px', overflowY: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
+                    <div style={{ display: 'grid', gap: '20px' }}>
                         {error ? (
                             <div style={{
-                                borderRadius: '16px',
+                                borderRadius: '12px',
                                 background: '#fef2f2',
                                 border: '1px solid #fecaca',
                                 color: '#b91c1c',
@@ -265,6 +405,7 @@ function OwnerListModal({
                             </div>
                         ) : null}
 
+                        {/* Identity */}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
                             <FormField label="Owner / Entity Name">
                                 <input
@@ -299,17 +440,21 @@ function OwnerListModal({
                                 </select>
                             </FormField>
                             <FormField label="Blockchain Network">
-                                <input
+                                <select
                                     value={form.blockchain_network}
                                     onChange={(e) => onChange('blockchain_network', e.target.value)}
                                     style={inputStyle}
-                                    placeholder="ethereum"
                                     required
-                                />
+                                >
+                                    {BLOCKCHAIN_NETWORKS.map((net) => (
+                                        <option key={net.value} value={net.value}>{net.label}</option>
+                                    ))}
+                                </select>
                             </FormField>
                         </div>
 
-                        <FormField label="Known Blockchain Addresses" hint="Use one address per line or separate them with commas.">
+                        {/* Addresses */}
+                        <FormField label="Known Blockchain Addresses" hint="One address per line or comma-separated.">
                             <textarea
                                 value={form.known_addresses}
                                 onChange={(e) => onChange('known_addresses', e.target.value)}
@@ -320,15 +465,18 @@ function OwnerListModal({
                             />
                         </FormField>
 
+                        {/* Physical address */}
                         <div style={{
                             display: 'grid',
                             gap: '16px',
                             padding: '18px',
-                            borderRadius: '20px',
+                            borderRadius: '14px',
                             background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
                             border: '1px solid #e2e8f0',
                         }}>
-                            <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>International Address</div>
+                            <div style={{ fontSize: '12px', fontWeight: '700', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                                Physical Address
+                            </div>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
                                 <FormField label="Specifics">
                                     <input
@@ -399,6 +547,7 @@ function OwnerListModal({
                             </div>
                         </div>
 
+                        {/* Notes */}
                         <FormField label="Notes">
                             <textarea
                                 value={form.notes}
@@ -409,22 +558,23 @@ function OwnerListModal({
                             />
                         </FormField>
 
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        {/* Footer */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', alignItems: 'center', paddingTop: '4px', borderTop: '1px solid #e2e8f0' }}>
                             <div style={{ fontSize: '11px', color: '#64748b', lineHeight: '1.5' }}>
-                                Saving a record will immediately run the labeling function against any cluster containing the submitted address.
+                                Saving will immediately relabel any cluster containing the submitted address.
                             </div>
                             <div style={{ display: 'flex', gap: '10px' }}>
                                 <button
                                     type="button"
                                     onClick={onClose}
                                     style={{
-                                        padding: '11px 16px',
-                                        borderRadius: '12px',
+                                        padding: '10px 16px',
+                                        borderRadius: '10px',
                                         border: '1px solid #cbd5e1',
                                         background: '#fff',
                                         color: '#334155',
                                         fontSize: '13px',
-                                        fontWeight: '700',
+                                        fontWeight: '600',
                                         cursor: 'pointer',
                                     }}
                                 >
@@ -434,10 +584,10 @@ function OwnerListModal({
                                     type="submit"
                                     disabled={submitting}
                                     style={{
-                                        padding: '11px 18px',
-                                        borderRadius: '12px',
+                                        padding: '10px 20px',
+                                        borderRadius: '10px',
                                         border: 'none',
-                                        background: submitting ? '#94a3b8' : '#0f172a',
+                                        background: submitting ? '#94a3b8' : '#0d1b2e',
                                         color: '#fff',
                                         fontSize: '13px',
                                         fontWeight: '700',
@@ -471,6 +621,7 @@ export default function Clusters({ onAddressClick }) {
     const [ownerForm, setOwnerForm] = useState(EMPTY_OWNER_FORM);
     const [ownerFormError, setOwnerFormError] = useState(null);
     const [ownerSuccess, setOwnerSuccess] = useState(null);
+    const [conflictData, setConflictData] = useState(null);
 
     const loadData = () => {
         setLoading(true);
@@ -533,10 +684,24 @@ export default function Clusters({ onAddressClick }) {
         }
     };
 
-    const openOwnerModal = (prefillAddress = '') => {
+    const openOwnerModal = (cluster = null) => {
+        const owner = cluster?.owner;
+        const prefillAddress = cluster?.addresses?.[0]?.address || '';
         setOwnerForm({
-            ...EMPTY_OWNER_FORM,
-            known_addresses: prefillAddress || '',
+            full_name: owner?.full_name || '',
+            entity_type: owner?.entity_type || 'individual',
+            list_category: owner?.list_category || 'watchlist',
+            known_addresses: prefillAddress,
+            blockchain_network: 'ethereum',
+            specifics: owner?.specifics || '',
+            street_address: owner?.street_address || '',
+            locality: owner?.locality || '',
+            city: owner?.city || '',
+            administrative_area: owner?.administrative_area || '',
+            postal_code: owner?.postal_code || '',
+            country: owner?.country || 'Ethiopia',
+            source_reference: owner?.source_reference || 'Owner Registry Intake',
+            notes: owner?.notes || '',
         });
         setOwnerFormError(null);
         setOwnerSuccess(null);
@@ -548,6 +713,7 @@ export default function Clusters({ onAddressClick }) {
         setOwnerModalOpen(false);
         setOwnerForm(EMPTY_OWNER_FORM);
         setOwnerFormError(null);
+        setConflictData(null);
     };
 
     const handleOwnerFieldChange = (field, value) => {
@@ -570,12 +736,21 @@ export default function Clusters({ onAddressClick }) {
 
         try {
             const result = await createOwnerListEntry(payload);
+
+            if (result._status === 409) {
+                // Show confirmation dialog — do not close the modal
+                setConflictData(result.conflicts || []);
+                setOwnerSubmitting(false);
+                return;
+            }
+
             const relabelSummary = result.relabel_summary || {};
             const matchedClusters = relabelSummary.matched_clusters || 0;
             const relabelled = relabelSummary.clusters_relabelled || 0;
 
             setOwnerModalOpen(false);
             setOwnerForm(EMPTY_OWNER_FORM);
+            setConflictData(null);
             setSelectedCluster(null);
             setOwnerSuccess(
                 `Owner list entry saved. Relabelled ${relabelled} cluster${relabelled === 1 ? '' : 's'}; ${matchedClusters} cluster${matchedClusters === 1 ? '' : 's'} matched the new address.`,
@@ -586,6 +761,46 @@ export default function Clusters({ onAddressClick }) {
         } finally {
             setOwnerSubmitting(false);
         }
+    };
+
+    const handleConfirmOverride = async () => {
+        setOwnerSubmitting(true);
+        setOwnerFormError(null);
+        setError(null);
+
+        const payload = {
+            ...ownerForm,
+            known_addresses: ownerForm.known_addresses
+                .split(/\n|,/)
+                .map((item) => item.trim())
+                .filter(Boolean),
+            force_override: true,
+        };
+
+        try {
+            const result = await createOwnerListEntry(payload);
+            const relabelSummary = result.relabel_summary || {};
+            const matchedClusters = relabelSummary.matched_clusters || 0;
+            const relabelled = relabelSummary.clusters_relabelled || 0;
+
+            setOwnerModalOpen(false);
+            setOwnerForm(EMPTY_OWNER_FORM);
+            setConflictData(null);
+            setSelectedCluster(null);
+            setOwnerSuccess(
+                `Owner list entry saved. Relabelled ${relabelled} cluster${relabelled === 1 ? '' : 's'}; ${matchedClusters} cluster${matchedClusters === 1 ? '' : 's'} matched the new address.`,
+            );
+            startTransition(() => loadData());
+        } catch (err) {
+            setOwnerFormError(err.message || 'Unable to save the owner record.');
+            setConflictData(null);
+        } finally {
+            setOwnerSubmitting(false);
+        }
+    };
+
+    const handleCancelOverride = () => {
+        setConflictData(null);
     };
 
     const closeDrawer = () => setSelectedCluster(null);
@@ -623,6 +838,9 @@ export default function Clusters({ onAddressClick }) {
                 onClose={closeOwnerModal}
                 onChange={handleOwnerFieldChange}
                 onSubmit={handleOwnerSubmit}
+                conflictData={conflictData}
+                onConfirmOverride={handleConfirmOverride}
+                onCancelOverride={handleCancelOverride}
             />
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
@@ -633,7 +851,7 @@ export default function Clusters({ onAddressClick }) {
                     </div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    <button onClick={() => openOwnerModal()} style={{
+                    <button onClick={() => openOwnerModal(null)} style={{
                         padding: '8px 14px', borderRadius: '8px', border: '1px solid #bfdbfe',
                         background: '#eff6ff', color: '#1d4ed8', fontSize: '12px', fontWeight: '700',
                         cursor: 'pointer',
@@ -812,7 +1030,7 @@ export default function Clusters({ onAddressClick }) {
                                 <div>
                                     <button
                                         type="button"
-                                        onClick={() => openOwnerModal(selectedCluster.addresses?.[0]?.address || '')}
+                                        onClick={() => openOwnerModal(selectedCluster)}
                                         style={{
                                             border: '1px solid #bfdbfe',
                                             borderRadius: '10px',

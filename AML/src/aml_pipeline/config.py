@@ -90,10 +90,6 @@ class Config:
     placement_micro_max_tx_eth: float
     placement_micro_min_tx_count: int
     placement_micro_min_total_eth: float
-    placement_funneling_min_in_degree: int
-    placement_funneling_min_in_out_ratio: float
-    placement_immediate_max_holding_seconds: int
-    placement_immediate_min_cycles: int
     placement_origin_max_hops: int
     placement_origin_branching_limit: int
     placement_origin_service_tx_count: int
@@ -212,22 +208,6 @@ def load_config() -> Config:
         placement_micro_min_total_eth=_get_float(
             "PLACEMENT_MICRO_MIN_TOTAL_ETH",
             default=1.0,
-        ),
-        placement_funneling_min_in_degree=_get_int(
-            "PLACEMENT_FUNNELING_MIN_IN_DEGREE",
-            default=5,
-        ),
-        placement_funneling_min_in_out_ratio=_get_float(
-            "PLACEMENT_FUNNELING_MIN_IN_OUT_RATIO",
-            default=3.0,
-        ),
-        placement_immediate_max_holding_seconds=_get_int(
-            "PLACEMENT_IMMEDIATE_MAX_HOLDING_SECONDS",
-            default=3600,
-        ),
-        placement_immediate_min_cycles=_get_int(
-            "PLACEMENT_IMMEDIATE_MIN_CYCLES",
-            default=3,
         ),
         placement_origin_max_hops=_get_int(
             "PLACEMENT_ORIGIN_MAX_HOPS",

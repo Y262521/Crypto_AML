@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 import unittest
 
-from aml_pipeline.analytics.placement import PlacementAnalysisEngine
+from aml_pipeline.analytics.placement import PlacementAnalysisEngine, _select_behavior_highlights
 from aml_pipeline.clustering.base import TxRecord
 from aml_pipeline.config import load_config
 
@@ -22,10 +22,6 @@ def _cfg():
         placement_micro_max_tx_eth=0.1,
         placement_micro_min_tx_count=6,
         placement_micro_min_total_eth=0.4,
-        placement_funneling_min_in_degree=4,
-        placement_funneling_min_in_out_ratio=2.0,
-        placement_immediate_max_holding_seconds=600,
-        placement_immediate_min_cycles=2,
         placement_origin_max_hops=3,
         placement_origin_branching_limit=4,
         placement_origin_service_tx_count=100,
@@ -140,40 +136,49 @@ class PlacementDetectionTests(unittest.TestCase):
         behaviors = {(behavior.entity_id, behavior.behavior_type) for behavior in result.behaviors}
         self.assertIn(("wallet", "micro_funding"), behaviors)
 
-    def test_funneling_detection_flags_high_in_degree_low_out_degree_entity(self) -> None:
-        transactions = [
-            _tx("f1", "u1", "hub", 0.6, 10),
-            _tx("f1b", "u1", "peer_1", 0.2, 12),
-            _tx("f2", "u2", "hub", 0.8, 200),
-            _tx("f2b", "u2", "peer_2", 0.2, 22),
-            _tx("f3", "u3", "hub", 1.0, 400),
-            _tx("f3b", "u3", "peer_3", 0.2, 32),
-            _tx("f4", "u4", "hub", 1.2, 600),
-            _tx("f4b", "u4", "peer_4", 0.2, 42),
-            _tx("f5", "hub", "cashout", 3.0, 50),
-        ]
-        engine = _PlacementEngineForTest(transactions)
+    def test_behavior_highlight_selection_prefers_single_dominant_signal(self) -> None:
+        highlighted, mode = _select_behavior_highlights(
+            [
+                {"behavior_type": "structuring", "confidence_score": 0.91},
+                {"behavior_type": "smurfing", "confidence_score": 0.70},
+                {"behavior_type": "micro_funding", "confidence_score": 0.66},
+            ]
+        )
 
-        result = engine.run()
+        self.assertEqual(mode, "dominant")
+        self.assertEqual([item["behavior_type"] for item in highlighted], ["structuring"])
 
-        behaviors = {(behavior.entity_id, behavior.behavior_type) for behavior in result.behaviors}
-        self.assertIn(("hub", "funneling"), behaviors)
+    def test_behavior_highlight_selection_prefers_pair_when_third_trails(self) -> None:
+        highlighted, mode = _select_behavior_highlights(
+            [
+                {"behavior_type": "smurfing", "confidence_score": 0.88},
+                {"behavior_type": "structuring", "confidence_score": 0.84},
+                {"behavior_type": "micro_funding", "confidence_score": 0.62},
+            ]
+        )
 
-    def test_immediate_utilization_flags_fast_receive_to_send_cycles(self) -> None:
-        transactions = [
-            _tx("i1", "src1", "wallet", 1.0, 10),
-            _tx("i2", "wallet", "sink1", 0.9, 70),
-            _tx("i3", "src2", "wallet", 1.0, 120),
-            _tx("i4", "wallet", "sink2", 0.9, 180),
-        ]
-        engine = _PlacementEngineForTest(transactions)
+        self.assertEqual(mode, "paired")
+        self.assertEqual(
+            [item["behavior_type"] for item in highlighted],
+            ["smurfing", "structuring"],
+        )
 
-        result = engine.run()
+    def test_behavior_highlight_selection_shows_all_when_scores_are_near_tied(self) -> None:
+        highlighted, mode = _select_behavior_highlights(
+            [
+                {"behavior_type": "smurfing", "confidence_score": 0.91},
+                {"behavior_type": "structuring", "confidence_score": 0.89},
+                {"behavior_type": "micro_funding", "confidence_score": 0.86},
+            ]
+        )
 
-        behaviors = {(behavior.entity_id, behavior.behavior_type) for behavior in result.behaviors}
-        self.assertIn(("wallet", "immediate_utilization"), behaviors)
+        self.assertEqual(mode, "balanced")
+        self.assertEqual(
+            [item["behavior_type"] for item in highlighted],
+            ["smurfing", "structuring", "micro_funding"],
+        )
 
-    def test_run_identifies_placement_origin_label_and_poi(self) -> None:
+    def test_run_identifies_placement_origin_label_and_behavior_profile(self) -> None:
         transactions = [
             _tx("p1", "p1", "collector", 0.6, 10),
             _tx("p2", "p2", "collector", 0.6, 20),
@@ -197,7 +202,10 @@ class PlacementDetectionTests(unittest.TestCase):
         self.assertIn("C-PLACEMENT", placement_ids)
         placement = next(placement for placement in result.placements if placement.entity_id == "C-PLACEMENT")
         self.assertIn("placement_origin", {label.label for label in result.labels if label.entity_id == "C-PLACEMENT"})
-        self.assertTrue(result.pois)
+        behavior_profile = placement.metrics.get("behavior_profile", {})
+        self.assertEqual(behavior_profile.get("primary_behavior"), "structuring")
+        self.assertIn("display_behaviors", behavior_profile)
+        self.assertNotIn("pois", result.summary)
         self.assertGreaterEqual(placement.confidence_score, 0.55)
 
 

@@ -609,7 +609,13 @@ def create_owner_list_entry(
     *,
     cfg: Config | None = None,
 ) -> dict[str, Any]:
-    """Insert an owner-list row and relabel any matching clusters."""
+    """Insert an owner-list row and relabel any matching clusters.
+
+    When ``force_override`` is ``True`` in *owner_data*, any existing
+    ``owner_list_addresses`` rows for the submitted addresses are deleted
+    before the new ones are inserted, effectively reassigning those addresses
+    to the new owner.
+    """
     cfg = cfg or load_config()
     from ..etl.load.mariadb_loader import create_tables_if_not_exist
 
@@ -619,6 +625,7 @@ def create_owner_list_entry(
         with engine.begin() as conn:
             addresses = normalize_owner_addresses(owner_data.pop("known_addresses"))
             network = owner_data.pop("blockchain_network", DEFAULT_NETWORK)
+            force_override = bool(owner_data.pop("force_override", False))
             existing_rows = []
             if addresses:
                 placeholders = ", ".join(f":addr{i}" for i in range(len(addresses)))
@@ -634,8 +641,26 @@ def create_owner_list_entry(
                     params,
                 ).scalars().all()
             if existing_rows:
-                existing = ", ".join(sorted(existing_rows))
-                raise ValueError(f"Address already exists in owner list: {existing}")
+                if force_override:
+                    # Delete conflicting rows so the INSERT below can proceed
+                    del_placeholders = ", ".join(
+                        f":del_addr{i}" for i in range(len(existing_rows))
+                    )
+                    del_params = {
+                        f"del_addr{i}": addr for i, addr in enumerate(existing_rows)
+                    }
+                    conn.execute(
+                        text(
+                            f"""
+                            DELETE FROM owner_list_addresses
+                            WHERE address IN ({del_placeholders})
+                            """
+                        ),
+                        del_params,
+                    )
+                else:
+                    existing = ", ".join(sorted(existing_rows))
+                    raise ValueError(f"Address already exists in owner list: {existing}")
 
             result = conn.execute(
                 text(

@@ -44,7 +44,6 @@ UTF8MB4_TABLES = (
     "placement_traces",
     "placement_detections",
     "placement_labels",
-    "placement_pois",
 )
 
 
@@ -417,6 +416,14 @@ def _migrate_legacy_owner_schema(engine: Engine, cfg: Config) -> None:
     _ensure_wallet_cluster_owner_fk(engine, cfg)
 
 
+def _drop_legacy_placement_poi_table(engine: Engine, cfg: Config) -> None:
+    if not _table_exists(engine, cfg, "placement_pois"):
+        return
+    with engine.begin() as conn:
+        conn.exec_driver_sql("DROP TABLE `placement_pois`")
+    logger.info("Dropped legacy placement_pois table")
+
+
 def create_tables_if_not_exist(cfg: Config | None = None) -> None:
     """Create the MariaDB database and transformed-data tables."""
     cfg = cfg or load_config()
@@ -433,6 +440,7 @@ def create_tables_if_not_exist(cfg: Config | None = None) -> None:
         _ensure_owner_address_indexes(engine, cfg)
         _ensure_wallet_cluster_label_columns(engine, cfg)
         _migrate_legacy_owner_schema(engine, cfg)
+        _drop_legacy_placement_poi_table(engine, cfg)
         _ensure_utf8mb4_tables(engine, cfg)
     finally:
         engine.dispose()
