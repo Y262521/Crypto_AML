@@ -11,6 +11,7 @@ from pathlib import Path
 import sys
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
 from db.mysql import fetch_all, fetch_one, get_pool
@@ -81,6 +82,8 @@ class OwnerListCreateRequest(BaseModel):
             return None
         cleaned = value.strip()
         return cleaned or None
+
+    force_override: bool = Field(default=False)
 
     @field_validator("known_addresses", mode="before")
     @classmethod
@@ -404,6 +407,33 @@ async def create_owner_list_record(payload: OwnerListCreateRequest):
     """Insert an owner-list entry and relabel any cluster containing that address."""
     _require_mysql()
 
+    # Check for duplicate addresses before calling create_owner_list_entry
+    if not payload.force_override:
+        placeholders = ", ".join(["%s"] * len(payload.known_addresses))
+        conflict_rows = await fetch_all(
+            f"""
+            SELECT ola.address, o.full_name AS current_owner_name
+            FROM owner_list_addresses ola
+            JOIN owner_list o ON ola.owner_list_id = o.id
+            WHERE ola.address IN ({placeholders})
+            """,
+            tuple(payload.known_addresses),
+        )
+        if conflict_rows:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "detail": "duplicate_addresses",
+                    "conflicts": [
+                        {
+                            "address": row["address"],
+                            "current_owner_name": row["current_owner_name"],
+                        }
+                        for row in conflict_rows
+                    ],
+                },
+            )
+
     try:
         cfg = _load_aml_config()
         from aml_pipeline.clustering.owner_registry import create_owner_list_entry
@@ -418,6 +448,40 @@ async def create_owner_list_record(payload: OwnerListCreateRequest):
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Owner insert failed: {exc}") from exc
+
+
+@router.get("/owner-by-address/{address}")
+async def get_owner_by_address(address: str):
+    """Look up owner profile by blockchain address."""
+    _require_mysql()
+
+    row = await fetch_one(
+        """
+        SELECT o.id AS owner_id,
+               o.full_name,
+               o.entity_type,
+               o.list_category,
+               COALESCE(wc.risk_level, 'normal') AS risk_level
+        FROM owner_list_addresses ola
+        JOIN owner_list o ON ola.owner_list_id = o.id
+        LEFT JOIN addresses a ON a.address = ola.address
+        LEFT JOIN wallet_clusters wc ON wc.id = a.cluster_id
+        WHERE ola.address = %s
+        LIMIT 1
+        """,
+        (address,),
+    )
+
+    if not row:
+        return {"owner": None}
+
+    return {
+        "owner_id": row.get("owner_id"),
+        "full_name": row.get("full_name"),
+        "entity_type": row.get("entity_type"),
+        "list_category": row.get("list_category"),
+        "risk_level": row.get("risk_level"),
+    }
 
 
 @router.get("/{cluster_id}")

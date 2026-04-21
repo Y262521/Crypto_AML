@@ -78,6 +78,12 @@ export const createOwnerListEntry = async (payload) => {
     body: JSON.stringify(payload),
   });
 
+  if (res.status === 409) {
+    // Return the conflict payload with a _status marker so callers can branch
+    const body = await res.json();
+    return { _status: 409, ...body };
+  }
+
   if (!res.ok) {
     let message = `Backend error: ${res.status}`;
     try {
@@ -91,6 +97,12 @@ export const createOwnerListEntry = async (payload) => {
     throw new Error(message);
   }
 
+  return await res.json();
+};
+
+export const getOwnerByAddress = async (address) => {
+  const res = await fetch(`${CLUSTER_URL}/owner-by-address/${encodeURIComponent(address)}`);
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
   return await res.json();
 };
 
@@ -116,8 +128,3 @@ export const getPlacementDetail = async (entityId) => {
   return await res.json();
 };
 
-export const runPlacementAnalysis = async () => {
-  const res = await fetch(`${PLACEMENT_URL}/run`, { method: 'POST' });
-  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
-  return await res.json();
-};

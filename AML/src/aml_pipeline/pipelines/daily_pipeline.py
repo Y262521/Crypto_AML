@@ -94,12 +94,12 @@ def run_daily_pipeline(
             placement_summary = {
                 "run_id": placement_result.run_id,
                 "placements_found": len(placement_result.placements),
-                "pois_created": len(placement_result.pois),
+                "behavior_hits": sum(placement_result.summary.get("behaviors", {}).values()),
             }
             logger.info(
-                "Placement analytics complete: %d placements, %d POIs",
+                "Placement analytics complete: %d placements, %d behavior hits",
                 placement_summary["placements_found"],
-                placement_summary["pois_created"],
+                placement_summary["behavior_hits"],
             )
         except Exception as exc:
             logger.warning("Placement stage failed (non-fatal): %s", exc)

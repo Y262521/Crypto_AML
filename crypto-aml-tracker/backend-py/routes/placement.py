@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime
 import json
 import logging
@@ -153,37 +152,20 @@ async def _fetch_addresses_map(run_id: str, entity_ids: list[str]) -> dict[str, 
     return address_map
 
 
-async def _fetch_poi_map(run_id: str, entity_ids: list[str]) -> dict[str, dict]:
-    if not entity_ids:
-        return {}
-    placeholders = ", ".join(["%s"] * len(entity_ids))
-    rows = await fetch_all(
-        f"""
-        SELECT poi_id, entity_id, risk_score, reason, linked_behaviors_json, supporting_evidence_json
-        FROM placement_pois
-        WHERE run_id = %s
-          AND entity_id IN ({placeholders})
-        """,
-        tuple([run_id, *entity_ids]),
-    )
-    return {
-        row["entity_id"]: {
-            "poi_id": row.get("poi_id"),
-            "risk_score": float(row.get("risk_score") or 0.0),
-            "reason": row.get("reason"),
-            "linked_behaviors": _decode_json(row.get("linked_behaviors_json"), []),
-            "supporting_evidence": _decode_json(row.get("supporting_evidence_json"), {}),
-        }
-        for row in rows
-    }
-
-
-def _placement_payload(row: dict, addresses: list[str], poi: dict | None = None) -> dict:
+def _placement_payload(row: dict, addresses: list[str]) -> dict:
     behaviors = _decode_json(row.get("behaviors_json"), [])
     reasons = _decode_json(row.get("reasons_json"), [])
     linked_root_entities = _decode_json(row.get("linked_root_entities_json"), [])
     supporting_tx_hashes = _decode_json(row.get("supporting_tx_hashes_json"), [])
     metrics = _decode_json(row.get("metrics_json"), {})
+    behavior_profile = metrics.get("behavior_profile") if isinstance(metrics, dict) else {}
+    if not isinstance(behavior_profile, dict):
+        behavior_profile = {}
+    # filter banned behaviors defensively
+    banned = {"funneling", "funnel", "immediate_utilization", "immediate-utilization", "immediate utilization"}
+    behaviors = [b for b in (behaviors or []) if (b or "").lower() not in banned]
+    display_behaviors = [b for b in (behavior_profile.get("display_behaviors") or behaviors[:1]) if (b or "").lower() not in banned]
+    primary_behavior = behavior_profile.get("primary_behavior") if (behavior_profile.get("primary_behavior") or "").lower() not in banned else (display_behaviors[0] if display_behaviors else None)
     return {
         "entity_id": row.get("entity_id"),
         "entity_type": row.get("entity_type"),
@@ -195,7 +177,15 @@ def _placement_payload(row: dict, addresses: list[str], poi: dict | None = None)
         "behavior_score": float(row.get("behavior_score") or 0.0),
         "graph_position_score": float(row.get("graph_position_score") or 0.0),
         "temporal_score": float(row.get("temporal_score") or 0.0),
-        "behaviors": behaviors,
+        "behaviors": display_behaviors,
+        "all_behaviors": behaviors,
+        "primary_behavior": primary_behavior,
+        "behavior_profile": {
+            "primary_behavior": primary_behavior,
+            "display_behaviors": display_behaviors,
+            "display_mode": behavior_profile.get("display_mode") or ("dominant" if display_behaviors else "none"),
+            "ranked_behaviors": [rb for rb in (behavior_profile.get("ranked_behaviors") or []) if (rb.get("behavior_type") or "").lower() not in banned],
+        },
         "reasons": reasons,
         "reason": reasons[0] if reasons else None,
         "linked_root_entities": linked_root_entities,
@@ -206,7 +196,6 @@ def _placement_payload(row: dict, addresses: list[str], poi: dict | None = None)
         "first_seen_at": _format_ts(row.get("first_seen_at")),
         "last_seen_at": _format_ts(row.get("last_seen_at")),
         "metrics": metrics,
-        "poi": poi,
     }
 
 
@@ -318,18 +307,13 @@ async def get_placements(
     )
     entity_ids = [row["entity_id"] for row in rows]
     address_map = await _fetch_addresses_map(run["id"], entity_ids)
-    poi_map = await _fetch_poi_map(run["id"], entity_ids)
 
     return {
         "run_id": run["id"],
         "generated_at": _format_ts(run.get("completed_at")),
         "summary": _decode_json(run.get("summary_json"), {}),
         "items": [
-            _placement_payload(
-                row,
-                address_map.get(row["entity_id"], []),
-                poi_map.get(row["entity_id"]),
-            )
+            _placement_payload(row, address_map.get(row["entity_id"], []))
             for row in rows
         ],
     }
@@ -375,28 +359,6 @@ async def get_placement_summary():
         ],
     }
 
-
-@router.post("/run")
-async def run_placement():
-    try:
-        ensure_placement_schema()
-        cfg = _load_aml_config()
-        from aml_pipeline.analytics.placement import PlacementAnalysisEngine
-
-        engine = PlacementAnalysisEngine(cfg=cfg)
-        result = await asyncio.to_thread(
-            engine.run,
-            "mariadb",
-            True,
-        )
-        return {
-            "status": "ok",
-            "run_id": result.run_id,
-            "placements_found": len(result.placements),
-            "pois_created": len(result.pois),
-        }
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Placement analysis failed: {exc}") from exc
 
 
 @router.get("/{entity_id}")
@@ -453,6 +415,9 @@ async def get_placement_detail(entity_id: str):
         """,
         (run["id"], entity_id),
     )
+    # defensive filter to remove banned behavior types from detail responses
+    _banned = {"funneling", "funnel", "immediate_utilization", "immediate-utilization", "immediate utilization"}
+    behaviors = [b for b in behaviors if (b.get("behavior_type") or "").lower() not in _banned]
     labels = await fetch_all(
         """
         SELECT label, label_source, confidence_score, explanation
@@ -463,7 +428,6 @@ async def get_placement_detail(entity_id: str):
         """,
         (run["id"], entity_id),
     )
-    poi_map = await _fetch_poi_map(run["id"], [entity_id])
     trace_rows = await fetch_all(
         """
         SELECT root_entity_id,
@@ -523,7 +487,7 @@ async def get_placement_detail(entity_id: str):
         "run_id": run["id"],
         "generated_at": _format_ts(run.get("completed_at")),
         "summary": _decode_json(run.get("summary_json"), {}),
-        "placement": _placement_payload(row, address_map.get(entity_id, []), poi_map.get(entity_id)),
+        "placement": _placement_payload(row, address_map.get(entity_id, [])),
         "behaviors": [
             {
                 "behavior_type": item.get("behavior_type"),
@@ -544,7 +508,6 @@ async def get_placement_detail(entity_id: str):
             }
             for item in labels
         ],
-        "poi": poi_map.get(entity_id),
         "trace_paths": trace_paths,
         "linked_transactions": [
             {

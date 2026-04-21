@@ -11,7 +11,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { ReactFlow, Background, Controls, ReactFlowProvider, useNodesState, useEdgesState, MiniMap } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { getGraphData } from '../services/transactionService';
+import { getGraphData, getOwnerByAddress } from '../services/transactionService';
 import { filterEdgesData, collapseLowActivityNodes, applyRadialLayout } from '../utils/graphUtils';
 import Loader from '../components/common/Loader';
 
@@ -180,12 +180,70 @@ const buildGraph = (edgesData, options = {}) => {
 // ── Side panel shown when a node is clicked ───────────────────────────────────
 const AddressPanel = ({ address, stats, edgesData, onClose }) => {
   const [showAllTx, setShowAllTx] = useState(false);
+  const [ownerInfo, setOwnerInfo] = useState(null);   // null = loading
+  const [ownerError, setOwnerError] = useState(false);
+
+  useEffect(() => {
+    if (!address) return;
+    setOwnerInfo(null);
+    setOwnerError(false);
+    getOwnerByAddress(address)
+      .then((data) => setOwnerInfo(data))
+      .catch(() => setOwnerError(true));
+  }, [address]);
+
   const txList = edgesData.filter(tx => tx.sender === address || tx.receiver === address);
   const displayedTx = showAllTx ? txList.slice(0, 200) : txList.slice(0, 10);
   const hasMoreTransactions = txList.length > 10;
   const showLimit = Math.min(200, txList.length);
 
   if (!address) return null;
+
+  const renderOwnerSection = () => {
+    if (ownerError) {
+      return (
+        <div style={{ color: '#b91c1c', fontSize: '12px' }}>Owner data unavailable</div>
+      );
+    }
+    if (ownerInfo === null) {
+      return (
+        <div style={{ color: '#94a3b8', fontSize: '12px' }}>Loading owner…</div>
+      );
+    }
+    if (ownerInfo.owner === null) {
+      return (
+        <div style={{ color: '#94a3b8', fontSize: '12px', fontStyle: 'italic' }}>Unassigned</div>
+      );
+    }
+    const categoryColors = {
+      sanction: { color: '#991b1b', background: '#fee2e2', border: '1px solid #fca5a5' },
+      watchlist: { color: '#92400e', background: '#fef3c7', border: '1px solid #fcd34d' },
+      exchange: { color: '#1e40af', background: '#dbeafe', border: '1px solid #93c5fd' },
+      merchant: { color: '#065f46', background: '#d1fae5', border: '1px solid #6ee7b7' },
+    };
+    const pillStyle = (key) => ({
+      ...(categoryColors[key] || { color: '#475569', background: '#e2e8f0', border: '1px solid #cbd5e1' }),
+      borderRadius: '999px',
+      display: 'inline-flex',
+      alignItems: 'center',
+      padding: '2px 8px',
+      fontSize: '10px',
+      fontWeight: '700',
+      letterSpacing: '0.04em',
+      textTransform: 'uppercase',
+    });
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>
+          {ownerInfo.full_name}
+        </div>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          <span style={pillStyle(ownerInfo.entity_type)}>{ownerInfo.entity_type}</span>
+          <span style={pillStyle(ownerInfo.list_category)}>{ownerInfo.list_category}</span>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div style={{
@@ -206,6 +264,14 @@ const AddressPanel = ({ address, stats, edgesData, onClose }) => {
           </div>
         </div>
         <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '18px', marginLeft: '8px', flexShrink: 0 }}>✕</button>
+      </div>
+
+      {/* Owner section */}
+      <div style={{ padding: '12px 18px', borderBottom: '1px solid #f1f5f9' }}>
+        <div style={{ fontSize: '11px', fontWeight: '600', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+          Owner
+        </div>
+        {renderOwnerSection()}
       </div>
 
       {/* Stats */}

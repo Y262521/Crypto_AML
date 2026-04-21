@@ -27,8 +27,19 @@ from ..utils.connections import get_maria_engine
 logger = logging.getLogger(__name__)
 
 _SUSPICIOUS_BEHAVIOR_THRESHOLD = 0.55
-_ACTIONABLE_POI_THRESHOLD = 0.65
 _TRACE_MIN_CONFIDENCE = 0.25
+_DOWNSTREAM_BEHAVIOR_WEIGHT = 0.92
+_DOMINANT_BEHAVIOR_GAP = 0.15
+_DOMINANT_BEHAVIOR_RATIO = 0.82
+_BALANCED_BEHAVIOR_GAP = 0.06
+_BALANCED_BEHAVIOR_RATIO = 0.94
+_BANNED_BEHAVIORS = {
+    "funneling",
+    "funnel",
+    "immediate_utilization",
+    "immediate-utilization",
+    "immediate utilization",
+}
 
 
 @dataclass
@@ -145,17 +156,6 @@ class EntityLabel:
 
 
 @dataclass
-class InvestigationPoi:
-    poi_id: str
-    entity_id: str
-    entity_type: str
-    risk_score: float
-    reason: str
-    linked_behaviors: list[str]
-    supporting_evidence: dict[str, Any]
-
-
-@dataclass
 class PlacementAnalysisResult:
     run_id: str
     generated_at: str
@@ -165,7 +165,6 @@ class PlacementAnalysisResult:
     trace_paths: list[TracePath]
     placements: list[PlacementDetection]
     labels: list[EntityLabel]
-    pois: list[InvestigationPoi]
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -177,7 +176,6 @@ class PlacementAnalysisResult:
             "trace_paths": [_serialize_trace(path) for path in self.trace_paths],
             "placements": [_serialize_placement(placement) for placement in self.placements],
             "labels": [_serialize_label(label) for label in self.labels],
-            "pois": [_serialize_poi(poi) for poi in self.pois],
         }
 
 
@@ -306,16 +304,32 @@ def _serialize_label(label: EntityLabel) -> dict[str, Any]:
     }
 
 
-def _serialize_poi(poi: InvestigationPoi) -> dict[str, Any]:
-    return {
-        "poi_id": poi.poi_id,
-        "entity_id": poi.entity_id,
-        "entity_type": poi.entity_type,
-        "risk_score": poi.risk_score,
-        "reason": poi.reason,
-        "linked_behaviors": poi.linked_behaviors,
-        "supporting_evidence": poi.supporting_evidence,
-    }
+def _select_behavior_highlights(
+    ranked_behaviors: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], str]:
+    if not ranked_behaviors:
+        return [], "none"
+    if len(ranked_behaviors) == 1:
+        return ranked_behaviors[:1], "dominant"
+
+    top_score = float(ranked_behaviors[0]["confidence_score"] or 0.0)
+    second_score = float(ranked_behaviors[1]["confidence_score"] or 0.0)
+    if (
+        top_score - second_score >= _DOMINANT_BEHAVIOR_GAP
+        or second_score <= top_score * _DOMINANT_BEHAVIOR_RATIO
+    ):
+        return ranked_behaviors[:1], "dominant"
+
+    if len(ranked_behaviors) == 2:
+        return ranked_behaviors[:2], "paired"
+
+    third_score = float(ranked_behaviors[2]["confidence_score"] or 0.0)
+    if (
+        top_score - third_score <= _BALANCED_BEHAVIOR_GAP
+        and third_score >= top_score * _BALANCED_BEHAVIOR_RATIO
+    ):
+        return ranked_behaviors[:3], "balanced"
+    return ranked_behaviors[:2], "paired"
 
 
 class PlacementAnalysisEngine:
@@ -340,14 +354,13 @@ class PlacementAnalysisEngine:
                     "entities": 0,
                     "behaviors": {},
                     "placements": 0,
-                    "pois": 0,
+                    "behavior_display_modes": {},
                 },
                 entities=[],
                 behaviors=[],
                 trace_paths=[],
                 placements=[],
                 labels=[],
-                pois=[],
             )
             if persist:
                 self._persist(result, {}, {}, [])
@@ -361,6 +374,9 @@ class PlacementAnalysisEngine:
             address_to_entity,
         )
         behaviors = self._detect_behaviors(profiles)
+        # Remove any banned behavior types so they are not used in downstream
+        # scoring, persistence, or API exposure.
+        behaviors = [b for b in behaviors if (b.behavior_type or "").lower() not in _BANNED_BEHAVIORS]
         behavior_map: dict[str, list[BehaviorDetection]] = defaultdict(list)
         for detection in behaviors:
             behavior_map[detection.entity_id].append(detection)
@@ -383,7 +399,6 @@ class PlacementAnalysisEngine:
             incoming_entity_edges,
         )
         labels = self._assign_labels(profiles, behavior_map, trace_paths, placements)
-        pois = self._build_pois(placements)
         summary = self._build_summary(
             source=source,
             transactions=transactions,
@@ -391,7 +406,6 @@ class PlacementAnalysisEngine:
             behaviors=behaviors,
             placements=placements,
             labels=labels,
-            pois=pois,
         )
 
         result = PlacementAnalysisResult(
@@ -407,7 +421,6 @@ class PlacementAnalysisEngine:
                 reverse=True,
             ),
             labels=sorted(labels, key=lambda label: (label.label, label.entity_id)),
-            pois=sorted(pois, key=lambda poi: (poi.risk_score, poi.entity_id), reverse=True),
         )
 
         if persist:
@@ -714,8 +727,6 @@ class PlacementAnalysisEngine:
                 self._detect_structuring(profile),
                 self._detect_smurfing(profile),
                 self._detect_micro_funding(profile),
-                self._detect_funneling(profile),
-                self._detect_immediate_utilization(profile),
             ]
             detections.extend([candidate for candidate in candidates if candidate is not None])
         return detections
@@ -857,93 +868,6 @@ class PlacementAnalysisEngine:
             last_observed_at=_iso_from_ts(small_incoming[-1].timestamp),
         )
 
-    def _detect_funneling(self, profile: EntityProfile) -> BehaviorDetection | None:
-        in_degree = len(profile.incoming_entities)
-        out_degree = max(1, len(profile.outgoing_entities))
-        min_in_degree = max(2, int(self.cfg.placement_funneling_min_in_degree or 5))
-        min_ratio = max(1.0, float(self.cfg.placement_funneling_min_in_out_ratio or 3.0))
-        ratio = in_degree / float(out_degree)
-        if in_degree < min_in_degree or ratio < min_ratio:
-            return None
-        sender_factor = min(1.0, in_degree / float(min_in_degree * 2))
-        ratio_factor = min(1.0, ratio / float(min_ratio * 2))
-        value_factor = min(1.0, profile.total_in / max(self.cfg.high_value_threshold_eth, 1.0))
-        confidence = _clamp(
-            0.45 * sender_factor + 0.35 * ratio_factor + 0.20 * value_factor
-        )
-        if confidence < _SUSPICIOUS_BEHAVIOR_THRESHOLD:
-            return None
-        supporting_txs = sorted(profile.incoming_transactions, key=lambda tx: tx.value_eth, reverse=True)
-        return BehaviorDetection(
-            entity_id=profile.entity.entity_id,
-            entity_type=profile.entity.entity_type,
-            behavior_type="funneling",
-            confidence_score=round(confidence, 4),
-            supporting_metrics={
-                "incoming_entity_count": in_degree,
-                "outgoing_entity_count": len(profile.outgoing_entities),
-                "in_out_ratio": round(ratio, 4),
-                "total_in_eth": round(profile.total_in, 8),
-                "total_out_eth": round(profile.total_out, 8),
-            },
-            supporting_tx_hashes=[tx.tx_hash for tx in supporting_txs[:25]],
-            first_observed_at=_iso_from_ts(profile.incoming_transactions[0].timestamp if profile.incoming_transactions else None),
-            last_observed_at=_iso_from_ts(profile.outgoing_transactions[-1].timestamp if profile.outgoing_transactions else profile.incoming_transactions[-1].timestamp),
-        )
-
-    def _detect_immediate_utilization(self, profile: EntityProfile) -> BehaviorDetection | None:
-        incoming = profile.incoming_transactions
-        outgoing = profile.outgoing_transactions
-        if not incoming or not outgoing:
-            return None
-        max_holding = max(60, int(self.cfg.placement_immediate_max_holding_seconds or 3600))
-        min_cycles = max(1, int(self.cfg.placement_immediate_min_cycles or 3))
-        matched_cycles: list[tuple[EntityTransaction, EntityTransaction, float]] = []
-        out_index = 0
-
-        for in_tx in incoming:
-            while out_index < len(outgoing) and outgoing[out_index].timestamp < in_tx.timestamp:
-                out_index += 1
-            if out_index >= len(outgoing):
-                break
-            out_tx = outgoing[out_index]
-            delta = out_tx.timestamp - in_tx.timestamp
-            if delta <= max_holding:
-                matched_cycles.append((in_tx, out_tx, delta))
-                out_index += 1
-
-        if len(matched_cycles) < min_cycles:
-            return None
-        delays = [cycle[2] for cycle in matched_cycles]
-        median_delay = sorted(delays)[len(delays) // 2]
-        cycle_factor = min(1.0, len(matched_cycles) / float(min_cycles * 2))
-        delay_factor = 1.0 - min(1.0, median_delay / max_holding)
-        forwarded_total = sum(cycle[1].value_eth for cycle in matched_cycles)
-        value_factor = min(1.0, forwarded_total / max(self.cfg.high_value_threshold_eth, 1.0))
-        confidence = _clamp(
-            0.45 * cycle_factor + 0.35 * delay_factor + 0.20 * value_factor
-        )
-        if confidence < _SUSPICIOUS_BEHAVIOR_THRESHOLD:
-            return None
-        tx_hashes = []
-        for in_tx, out_tx, _delta in matched_cycles[:15]:
-            tx_hashes.extend([in_tx.tx_hash, out_tx.tx_hash])
-        return BehaviorDetection(
-            entity_id=profile.entity.entity_id,
-            entity_type=profile.entity.entity_type,
-            behavior_type="immediate_utilization",
-            confidence_score=round(confidence, 4),
-            supporting_metrics={
-                "matched_cycles": len(matched_cycles),
-                "median_holding_seconds": int(median_delay),
-                "forwarded_total_eth": round(forwarded_total, 8),
-                "max_holding_seconds": max_holding,
-            },
-            supporting_tx_hashes=tx_hashes,
-            first_observed_at=_iso_from_ts(matched_cycles[0][0].timestamp),
-            last_observed_at=_iso_from_ts(matched_cycles[-1][1].timestamp),
-        )
-
     def _trace_suspicious_entities(
         self,
         profiles: dict[str, EntityProfile],
@@ -1077,6 +1001,43 @@ class PlacementAnalysisEngine:
         fanout_penalty = 0.9 if len(outgoing_entity_edges.get(edge.source_entity_id, [])) > 3 else 1.0
         return _clamp((0.45 + 0.55 * min(1.0, contribution)) * service_penalty * branch_penalty * fanout_penalty)
 
+    def _build_behavior_profile(
+        self,
+        origin_entity_id: str,
+        linked_root_entity_ids: set[str],
+        behavior_map: dict[str, list[BehaviorDetection]],
+    ) -> dict[str, Any]:
+        strongest_by_behavior: dict[str, dict[str, Any]] = {}
+        linked_entities = set(linked_root_entity_ids)
+        linked_entities.add(origin_entity_id)
+
+        for entity_id in linked_entities:
+            relation = "origin" if entity_id == origin_entity_id else "downstream"
+            weight = 1.0 if relation == "origin" else _DOWNSTREAM_BEHAVIOR_WEIGHT
+            for detection in behavior_map.get(entity_id, []):
+                weighted_score = round(_clamp(detection.confidence_score * weight), 4)
+                current = strongest_by_behavior.get(detection.behavior_type)
+                if current is None or weighted_score > current["confidence_score"]:
+                    strongest_by_behavior[detection.behavior_type] = {
+                        "behavior_type": detection.behavior_type,
+                        "confidence_score": weighted_score,
+                        "evidence_entity_id": entity_id,
+                        "source": relation,
+                    }
+
+        ranked_behaviors = sorted(
+            strongest_by_behavior.values(),
+            key=lambda item: (item["confidence_score"], item["behavior_type"]),
+            reverse=True,
+        )
+        display_behaviors, display_mode = _select_behavior_highlights(ranked_behaviors)
+        return {
+            "primary_behavior": ranked_behaviors[0]["behavior_type"] if ranked_behaviors else None,
+            "display_behaviors": [item["behavior_type"] for item in display_behaviors],
+            "display_mode": display_mode,
+            "ranked_behaviors": ranked_behaviors,
+        }
+
     def _identify_placements(
         self,
         profiles: dict[str, EntityProfile],
@@ -1098,13 +1059,15 @@ class PlacementAnalysisEngine:
             origin_profile = profiles[origin_entity_id]
             linked_root_entity_ids = {path.root_entity_id for path in origin_paths}
             linked_root_entities = sorted(linked_root_entity_ids)
-            descendant_behaviors = sorted(
-                {
-                    detection.behavior_type
-                    for entity_id in linked_root_entity_ids | {origin_entity_id}
-                    for detection in behavior_map.get(entity_id, [])
-                }
+            behavior_profile = self._build_behavior_profile(
+                origin_entity_id,
+                linked_root_entity_ids,
+                behavior_map,
             )
+            descendant_behaviors = [
+                item["behavior_type"]
+                for item in behavior_profile["ranked_behaviors"]
+            ]
             if not descendant_behaviors:
                 continue
 
@@ -1166,7 +1129,7 @@ class PlacementAnalysisEngine:
             if origin_behaviors:
                 reasons.append(
                     "direct suspicious behavior: " + ", ".join(
-                        sorted({behavior.behavior_type for behavior in origin_behaviors})
+                        dict.fromkeys(behavior.behavior_type for behavior in origin_behaviors)
                     )
                 )
             else:
@@ -1205,6 +1168,7 @@ class PlacementAnalysisEngine:
                     last_seen_at=_iso_from_ts(origin_profile.entity.last_seen_at),
                     metrics={
                         "avg_trace_score": round(avg_path_score, 4),
+                        "behavior_profile": behavior_profile,
                         "max_trace_depth": max_depth,
                         "linked_root_entities": linked_root_entities,
                         "prior_suspicious_history": prior_suspicious_history,
@@ -1276,31 +1240,6 @@ class PlacementAnalysisEngine:
 
         return labels
 
-    def _build_pois(self, placements: list[PlacementDetection]) -> list[InvestigationPoi]:
-        pois: list[InvestigationPoi] = []
-        for placement in placements:
-            if placement.confidence_score < _ACTIONABLE_POI_THRESHOLD:
-                continue
-            poi_id = "POI-" + hashlib.sha1(
-                f"{placement.entity_id}|{placement.first_seen_at}|{placement.placement_score}".encode()
-            ).hexdigest()[:10].upper()
-            pois.append(
-                InvestigationPoi(
-                    poi_id=poi_id,
-                    entity_id=placement.entity_id,
-                    entity_type=placement.entity_type,
-                    risk_score=round(placement.placement_score * 100.0, 2),
-                    reason="placement detection",
-                    linked_behaviors=placement.behaviors,
-                    supporting_evidence={
-                        "reasons": placement.reasons,
-                        "trace_path_count": placement.trace_path_count,
-                        "supporting_tx_hashes": placement.supporting_tx_hashes[:20],
-                    },
-                )
-            )
-        return pois
-
     def _build_summary(
         self,
         *,
@@ -1310,7 +1249,6 @@ class PlacementAnalysisEngine:
         behaviors: list[BehaviorDetection],
         placements: list[PlacementDetection],
         labels: list[EntityLabel],
-        pois: list[InvestigationPoi],
     ) -> dict[str, Any]:
         return {
             "source": source,
@@ -1320,9 +1258,14 @@ class PlacementAnalysisEngine:
             "address_entities": sum(1 for entity in entities.values() if entity.entity_type == "address"),
             "validation_status": dict(Counter(entity.validation_status for entity in entities.values())),
             "behaviors": dict(Counter(detection.behavior_type for detection in behaviors)),
+            "behavior_display_modes": dict(
+                Counter(
+                    placement.metrics.get("behavior_profile", {}).get("display_mode", "dominant")
+                    for placement in placements
+                )
+            ),
             "placements": len(placements),
             "labels": dict(Counter(label.label for label in labels)),
-            "pois": len(pois),
         }
 
     def _persist(
@@ -1376,6 +1319,7 @@ class PlacementAnalysisEngine:
                 "last_observed_at": datetime.fromisoformat(behavior.last_observed_at).replace(tzinfo=None) if behavior.last_observed_at else None,
             }
             for behavior in result.behaviors
+            if (behavior.behavior_type or "").lower() not in _BANNED_BEHAVIORS
         ]
 
         trace_rows = []
@@ -1460,20 +1404,6 @@ class PlacementAnalysisEngine:
                 "explanation": label.explanation,
             }
             for label in result.labels
-        ]
-
-        poi_rows = [
-            {
-                "poi_id": poi.poi_id,
-                "run_id": result.run_id,
-                "entity_id": poi.entity_id,
-                "entity_type": poi.entity_type,
-                "risk_score": poi.risk_score,
-                "reason": poi.reason,
-                "linked_behaviors_json": _json_dumps(poi.linked_behaviors),
-                "supporting_evidence_json": _json_dumps(poi.supporting_evidence),
-            }
-            for poi in result.pois
         ]
 
         try:
@@ -1690,40 +1620,10 @@ class PlacementAnalysisEngine:
                         label_rows,
                     )
 
-                if poi_rows:
-                    conn.execute(
-                        text(
-                            """
-                            INSERT INTO placement_pois (
-                                poi_id,
-                                run_id,
-                                entity_id,
-                                entity_type,
-                                risk_score,
-                                reason,
-                                linked_behaviors_json,
-                                supporting_evidence_json
-                            )
-                            VALUES (
-                                :poi_id,
-                                :run_id,
-                                :entity_id,
-                                :entity_type,
-                                :risk_score,
-                                :reason,
-                                :linked_behaviors_json,
-                                :supporting_evidence_json
-                            )
-                            """
-                        ),
-                        poi_rows,
-                    )
-
             logger.info(
-                "Persisted placement run %s with %d placements and %d POIs",
+                "Persisted placement run %s with %d placements",
                 result.run_id,
                 len(result.placements),
-                len(result.pois),
             )
         finally:
             engine.dispose()
