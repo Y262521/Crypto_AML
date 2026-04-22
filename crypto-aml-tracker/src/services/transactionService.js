@@ -106,12 +106,20 @@ export const getOwnerByAddress = async (address) => {
   return await res.json();
 };
 
-export const getPlacements = async ({ limit = 50, minConfidence = 0 } = {}) => {
+export const getPlacements = async ({ limit = 50, minConfidence = 0, runId = null, beforeDate = null } = {}) => {
   const params = new URLSearchParams({
     limit: String(limit),
     min_confidence: String(minConfidence),
   });
+  if (runId) params.set('run_id', runId);
+  if (beforeDate) params.set('before_date', beforeDate);
   const res = await fetch(`${PLACEMENT_URL}?${params.toString()}`);
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};
+
+export const getPlacementRuns = async () => {
+  const res = await fetch(`${PLACEMENT_URL}/runs`);
   if (!res.ok) throw new Error(`Backend error: ${res.status}`);
   return await res.json();
 };
