@@ -1,8 +1,0 @@
-{
-  "dependencies": {
-    "@xyflow/react": "^12.10.1",
-    "ml.js": "^0.0.1",
-    "react-flow-renderer": "^10.3.17",
-    "recharts": "^3.8.0"
-  }
-}
