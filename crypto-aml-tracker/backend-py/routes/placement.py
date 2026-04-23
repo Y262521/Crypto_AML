@@ -92,16 +92,39 @@ async def _latest_run() -> dict | None:
     )
 
 
-async def _latest_run_safe() -> dict | None:
+async def _get_run(run_id: str | None, before_date: str | None = None) -> dict | None:
+    """Return a specific run by ID, by date, or the latest."""
+    if run_id:
+        return await fetch_one(
+            "SELECT id, source, status, started_at, completed_at, summary_json FROM placement_runs WHERE id = %s",
+            (run_id,),
+        )
+    if before_date:
+        # Find the most recent completed run on or before the given date
+        return await fetch_one(
+            """
+            SELECT id, source, status, started_at, completed_at, summary_json
+            FROM placement_runs
+            WHERE status = 'completed'
+              AND DATE(completed_at) <= %s
+            ORDER BY completed_at DESC
+            LIMIT 1
+            """,
+            (before_date,),
+        )
+    return await _latest_run()
+
+
+async def _latest_run_safe(run_id: str | None = None, before_date: str | None = None) -> dict | None:
     ensure_placement_schema()
     try:
-        return await _latest_run()
+        return await _get_run(run_id, before_date)
     except ProgrammingError as exc:
         if exc.args and exc.args[0] == 1146:
             global _SCHEMA_READY
             _SCHEMA_READY = False
             ensure_placement_schema()
-            return await _latest_run()
+            return await _get_run(run_id, before_date)
         raise
 
 
@@ -260,13 +283,45 @@ def _build_trace_paths(
     return trace_paths
 
 
+@router.get("/runs")
+async def get_placement_runs():
+    """Return the last 10 completed placement runs for the run selector."""
+    _require_mysql()
+    ensure_placement_schema()
+    try:
+        rows = await fetch_all(
+            """
+            SELECT id, source, status, started_at, completed_at, summary_json
+            FROM placement_runs
+            WHERE status = 'completed'
+            ORDER BY completed_at DESC, created_at DESC
+            LIMIT 10
+            """
+        )
+        return [
+            {
+                "id": row["id"],
+                "source": row.get("source"),
+                "completed_at": _format_ts(row.get("completed_at")),
+                "started_at": _format_ts(row.get("started_at")),
+                "summary": _decode_json(row.get("summary_json"), {}),
+            }
+            for row in rows
+        ]
+    except Exception as exc:
+        logger.warning("Failed to fetch placement runs: %s", exc)
+        return []
+
+
 @router.get("/")
 async def get_placements(
     limit: int = Query(50, ge=1, le=500),
     min_confidence: float = Query(0.0, ge=0.0, le=1.0),
+    run_id: str | None = Query(None),
+    before_date: str | None = Query(None),
 ):
     _require_mysql()
-    run = await _latest_run_safe()
+    run = await _latest_run_safe(run_id, before_date)
     if not run:
         return {
             "run_id": None,

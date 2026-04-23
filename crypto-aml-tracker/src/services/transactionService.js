@@ -2,6 +2,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001
 const BACKEND_URL = `${API_BASE_URL}/transactions`;
 const CLUSTER_URL = `${API_BASE_URL}/clusters`;
 const PLACEMENT_URL = `${API_BASE_URL}/placement`;
+const LAYERING_URL = `${API_BASE_URL}/layering`;
 
 export const getLatestTransactions = async ({ limit = 200, offset = 0, sortBy = 'amount_desc' } = {}) => {
   const params = new URLSearchParams({
@@ -106,12 +107,20 @@ export const getOwnerByAddress = async (address) => {
   return await res.json();
 };
 
-export const getPlacements = async ({ limit = 50, minConfidence = 0 } = {}) => {
+export const getPlacements = async ({ limit = 50, minConfidence = 0, runId = null, beforeDate = null } = {}) => {
   const params = new URLSearchParams({
     limit: String(limit),
     min_confidence: String(minConfidence),
   });
+  if (runId) params.set('run_id', runId);
+  if (beforeDate) params.set('before_date', beforeDate);
   const res = await fetch(`${PLACEMENT_URL}?${params.toString()}`);
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};
+
+export const getPlacementRuns = async () => {
+  const res = await fetch(`${PLACEMENT_URL}/runs`);
   if (!res.ok) throw new Error(`Backend error: ${res.status}`);
   return await res.json();
 };
@@ -128,3 +137,39 @@ export const getPlacementDetail = async (entityId) => {
   return await res.json();
 };
 
+export const getLayeringAlerts = async ({ limit = 50, minConfidence = 0, runId = null } = {}) => {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    min_confidence: String(minConfidence),
+  });
+  if (runId) params.set('run_id', runId);
+  const res = await fetch(`${LAYERING_URL}?${params.toString()}`);
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};
+
+export const getLayeringRuns = async () => {
+  const res = await fetch(`${LAYERING_URL}/runs`);
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};
+
+export const getLayeringSummary = async (runId = null) => {
+  const url = runId
+    ? `${LAYERING_URL}/summary?run_id=${encodeURIComponent(runId)}`
+    : `${LAYERING_URL}/summary`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};
+
+export const getLayeringDetail = async (entityId, runId = null) => {
+  const params = new URLSearchParams();
+  if (runId) params.set('run_id', runId);
+  const url = params.toString()
+    ? `${LAYERING_URL}/${encodeURIComponent(entityId)}?${params.toString()}`
+    : `${LAYERING_URL}/${encodeURIComponent(entityId)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};

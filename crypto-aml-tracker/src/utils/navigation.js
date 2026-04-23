@@ -2,6 +2,7 @@ export const PAGE_ROUTES = Object.freeze({
   feed: '/',
   analytics: '/analytics',
   placement: '/placement',
+  layering: '/layering',
   clusters: '/clusters',
   graph: '/graph',
 })

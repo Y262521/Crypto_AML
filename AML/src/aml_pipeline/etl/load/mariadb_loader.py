@@ -44,6 +44,13 @@ UTF8MB4_TABLES = (
     "placement_traces",
     "placement_detections",
     "placement_labels",
+    "layering_runs",
+    "layering_entities",
+    "layering_entity_addresses",
+    "layering_detector_hits",
+    "layering_evidence",
+    "layering_bridge_pairs",
+    "layering_alerts",
 )
 
 
@@ -107,7 +114,8 @@ def _ensure_utf8mb4_tables(engine: Engine, cfg: Config) -> None:
         rows = conn.execute(query, {"db": cfg.mysql_db}).mappings().all()
 
     collations = {
-        row["table_name"]: row.get("table_collation")
+        {k.lower(): v for k, v in dict(row).items()}["table_name"]:
+        {k.lower(): v for k, v in dict(row).items()}.get("table_collation")
         for row in rows
     }
 
@@ -327,11 +335,12 @@ def _drop_legacy_wallet_cluster_owner_foreign_keys(engine: Engine, cfg: Config) 
 
         legacy_found = False
         for row in rows:
-            if row["referenced_table_name"] == "owner_list":
+            r = {k.lower(): v for k, v in dict(row).items()}
+            if r.get("referenced_table_name") == "owner_list":
                 continue
             legacy_found = True
             conn.exec_driver_sql(
-                f"ALTER TABLE `wallet_clusters` DROP FOREIGN KEY `{row['constraint_name']}`"
+                f"ALTER TABLE `wallet_clusters` DROP FOREIGN KEY `{r['constraint_name']}`"
             )
         return legacy_found
 
@@ -351,7 +360,7 @@ def _ensure_wallet_cluster_owner_fk(engine: Engine, cfg: Config) -> None:
             ),
             {"db": cfg.mysql_db},
         ).mappings().all()
-        if any(row["referenced_table_name"] == "owner_list" for row in rows):
+        if any({k.lower(): v for k, v in dict(row).items()}.get("referenced_table_name") == "owner_list" for row in rows):
             return
 
         conn.exec_driver_sql(

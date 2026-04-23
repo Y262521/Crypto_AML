@@ -30,6 +30,11 @@ def main():
         action="store_true",
         help="Skip the placement analytics stage",
     )
+    parser.add_argument(
+        "--skip-layering",
+        action="store_true",
+        help="Skip the layering analytics stage",
+    )
 
     args = parser.parse_args()
     run_daily_pipeline(
@@ -40,6 +45,7 @@ def main():
         strict_neo4j=args.strict_neo4j,
         run_clustering=not args.skip_clustering,
         run_placement=not args.skip_placement,
+        run_layering=not args.skip_layering,
     )
 
 

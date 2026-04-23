@@ -3,6 +3,7 @@ import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
 import GraphExplorer from './pages/GraphExplorer'
 import Analytics from './pages/Analytics'
+import Layering from './pages/Layering'
 import Placement from './pages/Placement'
 import Clusters from './pages/Clusters'
 import { getLatestTransactions } from './services/transactionService'
@@ -29,15 +30,15 @@ const getInitialInvestigateAddress = () => (
 )
 
 function App() {
-  const [activePage, setActivePage]         = useState(getInitialPage)
-  const [transactions, setTransactions]     = useState([])
-  const [txLoading, setTxLoading]           = useState(true)
-  const [txLoadingMore, setTxLoadingMore]   = useState(false)
-  const [txError, setTxError]               = useState(null)
-  const [txTotal, setTxTotal]               = useState(0)
-  const [graphVersion, setGraphVersion]     = useState(0)
+  const [activePage, setActivePage] = useState(getInitialPage)
+  const [transactions, setTransactions] = useState([])
+  const [txLoading, setTxLoading] = useState(true)
+  const [txLoadingMore, setTxLoadingMore] = useState(false)
+  const [txError, setTxError] = useState(null)
+  const [txTotal, setTxTotal] = useState(0)
+  const [graphVersion, setGraphVersion] = useState(0)
   const [investigateAddress, setInvestigate] = useState(getInitialInvestigateAddress)
-  const [lastUpdated, setLastUpdated]       = useState(null)
+  const [lastUpdated, setLastUpdated] = useState(null)
   const intervalRef = useRef(null)
 
   const fetchTransactions = useCallback(async ({ append = false, offset = 0 } = {}) => {
@@ -141,25 +142,27 @@ function App() {
       }}>
         {activePage === 'feed'
           ? <Dashboard
-              transactions={transactions}
-              loading={txLoading}
-              loadingMore={txLoadingMore}
-              error={txError}
-              onInvestigate={handleInvestigate}
-              onLoadMore={handleLoadMoreTransactions}
-              lastUpdated={lastUpdated}
-              totalTransactions={txTotal}
-            />
+            transactions={transactions}
+            loading={txLoading}
+            loadingMore={txLoadingMore}
+            error={txError}
+            onInvestigate={handleInvestigate}
+            onLoadMore={handleLoadMoreTransactions}
+            lastUpdated={lastUpdated}
+            totalTransactions={txTotal}
+          />
           : activePage === 'graph'
             ? <GraphExplorer
-                initialAddress={investigateAddress}
-                graphVersion={graphVersion}
-                lastUpdated={lastUpdated}
-              />
+              initialAddress={investigateAddress}
+              graphVersion={graphVersion}
+              lastUpdated={lastUpdated}
+            />
             : activePage === 'analytics'
-                ? <Analytics />
-                : activePage === 'placement'
-                  ? <Placement />
+              ? <Analytics />
+              : activePage === 'placement'
+                ? <Placement onNavigateToGraph={(address) => navigate('graph', { address })} />
+                : activePage === 'layering'
+                  ? <Layering onNavigateToGraph={(address) => navigate('graph', { address })} />
                 : activePage === 'clusters'
                   ? <Clusters onAddressClick={handleAddressClick} />
                   : null
