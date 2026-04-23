@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useState } from 'react';
 import Loader from '../components/common/Loader';
-import { getLayeringAlerts, getLayeringRuns, getLayeringSummary } from '../services/transactionService';
+import { getLayeringAlerts, getLayeringRuns, getLayeringSummary, getLayeringDetail } from '../services/transactionService';
 
 const formatNumber = (value, maximumFractionDigits = 2) => {
     const parsed = Number(value || 0);
@@ -15,6 +15,14 @@ const truncate = (value, maxLength = 18) => {
 };
 
 const formatMethod = (value) => (value || '').replaceAll('_', ' ');
+
+const displayDetectorScore = (v) => {
+    if (v === null || v === undefined) return '0';
+    const num = Number(v);
+    if (!Number.isFinite(num)) return String(v);
+    if (num <= 1) return `${Math.round(num * 100)}%`;
+    return String(num);
+};
 
 const humanizeLayeringReason = (reasons = [], primaryMethod = '') => {
     if (!reasons || reasons.length === 0) {
@@ -67,6 +75,7 @@ export default function Layering({ onNavigateToGraph }) {
     const [methodFilter, setMethodFilter] = useState('All');
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 10;
+    const [detectionsMap, setDetectionsMap] = useState({});
 
     const deferredSearch = useDeferredValue(search);
 
@@ -112,6 +121,26 @@ export default function Layering({ onNavigateToGraph }) {
 
     const totalPages = Math.max(1, Math.ceil(filteredAlerts.length / PAGE_SIZE));
     const visibleAlerts = filteredAlerts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+    useEffect(() => {
+        let mounted = true;
+        const ids = visibleAlerts.map(a => a.entity_id).filter(Boolean);
+        if (ids.length === 0) {
+            setDetectionsMap({});
+            return;
+        }
+        Promise.all(ids.map(id => getLayeringDetail(id, selectedRunId)
+            .then(r => ({ id, detections: r.detections || [] }))
+            .catch(() => ({ id, detections: [] }))
+        ))
+            .then((results) => {
+                if (!mounted) return;
+                const map = {};
+                results.forEach((item) => { map[item.id] = item.detections || []; });
+                setDetectionsMap(map);
+            });
+        return () => { mounted = false; };
+    }, [visibleAlerts, selectedRunId]);
 
     if (loading) return <Loader />;
     if (error) return <div style={{ color: '#b33a3a', padding: '1rem' }}>Error: {error}</div>;
@@ -223,6 +252,7 @@ export default function Layering({ onNavigateToGraph }) {
                             <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
                                 <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Entity</th>
                                 <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Methods</th>
+                                <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Detectors</th>
                                 <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Confidence</th>
 
                                 <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Placement Seed</th>
@@ -234,7 +264,7 @@ export default function Layering({ onNavigateToGraph }) {
                         <tbody>
                             {filteredAlerts.length === 0 ? (
                                 <tr>
-                                    <td colSpan="8" style={{ padding: '28px 16px', textAlign: 'center', color: '#64748b' }}>
+                                    <td colSpan="9" style={{ padding: '28px 16px', textAlign: 'center', color: '#64748b' }}>
                                         No layering alerts match the current filters.
                                     </td>
                                 </tr>
@@ -265,6 +295,20 @@ export default function Layering({ onNavigateToGraph }) {
                                             ))}
                                         </div>
                                     </td>
+
+                                    <td style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', verticalAlign: 'top', minWidth: '140px' }}>
+                                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                            {(detectionsMap[alert.entity_id] || []).map((d, i) => (
+                                                <span key={`${d.detector_type}-${i}`} style={{ padding: '4px 8px', borderRadius: '999px', background: '#f8fafc', color: toneForMethod(d.detector_type), fontSize: '11px', fontWeight: 700 }}>
+                                                    {formatMethod(d.detector_type)} {displayDetectorScore(d.confidence_score)}
+                                                </span>
+                                            ))}
+                                            {!(detectionsMap[alert.entity_id] || []).length && (
+                                                <span style={{ fontSize: '11px', color: '#94a3b8' }}>no detections</span>
+                                            )}
+                                        </div>
+                                    </td>
+
                                     <td style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', fontWeight: 600 }}>
                                         {formatNumber(alert.confidence)}
                                     </td>
