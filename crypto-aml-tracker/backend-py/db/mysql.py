@@ -15,8 +15,8 @@ async def connect_mysql():
     pool = await aiomysql.create_pool(
         host=os.getenv("MYSQL_HOST", "localhost"),
         port=int(os.getenv("MYSQL_PORT", 3306)),
-        user=os.getenv("MYSQL_USER", "root"),
-        password=os.getenv("MYSQL_PASSWORD", "1216mysql"),
+        user=os.getenv("MYSQL_USER", "hakim"),
+        password=os.getenv("MYSQL_PASSWORD", "hakim22"),
         db=os.getenv("MYSQL_DB", "aml_db"),
         charset="utf8mb4",
         use_unicode=True,

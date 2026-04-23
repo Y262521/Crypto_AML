@@ -95,6 +95,36 @@ class Config:
     placement_origin_service_tx_count: int
     placement_origin_service_degree: int
 
+    # Layering analytics
+    layering_service_profile_path: str
+    layering_min_seed_confidence: float
+    layering_service_tx_count: int
+    layering_service_degree: int
+    layering_peel_min_hops: int
+    layering_peel_max_hops: int
+    layering_peel_min_decay_ratio: float
+    layering_peel_min_fragment_ratio: float
+    layering_peel_max_fragment_ratio: float
+    layering_peel_max_time_gap_seconds: int
+    layering_mixing_min_interactions: int
+    layering_mixing_min_repeated_denominations: int
+    layering_mixing_max_time_gap_seconds: int
+    layering_mixing_min_ego_density: float
+    layering_bridge_amount_tolerance_ratio: float
+    layering_bridge_max_latency_seconds: int
+    layering_bridge_min_pairs: int
+    layering_shell_window_seconds: int
+    layering_shell_min_community_size: int
+    layering_shell_min_internal_ratio: float
+    layering_shell_min_density: float
+    layering_shell_min_temporal_windows: int
+    layering_depth_max_hops: int
+    layering_depth_min_hops: int
+    layering_depth_branching_limit: int
+    layering_depth_min_value_retention: float
+    layering_depth_max_latency_seconds: int
+    layering_depth_min_score: float
+
 
 def load_config() -> Config:
     base_dir = Path(__file__).resolve().parents[2]
@@ -133,13 +163,13 @@ def load_config() -> Config:
 
         mysql_host=_get_env("MYSQL_HOST", default="localhost"),
         mysql_port=_get_int("MYSQL_PORT", default=3306),
-        mysql_user=_get_env("MYSQL_USER", default="root"),
-        mysql_password=_get_env("MYSQL_PASSWORD", default="1216mysql"),
+        mysql_user=_get_env("MYSQL_USER", default="hakim"),
+        mysql_password=_get_env("MYSQL_PASSWORD", default="hakim22"),
         mysql_db=_get_env("MYSQL_DB", default="aml_db"),
 
         neo4j_uri=_get_env("NEO4J_URI", default="bolt://localhost:7687"),
         neo4j_user=_get_env("NEO4J_USER", default="neo4j"),
-        neo4j_password=_get_env("NEO4J_PASSWORD", default="neo4j1216"),
+        neo4j_password=_get_env("NEO4J_PASSWORD", default="hakimaj22"),
         neo4j_database=_get_env("NEO4J_DATABASE", default="neo4j"),
         neo4j_batch_size=_get_int("NEO4J_BATCH_SIZE", default=500),
 
@@ -151,7 +181,7 @@ def load_config() -> Config:
         ),
         eth_network=_get_env("ETH_NETWORK", default="mainnet"),
         eth_start_block=_get_int("ETH_START_BLOCK", default=23849990),
-        eth_batch_size=_get_int("ETH_BATCH_SIZE", "BATCH_SIZE", default=30),
+        eth_batch_size=_get_int("ETH_BATCH_SIZE", "BATCH_SIZE", default=5),
         batch_size=_get_int("BATCH_SIZE", default=1000),
         batch_size_transform=_get_int("BATCH_SIZE_TRANSFORM", "TRANSFORM_BATCH_SIZE", default=300),
         high_value_threshold_eth=_get_float(
@@ -224,5 +254,117 @@ def load_config() -> Config:
         placement_origin_service_degree=_get_int(
             "PLACEMENT_ORIGIN_SERVICE_DEGREE",
             default=25,
+        ),
+        layering_service_profile_path=_get_env(
+            "LAYERING_SERVICE_PROFILE_PATH",
+            default="",
+        ),
+        layering_min_seed_confidence=_get_float(
+            "LAYERING_MIN_SEED_CONFIDENCE",
+            default=0.55,
+        ),
+        layering_service_tx_count=_get_int(
+            "LAYERING_SERVICE_TX_COUNT",
+            default=200,
+        ),
+        layering_service_degree=_get_int(
+            "LAYERING_SERVICE_DEGREE",
+            default=25,
+        ),
+        layering_peel_min_hops=_get_int(
+            "LAYERING_PEEL_MIN_HOPS",
+            default=3,
+        ),
+        layering_peel_max_hops=_get_int(
+            "LAYERING_PEEL_MAX_HOPS",
+            default=6,
+        ),
+        layering_peel_min_decay_ratio=_get_float(
+            "LAYERING_PEEL_MIN_DECAY_RATIO",
+            default=0.02,
+        ),
+        layering_peel_min_fragment_ratio=_get_float(
+            "LAYERING_PEEL_MIN_FRAGMENT_RATIO",
+            default=0.01,
+        ),
+        layering_peel_max_fragment_ratio=_get_float(
+            "LAYERING_PEEL_MAX_FRAGMENT_RATIO",
+            default=0.35,
+        ),
+        layering_peel_max_time_gap_seconds=_get_int(
+            "LAYERING_PEEL_MAX_TIME_GAP_SECONDS",
+            default=7200,
+        ),
+        layering_mixing_min_interactions=_get_int(
+            "LAYERING_MIXING_MIN_INTERACTIONS",
+            default=2,
+        ),
+        layering_mixing_min_repeated_denominations=_get_int(
+            "LAYERING_MIXING_MIN_REPEATED_DENOMINATIONS",
+            default=2,
+        ),
+        layering_mixing_max_time_gap_seconds=_get_int(
+            "LAYERING_MIXING_MAX_TIME_GAP_SECONDS",
+            default=21600,
+        ),
+        layering_mixing_min_ego_density=_get_float(
+            "LAYERING_MIXING_MIN_EGO_DENSITY",
+            default=0.18,
+        ),
+        layering_bridge_amount_tolerance_ratio=_get_float(
+            "LAYERING_BRIDGE_AMOUNT_TOLERANCE_RATIO",
+            default=0.03,
+        ),
+        layering_bridge_max_latency_seconds=_get_int(
+            "LAYERING_BRIDGE_MAX_LATENCY_SECONDS",
+            default=86400,
+        ),
+        layering_bridge_min_pairs=_get_int(
+            "LAYERING_BRIDGE_MIN_PAIRS",
+            default=1,
+        ),
+        layering_shell_window_seconds=_get_int(
+            "LAYERING_SHELL_WINDOW_SECONDS",
+            default=43200,
+        ),
+        layering_shell_min_community_size=_get_int(
+            "LAYERING_SHELL_MIN_COMMUNITY_SIZE",
+            default=4,
+        ),
+        layering_shell_min_internal_ratio=_get_float(
+            "LAYERING_SHELL_MIN_INTERNAL_RATIO",
+            default=0.72,
+        ),
+        layering_shell_min_density=_get_float(
+            "LAYERING_SHELL_MIN_DENSITY",
+            default=0.28,
+        ),
+        layering_shell_min_temporal_windows=_get_int(
+            "LAYERING_SHELL_MIN_TEMPORAL_WINDOWS",
+            default=2,
+        ),
+        layering_depth_max_hops=_get_int(
+            "LAYERING_DEPTH_MAX_HOPS",
+            default=6,
+        ),
+        layering_depth_min_hops=_get_int(
+            "LAYERING_DEPTH_MIN_HOPS",
+            default=4,
+        ),
+        layering_depth_branching_limit=_get_int(
+            "LAYERING_DEPTH_BRANCHING_LIMIT",
+            default=3,
+        ),
+        layering_depth_min_value_retention=_get_float(
+            "LAYERING_DEPTH_MIN_VALUE_RETENTION",
+            default=0.55,
+        ),
+        layering_depth_max_latency_seconds=_get_int(
+            "LAYERING_DEPTH_MAX_LATENCY_SECONDS",
+            default=86400,
+        ),
+        layering_depth_min_score=_get_float(
+            "LAYERING_DEPTH_MIN_SCORE",
+            default=0.58,
         ),
     )
