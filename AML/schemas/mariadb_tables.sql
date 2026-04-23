@@ -240,3 +240,151 @@ CREATE TABLE IF NOT EXISTS placement_labels (
         FOREIGN KEY (run_id) REFERENCES placement_runs(id)
         ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS layering_runs (
+    id VARCHAR(64) PRIMARY KEY,
+    source VARCHAR(32) NOT NULL DEFAULT 'auto',
+    placement_run_id VARCHAR(64) NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'completed',
+    started_at DATETIME NULL,
+    completed_at DATETIME NULL,
+    summary_json LONGTEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_layering_runs_completed_at (completed_at),
+    KEY idx_layering_runs_status (status),
+    KEY idx_layering_runs_placement_run_id (placement_run_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS layering_entities (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    run_id VARCHAR(64) NOT NULL,
+    entity_id VARCHAR(64) NOT NULL,
+    entity_type VARCHAR(16) NOT NULL,
+    placement_score DECIMAL(6,4) NOT NULL DEFAULT 0,
+    placement_confidence DECIMAL(6,4) NOT NULL DEFAULT 0,
+    placement_behaviors_json LONGTEXT NULL,
+    validation_status VARCHAR(32) NOT NULL,
+    validation_confidence DECIMAL(6,4) NOT NULL DEFAULT 0,
+    source_kind VARCHAR(32) NOT NULL,
+    address_count INT NOT NULL DEFAULT 0,
+    first_seen_at DATETIME NULL,
+    last_seen_at DATETIME NULL,
+    metrics_json LONGTEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_layering_entities_run_entity (run_id, entity_id),
+    KEY idx_layering_entities_run_id (run_id),
+    KEY idx_layering_entities_entity_type (entity_type),
+    CONSTRAINT fk_layering_entities_run
+        FOREIGN KEY (run_id) REFERENCES layering_runs(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS layering_entity_addresses (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    run_id VARCHAR(64) NOT NULL,
+    entity_id VARCHAR(64) NOT NULL,
+    address VARCHAR(64) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_layering_entity_addresses (run_id, entity_id, address),
+    KEY idx_layering_entity_addresses_run_entity (run_id, entity_id),
+    KEY idx_layering_entity_addresses_address (address),
+    CONSTRAINT fk_layering_entity_addresses_run
+        FOREIGN KEY (run_id) REFERENCES layering_runs(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS layering_detector_hits (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    run_id VARCHAR(64) NOT NULL,
+    entity_id VARCHAR(64) NOT NULL,
+    entity_type VARCHAR(16) NOT NULL,
+    detector_type VARCHAR(64) NOT NULL,
+    confidence_score DECIMAL(6,4) NOT NULL DEFAULT 0,
+    summary_text TEXT NULL,
+    score_components_json LONGTEXT NULL,
+    metrics_json LONGTEXT NULL,
+    supporting_tx_hashes_json LONGTEXT NULL,
+    evidence_ids_json LONGTEXT NULL,
+    first_observed_at DATETIME NULL,
+    last_observed_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_layering_detector_hits_run_id (run_id),
+    KEY idx_layering_detector_hits_entity_id (entity_id),
+    KEY idx_layering_detector_hits_detector_type (detector_type),
+    CONSTRAINT fk_layering_detector_hits_run
+        FOREIGN KEY (run_id) REFERENCES layering_runs(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS layering_evidence (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    run_id VARCHAR(64) NOT NULL,
+    evidence_id VARCHAR(64) NOT NULL,
+    entity_id VARCHAR(64) NOT NULL,
+    detector_type VARCHAR(64) NOT NULL,
+    evidence_type VARCHAR(64) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    summary_text TEXT NULL,
+    entity_ids_json LONGTEXT NULL,
+    tx_hashes_json LONGTEXT NULL,
+    path_json LONGTEXT NULL,
+    metrics_json LONGTEXT NULL,
+    first_seen_at DATETIME NULL,
+    last_seen_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_layering_evidence_run_evidence (run_id, evidence_id),
+    KEY idx_layering_evidence_run_entity (run_id, entity_id),
+    KEY idx_layering_evidence_detector_type (detector_type),
+    CONSTRAINT fk_layering_evidence_run
+        FOREIGN KEY (run_id) REFERENCES layering_runs(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS layering_bridge_pairs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    run_id VARCHAR(64) NOT NULL,
+    entity_id VARCHAR(64) NOT NULL,
+    source_tx_hash VARCHAR(66) NOT NULL,
+    destination_tx_hash VARCHAR(66) NOT NULL,
+    bridge_contract VARCHAR(64) NOT NULL,
+    token_symbol VARCHAR(64) NOT NULL DEFAULT 'ETH',
+    amount DECIMAL(38,18) NOT NULL DEFAULT 0,
+    latency_seconds DECIMAL(18,2) NOT NULL DEFAULT 0,
+    confidence_score DECIMAL(6,4) NOT NULL DEFAULT 0,
+    source_address VARCHAR(64) NOT NULL,
+    destination_address VARCHAR(64) NOT NULL,
+    details_json LONGTEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_layering_bridge_pairs_run_entity (run_id, entity_id),
+    KEY idx_layering_bridge_pairs_source_tx (source_tx_hash),
+    KEY idx_layering_bridge_pairs_destination_tx (destination_tx_hash),
+    CONSTRAINT fk_layering_bridge_pairs_run
+        FOREIGN KEY (run_id) REFERENCES layering_runs(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS layering_alerts (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    run_id VARCHAR(64) NOT NULL,
+    entity_id VARCHAR(64) NOT NULL,
+    entity_type VARCHAR(16) NOT NULL,
+    confidence_score DECIMAL(6,4) NOT NULL DEFAULT 0,
+    layering_score DECIMAL(6,4) NOT NULL DEFAULT 0,
+    placement_score DECIMAL(6,4) NOT NULL DEFAULT 0,
+    placement_confidence DECIMAL(6,4) NOT NULL DEFAULT 0,
+    method_scores_json LONGTEXT NULL,
+    methods_json LONGTEXT NULL,
+    reasons_json LONGTEXT NULL,
+    supporting_tx_hashes_json LONGTEXT NULL,
+    evidence_ids_json LONGTEXT NULL,
+    metrics_json LONGTEXT NULL,
+    first_seen_at DATETIME NULL,
+    last_seen_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_layering_alerts_run_entity (run_id, entity_id),
+    KEY idx_layering_alerts_run_id (run_id),
+    KEY idx_layering_alerts_score (layering_score),
+    CONSTRAINT fk_layering_alerts_run
+        FOREIGN KEY (run_id) REFERENCES layering_runs(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

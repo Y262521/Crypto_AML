@@ -291,7 +291,7 @@ async def get_graph_data(
 
 @router.post("/refresh")
 async def refresh_pipeline():
-    """Optional manual refresh: run ETL + clustering once."""
+    """Optional manual refresh: run ETL plus analytics once."""
     try:
         import sys
         from pathlib import Path

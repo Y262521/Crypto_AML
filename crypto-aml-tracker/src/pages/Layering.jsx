@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useState } from 'react';
+import { useDeferredValue, useEffect, useRef, useState } from 'react';
 import Loader from '../components/common/Loader';
 import { getLayeringAlerts, getLayeringRuns, getLayeringSummary } from '../services/transactionService';
 
@@ -23,13 +23,6 @@ const METHOD_LABELS = {
 };
 
 const formatMethod = (value) => METHOD_LABELS[value] || (value || '').replaceAll('_', ' ');
-
-const formatConfidence = (value) => {
-    const parsed = Number(value || 0);
-    if (!Number.isFinite(parsed)) return '0%';
-    if (parsed <= 1) return `${Math.round(parsed * 100)}%`;
-    return `${Math.round(parsed)}%`;
-};
 
 const cardStyle = {
     background: '#ffffff',
@@ -87,6 +80,139 @@ const getHighlightedMethods = (alert) => {
 
     return hasStrongSecondary ? rankedMethods.slice(0, 2) : rankedMethods.slice(0, 1);
 };
+
+function ReasonPreview({ text, onExpand }) {
+    const containerRef = useRef(null);
+    const measureRef = useRef(null);
+    const [preview, setPreview] = useState(text || '—');
+    const [isTruncated, setIsTruncated] = useState(false);
+
+    useEffect(() => {
+        const container = containerRef.current;
+        const measure = measureRef.current;
+        const value = String(text || '').trim();
+
+        if (!value) {
+            setPreview('—');
+            setIsTruncated(false);
+            return undefined;
+        }
+
+        if (!container || !measure) {
+            setPreview(value);
+            setIsTruncated(false);
+            return undefined;
+        }
+
+        const recalculate = () => {
+            const width = container.clientWidth;
+            if (!width) return;
+
+            const computed = window.getComputedStyle(container);
+            const fontSize = Number.parseFloat(computed.fontSize) || 14;
+            const lineHeight = computed.lineHeight === 'normal'
+                ? fontSize * 1.5
+                : Number.parseFloat(computed.lineHeight) || fontSize * 1.5;
+            const maxHeight = lineHeight * 2;
+
+            measure.style.width = `${width}px`;
+            measure.style.font = computed.font;
+            measure.style.fontFamily = computed.fontFamily;
+            measure.style.fontSize = computed.fontSize;
+            measure.style.fontWeight = computed.fontWeight;
+            measure.style.letterSpacing = computed.letterSpacing;
+            measure.style.lineHeight = computed.lineHeight;
+            measure.style.whiteSpace = 'normal';
+            measure.style.wordBreak = 'break-word';
+            measure.style.overflowWrap = 'anywhere';
+
+            measure.textContent = value;
+            if (measure.scrollHeight <= maxHeight + 1) {
+                setPreview(value);
+                setIsTruncated(false);
+                return;
+            }
+
+            let low = 0;
+            let high = value.length;
+            let best = '';
+
+            while (low <= high) {
+                const mid = Math.floor((low + high) / 2);
+                const candidate = value.slice(0, mid).trimEnd();
+                measure.textContent = `${candidate}...`;
+
+                if (measure.scrollHeight <= maxHeight + 1) {
+                    best = candidate;
+                    low = mid + 1;
+                } else {
+                    high = mid - 1;
+                }
+            }
+
+            setPreview(best);
+            setIsTruncated(true);
+        };
+
+        recalculate();
+
+        if (typeof ResizeObserver === 'undefined') {
+            window.addEventListener('resize', recalculate);
+            return () => window.removeEventListener('resize', recalculate);
+        }
+
+        const observer = new ResizeObserver(() => recalculate());
+        observer.observe(container);
+        return () => observer.disconnect();
+    }, [text]);
+
+    return (
+        <>
+            <div
+                ref={containerRef}
+                style={{
+                    color: '#334155',
+                    lineHeight: 1.5,
+                    fontSize: '14px',
+                    overflowWrap: 'anywhere',
+                }}
+            >
+                {preview}
+                {isTruncated ? (
+                    <button
+                        type="button"
+                        onClick={onExpand}
+                        aria-label="See full reason"
+                        title="See full reason"
+                        style={{
+                            font: 'inherit',
+                            color: '#0f6578',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: 0,
+                            textDecoration: 'underline',
+                        }}
+                    >
+                        ...
+                    </button>
+                ) : null}
+            </div>
+            <div
+                ref={measureRef}
+                aria-hidden="true"
+                style={{
+                    position: 'fixed',
+                    top: '-9999px',
+                    left: '-9999px',
+                    visibility: 'hidden',
+                    pointerEvents: 'none',
+                    zIndex: -1,
+                }}
+            />
+        </>
+    );
+}
 
 export default function Layering({ onNavigateToGraph }) {
     const [runs, setRuns] = useState([]);
@@ -208,11 +334,6 @@ export default function Layering({ onNavigateToGraph }) {
                     <div style={{ fontSize: '26px', fontWeight: 700, color: '#0f172a' }}>{formatNumber(summaryBody.bridge_pairs || 0, 0)}</div>
                     <div style={{ fontSize: '12px', color: '#64748b' }}>Matched bridge hop records</div>
                 </div>
-                <div style={cardStyle}>
-                    <div style={{ fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Avg Confidence</div>
-                    <div style={{ fontSize: '26px', fontWeight: 700, color: '#0f172a' }}>{formatNumber(summaryBody.average_alert_confidence || 0)}</div>
-                    <div style={{ fontSize: '12px', color: '#64748b' }}>Across final alerts</div>
-                </div>
             </div>
 
             <div style={{
@@ -275,7 +396,6 @@ export default function Layering({ onNavigateToGraph }) {
                             <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
                                 <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Entity</th>
                                 <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Methods</th>
-                                <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Confidence</th>
                                 <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Placement Seed</th>
                                 <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Evidence</th>
                                 <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Reason</th>
@@ -285,7 +405,7 @@ export default function Layering({ onNavigateToGraph }) {
                         <tbody>
                             {filteredAlerts.length === 0 ? (
                                 <tr>
-                                    <td colSpan="7" style={{ padding: '28px 16px', textAlign: 'center', color: '#64748b' }}>
+                                    <td colSpan="6" style={{ padding: '28px 16px', textAlign: 'center', color: '#64748b' }}>
                                         No layering alerts match the current filters.
                                     </td>
                                 </tr>
@@ -321,9 +441,6 @@ export default function Layering({ onNavigateToGraph }) {
                                             })}
                                         </div>
                                     </td>
-                                    <td style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', fontWeight: 600 }}>
-                                        <div style={{ color: toneForMethod(alert.primary_method) }}>{formatConfidence(alert.confidence)}</div>
-                                    </td>
                                     <td style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>
                                         <div>{formatNumber(alert.placement_score)}</div>
                                         <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
@@ -336,20 +453,11 @@ export default function Layering({ onNavigateToGraph }) {
                                             {formatNumber((alert.supporting_tx_hashes || []).length, 0)} linked txs
                                         </div>
                                     </td>
-                                                            <td style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', maxWidth: '340px', color: '#334155', lineHeight: 1.5 }}>
-                                        {(() => {
-                                            const full = humanizeLayeringReason(alert.reasons, alert.primary_method) || '—';
-                                            const limit = 160;
-                                            if (!full || full === '—') return <span>{full}</span>;
-                                            if (full.length <= limit) return <span>{full}</span>;
-                                            const truncated = full.slice(0, limit);
-                                            return (
-                                                <span>
-                                                    {truncated}
-                                                    <button type="button" onClick={() => setReasonPopup({ entityId: alert.entity_id, full, reasons: alert.reasons })} style={{ marginLeft: 6, background: 'none', border: 'none', color: '#0f6578', cursor: 'pointer', fontWeight: 700 }}>...</button>
-                                                </span>
-                                            );
-                                        })()}
+                                    <td style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', maxWidth: '340px' }}>
+                                        <ReasonPreview
+                                            text={alert.reason}
+                                            onExpand={() => setReasonPopup({ entityId: alert.entity_id, reason: alert.reason })}
+                                        />
                                     </td>
                                     <td style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>
                                         <button
@@ -408,32 +516,56 @@ export default function Layering({ onNavigateToGraph }) {
                         ))}
                     </div>
                 ) : null}
+            </div>
 
-                {reasonPopup && (
-                    <>
-                        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.25)', zIndex: 999 }} onClick={() => setReasonPopup(null)} />
-                        <div style={{ position: 'fixed', top: '20%', left: '50%', transform: 'translateX(-50%)', width: 'min(760px,90%)', background: '#fff', zIndex: 1000, borderRadius: 8, boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
-                            <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ fontSize: 13, fontWeight: 800 }}>Full Reason</div>
-                                <button onClick={() => setReasonPopup(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18 }}>✕</button>
-                            </div>
-                            <div style={{ padding: '16px', maxHeight: '60vh', overflowY: 'auto' }}>
-                                <div style={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#0f172a' }}>{reasonPopup.full}</div>
-                                {reasonPopup.reasons && reasonPopup.reasons.length > 1 && (
-                                    <div style={{ marginTop: 12, fontSize: 13, color: '#64748b' }}>
-                                        Other reasons:
-                                        <ul>
-                                            {reasonPopup.reasons.map((r, i) => (
-                                                <li key={i}>{r}</li>
-                                            ))}
-                                        </ul>
+            {reasonPopup ? (
+                <>
+                    <div
+                        style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.32)', zIndex: 999 }}
+                        onClick={() => setReasonPopup(null)}
+                    />
+                    <div
+                        style={{
+                            position: 'fixed',
+                            top: 0,
+                            right: 0,
+                            bottom: 0,
+                            width: '420px',
+                            maxWidth: '100%',
+                            background: '#fff',
+                            zIndex: 1000,
+                            boxShadow: '-8px 0 32px rgba(0,0,0,0.15)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                        }}
+                    >
+                        <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', background: 'linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                                <div>
+                                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#0f6578', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>
+                                        Layering Reason
                                     </div>
-                                )}
+                                    <div style={{ fontSize: '12px', fontFamily: 'monospace', color: '#0f172a', wordBreak: 'break-all' }}>
+                                        {reasonPopup.entityId}
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setReasonPopup(null)}
+                                    style={{ border: '1px solid #e2e8f0', background: '#fff', borderRadius: '8px', padding: '4px 10px', cursor: 'pointer', fontSize: '14px', color: '#64748b', flexShrink: 0 }}
+                                >
+                                    ✕
+                                </button>
                             </div>
                         </div>
-                    </>
-                )}
-            </div>
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+                            <div style={{ padding: '14px 16px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#0f172a', lineHeight: 1.7 }}>
+                                {reasonPopup.reason}
+                            </div>
+                        </div>
+                    </div>
+                </>
+            ) : null}
         </div>
     );
 }

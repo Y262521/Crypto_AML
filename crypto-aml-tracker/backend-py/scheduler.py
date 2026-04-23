@@ -1,5 +1,5 @@
 """
-APScheduler — runs the ETL pipeline + clustering automatically.
+APScheduler — runs the ETL pipeline + analytics automatically.
 
 Schedule (configurable via .env):
   PIPELINE_SCHEDULE_HOURS  — comma-separated hours to run (24h format)
@@ -8,7 +8,7 @@ Schedule (configurable via .env):
 What it does each run:
   1. Fetch new Ethereum blocks into raw MongoDB
   2. Transform all raw blocks -> load processed transactions into MariaDB and graph data into Neo4j
-  3. Run clustering engine -> persist results to MySQL
+  3. Run clustering, placement, and layering analytics -> persist results to MySQL
 
 Status is tracked in memory and exposed via /api/status.
 """
@@ -45,7 +45,7 @@ def _get_aml_root() -> Path:
 
 
 async def run_pipeline():
-    """Execute the full ETL + clustering pipeline."""
+    """Execute the full ETL + analytics pipeline."""
     global pipeline_status
 
     pipeline_status["last_run_at"]     = datetime.now(timezone.utc).isoformat()
@@ -70,7 +70,7 @@ async def run_pipeline():
 
         cfg = load_config()
 
-        # Run full pipeline: extract → transform → load → cluster
+        # Run full pipeline: extract → transform → load → analytics
         summary = await asyncio.to_thread(
             run_daily_pipeline,
             cfg=cfg,
@@ -87,6 +87,8 @@ async def run_pipeline():
             "clusters_found":      (summary.get("clustering") or {}).get("clusters_found", 0),
             "placements_found":    (summary.get("placement") or {}).get("placements_found", 0),
             "behavior_hits":       (summary.get("placement") or {}).get("behavior_hits", 0),
+            "layering_alerts":     (summary.get("layering") or {}).get("alerts_found", 0),
+            "layering_detector_hits": (summary.get("layering") or {}).get("detector_hits", 0),
         }
         logger.info("Scheduled pipeline run completed: %s", pipeline_status["last_run_summary"])
 
@@ -110,7 +112,7 @@ def create_scheduler() -> AsyncIOScheduler:
         run_pipeline,
         trigger=CronTrigger(hour=hour_expr, minute=0),
         id="etl_pipeline",
-        name="ETL + Clustering",
+        name="ETL + Analytics",
         replace_existing=True,
         misfire_grace_time=300,   # allow up to 5 min late start
     )

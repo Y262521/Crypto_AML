@@ -26,9 +26,10 @@ def run_daily_pipeline(
     strict_neo4j: bool = False,
     run_clustering: bool = True,
     run_placement: bool = True,
+    run_layering: bool = True,
     cfg: Config | None = None,
 ) -> dict:
-    """Run extract, transform, load, clustering, and placement analytics."""
+    """Run extract, transform, load, clustering, placement, and layering analytics."""
     cfg = cfg or load_config()
     setup_logging(cfg.log_level)
 
@@ -49,6 +50,7 @@ def run_daily_pipeline(
             "neo4j": None,
             "clustering": None,
             "placement": None,
+            "layering": None,
         }
 
     load_summary = run_load_stage(
@@ -82,6 +84,7 @@ def run_daily_pipeline(
             clustering_summary = {"error": str(exc)}
 
     placement_summary = None
+    placement_result = None
     if run_placement:
         try:
             from ..analytics.placement import PlacementAnalysisEngine
@@ -105,6 +108,32 @@ def run_daily_pipeline(
             logger.warning("Placement stage failed (non-fatal): %s", exc)
             placement_summary = {"error": str(exc)}
 
+    layering_summary = None
+    if run_layering:
+        try:
+            from ..analytics.layering import LayeringAnalysisEngine
+
+            layering_engine = LayeringAnalysisEngine(cfg=cfg)
+            layering_result = layering_engine.run(
+                source="mariadb",
+                persist=True,
+                placement_result=placement_result,
+            )
+            layering_summary = {
+                "run_id": layering_result.run_id,
+                "alerts_found": len(layering_result.alerts),
+                "detector_hits": len(layering_result.detections),
+                "bridge_pairs": len(layering_result.bridge_pairs),
+            }
+            logger.info(
+                "Layering analytics complete: %d alerts, %d detector hits",
+                layering_summary["alerts_found"],
+                layering_summary["detector_hits"],
+            )
+        except Exception as exc:
+            logger.warning("Layering stage failed (non-fatal): %s", exc)
+            layering_summary = {"error": str(exc)}
+
     logger.info(
         "Load stage complete | MariaDB transactions: %s | Neo4j edges: %s | Mongo backup: %s",
         0 if mariadb_summary is None else mariadb_summary["transactions_loaded"],
@@ -119,4 +148,5 @@ def run_daily_pipeline(
         "neo4j": neo4j_summary,
         "clustering": clustering_summary,
         "placement": placement_summary,
+        "layering": layering_summary,
     }

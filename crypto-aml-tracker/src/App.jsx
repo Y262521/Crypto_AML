@@ -3,6 +3,7 @@ import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
 import GraphExplorer from './pages/GraphExplorer'
 import Analytics from './pages/Analytics'
+import Layering from './pages/Layering'
 import Placement from './pages/Placement'
 import Clusters from './pages/Clusters'
 import { getLatestTransactions } from './services/transactionService'
@@ -160,6 +161,8 @@ function App() {
               ? <Analytics />
               : activePage === 'placement'
                 ? <Placement onNavigateToGraph={(address) => navigate('graph', { address })} />
+                : activePage === 'layering'
+                  ? <Layering onNavigateToGraph={(address) => navigate('graph', { address })} />
                 : activePage === 'clusters'
                   ? <Clusters onAddressClick={handleAddressClick} />
                   : null

@@ -44,6 +44,13 @@ UTF8MB4_TABLES = (
     "placement_traces",
     "placement_detections",
     "placement_labels",
+    "layering_runs",
+    "layering_entities",
+    "layering_entity_addresses",
+    "layering_detector_hits",
+    "layering_evidence",
+    "layering_bridge_pairs",
+    "layering_alerts",
 )
 
 
