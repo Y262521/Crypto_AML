@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useState } from 'react';
 import Loader from '../components/common/Loader';
-import { getLayeringAlerts, getLayeringRuns, getLayeringSummary, getLayeringDetail } from '../services/transactionService';
+import { getLayeringAlerts, getLayeringRuns, getLayeringSummary } from '../services/transactionService';
 
 const formatNumber = (value, maximumFractionDigits = 2) => {
     const parsed = Number(value || 0);
@@ -14,34 +14,21 @@ const truncate = (value, maxLength = 18) => {
     return `${value.slice(0, maxLength - 3)}...`;
 };
 
-const formatMethod = (value) => (value || '').replaceAll('_', ' ');
-
-const displayDetectorScore = (v) => {
-    if (v === null || v === undefined) return '0';
-    const num = Number(v);
-    if (!Number.isFinite(num)) return String(v);
-    if (num <= 1) return `${Math.round(num * 100)}%`;
-    return String(num);
+const METHOD_LABELS = {
+    peeling_chain: 'Peeling chains',
+    mixing_interaction: 'Mixing & anonymity tool interaction',
+    bridge_hopping: 'Cross-chain & bridge hopping',
+    shell_wallet_network: 'Shell wallet networks',
+    high_depth_transaction_chaining: 'High-depth transaction chaining',
 };
 
-const humanizeLayeringReason = (reasons = [], primaryMethod = '') => {
-    if (!reasons || reasons.length === 0) {
-        if (primaryMethod) return `Flagged by ${formatMethod(primaryMethod)} detector.`;
-        return 'Flagged by layering detection heuristics.';
-    }
-    const map = {
-        'repeated_shaved_transfers': 'Repeated small transfers that appear to shave funds across many addresses.',
-        'mixing_interaction': 'Interaction with mixing services or anonymity tools.',
-        'bridge_hopping': 'Funds routed through bridge contracts to obscure origin.',
-        'shell_wallet_network': 'Clustered shell wallets exhibiting rapid forwarding behavior.',
-        'high_depth_transaction_chaining': 'Long forwarding chains indicating deep transaction hops.',
-    };
-    const readable = reasons.map((r) => {
-        const key = Object.keys(map).find((k) => r?.toLowerCase().includes(k.toLowerCase()));
-        return key ? map[key] : null;
-    }).filter(Boolean);
-    if (readable.length > 0) return readable[0];
-    return reasons[0]?.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || 'Flagged by layering detection heuristics.';
+const formatMethod = (value) => METHOD_LABELS[value] || (value || '').replaceAll('_', ' ');
+
+const formatConfidence = (value) => {
+    const parsed = Number(value || 0);
+    if (!Number.isFinite(parsed)) return '0%';
+    if (parsed <= 1) return `${Math.round(parsed * 100)}%`;
+    return `${Math.round(parsed)}%`;
 };
 
 const cardStyle = {
@@ -64,6 +51,43 @@ const toneForMethod = (method) => {
     return '#334155';
 };
 
+const paletteForMethod = (method) => {
+    if (method === 'peeling_chain') return { background: '#fef2f2', border: '#fecaca', color: '#b91c1c' };
+    if (method === 'mixing_interaction') return { background: '#fffbeb', border: '#fde68a', color: '#92400e' };
+    if (method === 'bridge_hopping') return { background: '#f0f9ff', border: '#bae6fd', color: '#0369a1' };
+    if (method === 'shell_wallet_network') return { background: '#f0fdf4', border: '#bbf7d0', color: '#166534' };
+    if (method === 'high_depth_transaction_chaining') return { background: '#eef2ff', border: '#c7d2fe', color: '#312e81' };
+    return { background: '#f8fafc', border: '#cbd5e1', color: '#334155' };
+};
+
+const getHighlightedMethods = (alert) => {
+    const methodScores = alert.method_scores || {};
+    const rankedMethods = Array.from(
+        new Set([
+            ...(alert.methods || []),
+            ...Object.keys(methodScores),
+        ]),
+    )
+        .filter(Boolean)
+        .map((method) => ({
+            method,
+            score: Number(methodScores[method] || 0),
+        }))
+        .sort((left, right) => {
+            if (right.score !== left.score) return right.score - left.score;
+            return left.method.localeCompare(right.method);
+        });
+
+    if (rankedMethods.length <= 1) return rankedMethods;
+
+    const primary = rankedMethods[0];
+    const secondary = rankedMethods[1];
+    const scale = primary.score > 1 ? 10 : 1;
+    const hasStrongSecondary = secondary.score >= scale * 0.45 && secondary.score >= primary.score * 0.72;
+
+    return hasStrongSecondary ? rankedMethods.slice(0, 2) : rankedMethods.slice(0, 1);
+};
+
 export default function Layering({ onNavigateToGraph }) {
     const [runs, setRuns] = useState([]);
     const [selectedRunId, setSelectedRunId] = useState(null);
@@ -75,11 +99,8 @@ export default function Layering({ onNavigateToGraph }) {
     const [methodFilter, setMethodFilter] = useState('All');
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 10;
-    const [detectionsMap, setDetectionsMap] = useState({});
-
+    const [reasonPopup, setReasonPopup] = useState(null);
     const deferredSearch = useDeferredValue(search);
-
-    useEffect(() => { setPage(1); }, [deferredSearch, methodFilter]);
 
     useEffect(() => {
         getLayeringRuns()
@@ -109,6 +130,10 @@ export default function Layering({ onNavigateToGraph }) {
             .finally(() => setLoading(false));
     }, [selectedRunId]);
 
+    useEffect(() => {
+        setPage(1);
+    }, [deferredSearch, methodFilter, selectedRunId]);
+
     const allMethods = Array.from(new Set(alerts.flatMap((alert) => alert.methods || []))).sort();
     const filteredAlerts = alerts.filter((alert) => {
         const query = deferredSearch.trim().toLowerCase();
@@ -118,29 +143,14 @@ export default function Layering({ onNavigateToGraph }) {
         const matchMethod = methodFilter === 'All' || (alert.methods || []).includes(methodFilter);
         return matchSearch && matchMethod;
     });
-
     const totalPages = Math.max(1, Math.ceil(filteredAlerts.length / PAGE_SIZE));
     const visibleAlerts = filteredAlerts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
     useEffect(() => {
-        let mounted = true;
-        const ids = visibleAlerts.map(a => a.entity_id).filter(Boolean);
-        if (ids.length === 0) {
-            setDetectionsMap({});
-            return;
+        if (page > totalPages) {
+            setPage(totalPages);
         }
-        Promise.all(ids.map(id => getLayeringDetail(id, selectedRunId)
-            .then(r => ({ id, detections: r.detections || [] }))
-            .catch(() => ({ id, detections: [] }))
-        ))
-            .then((results) => {
-                if (!mounted) return;
-                const map = {};
-                results.forEach((item) => { map[item.id] = item.detections || []; });
-                setDetectionsMap(map);
-            });
-        return () => { mounted = false; };
-    }, [visibleAlerts, selectedRunId]);
+    }, [page, totalPages]);
 
     if (loading) return <Loader />;
     if (error) return <div style={{ color: '#b33a3a', padding: '1rem' }}>Error: {error}</div>;
@@ -179,7 +189,6 @@ export default function Layering({ onNavigateToGraph }) {
                             </option>
                         ))}
                     </select>
-
                 </div>
             </div>
 
@@ -246,15 +255,27 @@ export default function Layering({ onNavigateToGraph }) {
                 borderRadius: '14px',
                 overflow: 'hidden',
             }}>
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '12px 16px',
+                    borderBottom: '1px solid #e2e8f0',
+                    background: '#fafbfc',
+                    flexWrap: 'wrap',
+                }}>
+                    <div style={{ fontSize: '12px', color: '#64748b' }}>
+                        {formatNumber(filteredAlerts.length, 0)} alerts, page {page} of {totalPages}
+                    </div>
+                </div>
                 <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1040px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '980px' }}>
                         <thead>
                             <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
                                 <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Entity</th>
                                 <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Methods</th>
-                                <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Detectors</th>
                                 <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Confidence</th>
-
                                 <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Placement Seed</th>
                                 <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Evidence</th>
                                 <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Reason</th>
@@ -264,7 +285,7 @@ export default function Layering({ onNavigateToGraph }) {
                         <tbody>
                             {filteredAlerts.length === 0 ? (
                                 <tr>
-                                    <td colSpan="9" style={{ padding: '28px 16px', textAlign: 'center', color: '#64748b' }}>
+                                    <td colSpan="7" style={{ padding: '28px 16px', textAlign: 'center', color: '#64748b' }}>
                                         No layering alerts match the current filters.
                                     </td>
                                 </tr>
@@ -278,41 +299,31 @@ export default function Layering({ onNavigateToGraph }) {
                                     </td>
                                     <td style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', verticalAlign: 'top' }}>
                                         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                            {(alert.methods || []).map((method) => (
+                                            {getHighlightedMethods(alert).map(({ method }, index) => {
+                                                const palette = paletteForMethod(method);
+                                                return (
                                                 <span
                                                     key={method}
                                                     style={{
-                                                        padding: '4px 8px',
+                                                        padding: '4px 10px',
                                                         borderRadius: '999px',
-                                                        background: '#eff6ff',
-                                                        color: toneForMethod(method),
+                                                        background: palette.background,
+                                                        color: palette.color,
+                                                        border: `1px solid ${palette.border}`,
                                                         fontSize: '12px',
-                                                        fontWeight: 600,
+                                                        fontWeight: index === 0 ? 800 : 700,
+                                                        opacity: index === 0 ? 1 : 0.5,
                                                     }}
                                                 >
                                                     {formatMethod(method)}
                                                 </span>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     </td>
-
-                                    <td style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', verticalAlign: 'top', minWidth: '140px' }}>
-                                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                            {(detectionsMap[alert.entity_id] || []).map((d, i) => (
-                                                <span key={`${d.detector_type}-${i}`} style={{ padding: '4px 8px', borderRadius: '999px', background: '#f8fafc', color: toneForMethod(d.detector_type), fontSize: '11px', fontWeight: 700 }}>
-                                                    {formatMethod(d.detector_type)} {displayDetectorScore(d.confidence_score)}
-                                                </span>
-                                            ))}
-                                            {!(detectionsMap[alert.entity_id] || []).length && (
-                                                <span style={{ fontSize: '11px', color: '#94a3b8' }}>no detections</span>
-                                            )}
-                                        </div>
-                                    </td>
-
                                     <td style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', fontWeight: 600 }}>
-                                        {formatNumber(alert.confidence)}
+                                        <div style={{ color: toneForMethod(alert.primary_method) }}>{formatConfidence(alert.confidence)}</div>
                                     </td>
-
                                     <td style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>
                                         <div>{formatNumber(alert.placement_score)}</div>
                                         <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
@@ -325,8 +336,20 @@ export default function Layering({ onNavigateToGraph }) {
                                             {formatNumber((alert.supporting_tx_hashes || []).length, 0)} linked txs
                                         </div>
                                     </td>
-                                    <td style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', maxWidth: '300px', color: '#334155' }}>
-                                        {(humanizeLayeringReason(alert.reasons, alert.primary_method) || '—')}
+                                                            <td style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', maxWidth: '340px', color: '#334155', lineHeight: 1.5 }}>
+                                        {(() => {
+                                            const full = humanizeLayeringReason(alert.reasons, alert.primary_method) || '—';
+                                            const limit = 160;
+                                            if (!full || full === '—') return <span>{full}</span>;
+                                            if (full.length <= limit) return <span>{full}</span>;
+                                            const truncated = full.slice(0, limit);
+                                            return (
+                                                <span>
+                                                    {truncated}
+                                                    <button type="button" onClick={() => setReasonPopup({ entityId: alert.entity_id, full, reasons: alert.reasons })} style={{ marginLeft: 6, background: 'none', border: 'none', color: '#0f6578', cursor: 'pointer', fontWeight: 700 }}>...</button>
+                                                </span>
+                                            );
+                                        })()}
                                     </td>
                                     <td style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>
                                         <button
@@ -349,28 +372,68 @@ export default function Layering({ onNavigateToGraph }) {
                         </tbody>
                     </table>
                 </div>
+                {totalPages > 1 ? (
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '14px 20px', borderTop: '1px solid #f1f5f9', background: '#fafbfc', flexWrap: 'wrap' }}>
+                        {[
+                            { label: '« First', action: () => setPage(1), disabled: page === 1 },
+                            { label: '‹ Prev', action: () => setPage((current) => Math.max(1, current - 1)), disabled: page === 1 },
+                            null,
+                            { label: 'Next ›', action: () => setPage((current) => Math.min(totalPages, current + 1)), disabled: page === totalPages },
+                            { label: 'Last »', action: () => setPage(totalPages), disabled: page === totalPages },
+                        ].map((button) => (
+                            button === null ? (
+                                <span key="counter" style={{ fontSize: '12px', color: '#64748b', minWidth: '90px', textAlign: 'center' }}>
+                                    {page} / {totalPages}
+                                </span>
+                            ) : (
+                                <button
+                                    key={button.label}
+                                    type="button"
+                                    onClick={button.action}
+                                    disabled={button.disabled}
+                                    style={{
+                                        padding: '6px 14px',
+                                        borderRadius: '8px',
+                                        border: '1px solid #e2e8f0',
+                                        background: button.disabled ? '#f8fafc' : '#fff',
+                                        color: button.disabled ? '#cbd5e1' : '#0f6578',
+                                        fontSize: '12px',
+                                        fontWeight: '700',
+                                        cursor: button.disabled ? 'not-allowed' : 'pointer',
+                                    }}
+                                >
+                                    {button.label}
+                                </button>
+                            )
+                        ))}
+                    </div>
+                ) : null}
+
+                {reasonPopup && (
+                    <>
+                        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.25)', zIndex: 999 }} onClick={() => setReasonPopup(null)} />
+                        <div style={{ position: 'fixed', top: '20%', left: '50%', transform: 'translateX(-50%)', width: 'min(760px,90%)', background: '#fff', zIndex: 1000, borderRadius: 8, boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
+                            <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ fontSize: 13, fontWeight: 800 }}>Full Reason</div>
+                                <button onClick={() => setReasonPopup(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18 }}>✕</button>
+                            </div>
+                            <div style={{ padding: '16px', maxHeight: '60vh', overflowY: 'auto' }}>
+                                <div style={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#0f172a' }}>{reasonPopup.full}</div>
+                                {reasonPopup.reasons && reasonPopup.reasons.length > 1 && (
+                                    <div style={{ marginTop: 12, fontSize: 13, color: '#64748b' }}>
+                                        Other reasons:
+                                        <ul>
+                                            {reasonPopup.reasons.map((r, i) => (
+                                                <li key={i}>{r}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
-
-            {totalPages > 1 && (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '14px 20px', borderTop: '1px solid #f1f5f9', background: '#fafbfc' }}>
-                    {[
-                        { label: '«', action: () => setPage(1), disabled: page === 1 },
-                        { label: '‹ Back', action: () => setPage(p => Math.max(1, p - 1)), disabled: page === 1 },
-                        null,
-                        { label: 'Next ›', action: () => setPage(p => Math.min(totalPages, p + 1)), disabled: page === totalPages },
-                        { label: '»', action: () => setPage(totalPages), disabled: page === totalPages },
-                    ].map((btn) =>
-                        btn === null ? (
-                            <span key="counter" style={{ fontSize: '12px', color: '#64748b', minWidth: '70px', textAlign: 'center' }}>{page} / {totalPages}</span>
-                        ) : (
-                            <button key={btn.label} type="button" onClick={btn.action} disabled={btn.disabled} style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', background: btn.disabled ? '#f8fafc' : '#fff', color: btn.disabled ? '#cbd5e1' : '#0f6578', fontSize: '12px', fontWeight: '700', cursor: btn.disabled ? 'not-allowed' : 'pointer' }}>
-                                {btn.label}
-                            </button>
-                        )
-                    )}
-                </div>
-            )}
-
         </div>
     );
 }
