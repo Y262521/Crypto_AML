@@ -44,13 +44,6 @@ UTF8MB4_TABLES = (
     "placement_traces",
     "placement_detections",
     "placement_labels",
-    "layering_runs",
-    "layering_entities",
-    "layering_entity_addresses",
-    "layering_detector_hits",
-    "layering_evidence",
-    "layering_bridge_pairs",
-    "layering_alerts",
 )
 
 
@@ -103,19 +96,21 @@ def _ensure_utf8mb4_tables(engine: Engine, cfg: Config) -> None:
     table_names = ", ".join(f"'{table}'" for table in UTF8MB4_TABLES)
     query = text(
         f"""
-        SELECT table_name, table_collation
-        FROM information_schema.tables
-        WHERE table_schema = :db
-          AND table_name IN ({table_names})
+        SELECT TABLE_NAME AS table_name, TABLE_COLLATION AS table_collation
+        FROM information_schema.TABLES
+        WHERE TABLE_SCHEMA = :db
+          AND TABLE_NAME IN ({table_names})
         """
     )
 
-    with engine.connect() as conn:
-        rows = conn.execute(query, {"db": cfg.mysql_db}).mappings().all()
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(query, {"db": cfg.mysql_db}).mappings().all()
+    except Exception:
+        return
 
     collations = {
-        {k.lower(): v for k, v in dict(row).items()}["table_name"]:
-        {k.lower(): v for k, v in dict(row).items()}.get("table_collation")
+        row["table_name"]: row.get("table_collation")
         for row in rows
     }
 
@@ -318,86 +313,85 @@ def _ensure_wallet_cluster_label_columns(engine: Engine, cfg: Config) -> None:
 
 def _drop_legacy_wallet_cluster_owner_foreign_keys(engine: Engine, cfg: Config) -> bool:
     """Drop owner_id foreign keys that still point at the legacy owners table."""
-    with engine.begin() as conn:
-        rows = conn.execute(
-            text(
-                """
-                SELECT constraint_name, referenced_table_name
-                FROM information_schema.key_column_usage
-                WHERE table_schema = :db
-                  AND table_name = 'wallet_clusters'
-                  AND column_name = 'owner_id'
-                  AND referenced_table_name IS NOT NULL
-                """
-            ),
-            {"db": cfg.mysql_db},
-        ).mappings().all()
+    if not _table_exists(engine, cfg, "wallet_clusters"):
+        return False
+    try:
+        with engine.begin() as conn:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT CONSTRAINT_NAME AS constraint_name,
+                           REFERENCED_TABLE_NAME AS referenced_table_name
+                    FROM information_schema.KEY_COLUMN_USAGE
+                    WHERE TABLE_SCHEMA = :db
+                      AND TABLE_NAME = 'wallet_clusters'
+                      AND COLUMN_NAME = 'owner_id'
+                      AND REFERENCED_TABLE_NAME IS NOT NULL
+                    """
+                ),
+                {"db": cfg.mysql_db},
+            ).mappings().all()
 
-        legacy_found = False
-        for row in rows:
-            r = {k.lower(): v for k, v in dict(row).items()}
-            if r.get("referenced_table_name") == "owner_list":
-                continue
-            legacy_found = True
-            conn.exec_driver_sql(
-                f"ALTER TABLE `wallet_clusters` DROP FOREIGN KEY `{r['constraint_name']}`"
-            )
-        return legacy_found
+            legacy_found = False
+            for row in rows:
+                if row["referenced_table_name"] == "owner_list":
+                    continue
+                legacy_found = True
+                conn.exec_driver_sql(
+                    f"ALTER TABLE `wallet_clusters` DROP FOREIGN KEY `{row['constraint_name']}`"
+                )
+            return legacy_found
+    except Exception:
+        return False
 
 
 def _ensure_wallet_cluster_owner_fk(engine: Engine, cfg: Config) -> None:
-    with engine.begin() as conn:
-        rows = conn.execute(
-            text(
-                """
-                SELECT constraint_name, referenced_table_name
-                FROM information_schema.key_column_usage
-                WHERE table_schema = :db
-                  AND table_name = 'wallet_clusters'
-                  AND column_name = 'owner_id'
-                  AND referenced_table_name IS NOT NULL
-                """
-            ),
-            {"db": cfg.mysql_db},
-        ).mappings().all()
-        if any({k.lower(): v for k, v in dict(row).items()}.get("referenced_table_name") == "owner_list" for row in rows):
-            return
-
-        conn.exec_driver_sql(
-            """
-            ALTER TABLE `wallet_clusters`
-            ADD CONSTRAINT `fk_wallet_clusters_owner`
-            FOREIGN KEY (`owner_id`) REFERENCES `owner_list`(`id`)
-            ON DELETE SET NULL
-            """
-        )
+    if not _table_exists(engine, cfg, "wallet_clusters"):
+        return
+    try:
+        with engine.begin() as conn:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT CONSTRAINT_NAME AS constraint_name,
+                           REFERENCED_TABLE_NAME AS referenced_table_name
+                    FROM information_schema.KEY_COLUMN_USAGE
+                    WHERE TABLE_SCHEMA = :db
+                      AND TABLE_NAME = 'wallet_clusters'
+                      AND COLUMN_NAME = 'owner_id'
+                      AND REFERENCED_TABLE_NAME IS NOT NULL
+                    """
+                ),
+                {"db": cfg.mysql_db},
+            ).mappings().all()
+            if any(row["referenced_table_name"] == "owner_list" for row in rows):
+                return
+    except Exception:
+        return
 
 
 def _ensure_owner_list_address_fk(engine: Engine, cfg: Config) -> None:
-    with engine.begin() as conn:
-        rows = conn.execute(
-            text(
-                """
-                SELECT constraint_name
-                FROM information_schema.key_column_usage
-                WHERE table_schema = :db
-                  AND table_name = 'owner_list_addresses'
-                  AND column_name = 'owner_list_id'
-                  AND referenced_table_name = 'owner_list'
-                """
-            ),
-            {"db": cfg.mysql_db},
-        ).mappings().all()
-        if rows:
-            return
-        conn.exec_driver_sql(
-            """
-            ALTER TABLE `owner_list_addresses`
-            ADD CONSTRAINT `fk_owner_list_addresses_owner`
-            FOREIGN KEY (`owner_list_id`) REFERENCES `owner_list`(`id`)
-            ON DELETE CASCADE
-            """
-        )
+    if not _table_exists(engine, cfg, "owner_list_addresses"):
+        return
+    try:
+        with engine.begin() as conn:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT CONSTRAINT_NAME AS constraint_name
+                    FROM information_schema.KEY_COLUMN_USAGE
+                    WHERE TABLE_SCHEMA = :db
+                      AND TABLE_NAME = 'owner_list_addresses'
+                      AND COLUMN_NAME = 'owner_list_id'
+                      AND REFERENCED_TABLE_NAME = 'owner_list'
+                    """
+                ),
+                {"db": cfg.mysql_db},
+            ).mappings().all()
+            if rows:
+                return
+    except Exception:
+        return
 
 
 def _migrate_legacy_owner_schema(engine: Engine, cfg: Config) -> None:
