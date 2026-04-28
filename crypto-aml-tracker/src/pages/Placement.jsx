@@ -241,35 +241,6 @@ export default function Placement({ onNavigateToGraph }) {
                     <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '6px' }}>Flagged entities at the money-laundering placement stage.</div>
                 </div>
 
-                {/* Date/time picker — top right */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
-                    <div style={{ fontSize: '10px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                        📅 Filter by Date &amp; Time
-                    </div>
-                    <input
-                        type="datetime-local"
-                        value={dateTimeInput}
-                        max={new Date().toISOString().slice(0, 16)}
-                        onChange={(e) => {
-                            setDateTimeInput(e.target.value);
-                            setSelectedRunId(null);
-                        }}
-                        style={{
-                            padding: '8px 12px',
-                            borderRadius: '10px',
-                            border: '1px solid #334155',
-                            background: '#1e3a5f',
-                            color: '#e2e8f0',
-                            fontSize: '13px',
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                            outline: 'none',
-                            minWidth: '220px',
-                            colorScheme: 'dark',
-                        }}
-                    />
-                    <div style={{ fontSize: '10px', color: '#64748b' }}>Shows run closest to selected time</div>
-                </div>
             </div>
 
             {/* Summary cards */}
@@ -304,6 +275,40 @@ export default function Placement({ onNavigateToGraph }) {
                     ))}
                 </div>
             </div>
+            {/* Date/time picker with available runs */}
+            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '14px 16px', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>📅 Filter by Analysis Date</div>
+                    <input type="datetime-local" value={dateTimeInput} max={new Date().toISOString().slice(0, 16)} onChange={(e) => { setDateTimeInput(e.target.value); setSelectedRunId(null); }} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontSize: '13px', fontWeight: '600', cursor: 'pointer', outline: 'none' }} />
+                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>Shows the run closest to the selected date</div>
+                </div>
+                {runs.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Available Runs</div>
+                        <select
+                            value={dateTimeInput}
+                            onChange={(e) => {
+                                const inputVal = e.target.value;
+                                setDateTimeInput(inputVal);
+                                const run = runs.find(r => r.completed_at && new Date(r.completed_at).toISOString().slice(0, 16) === inputVal);
+                                if (run) setSelectedRunId(run.id);
+                            }}
+                            style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontSize: '13px', fontWeight: '600', cursor: 'pointer', outline: 'none', maxWidth: '320px' }}
+                        >
+                            {runs.map((run, i) => {
+                                const dt = run.completed_at ? new Date(run.completed_at) : null;
+                                const label = dt ? dt.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : run.id;
+                                const inputVal = dt ? dt.toISOString().slice(0, 16) : '';
+                                return (
+                                    <option key={run.id} value={inputVal}>
+                                        {i === 0 ? `★ LATEST — ${label}` : label}
+                                    </option>
+                                );
+                            })}
+                        </select>
+                    </div>
+                )}
+            </div>
 
             {/* Alert table */}
             <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden' }}>
@@ -332,22 +337,25 @@ export default function Placement({ onNavigateToGraph }) {
                             {/* Entity */}
                             <div style={{ minWidth: 0 }}>
                                 <div style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '3px' }}>{isCluster ? '🔗 Cluster' : '📍 Address'}</div>
+                                <div style={{ fontSize: '13px', fontWeight: '700', color: alert.entity_name ? '#0f172a' : '#94a3b8', marginBottom: '2px', fontStyle: alert.entity_name ? 'normal' : 'italic' }}>
+                                    {alert.entity_name || 'Unknown'}
+                                </div>
                                 {isCluster ? (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                        <span style={{ fontSize: '13px', fontWeight: '600', fontFamily: 'monospace', color: '#0f172a' }}>{truncate(alert.entity_id, 28)}</span>
+                                        <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#64748b' }}>{truncate(alert.entity_id, 24)}</span>
                                         <button type="button" onClick={() => setClusterPopup({ entityId: alert.entity_id, addresses })} style={{ fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '999px', background: '#e6f6f8', color: '#0f6578', border: '1px solid #b3dde5', cursor: 'pointer' }}>
                                             {addresses.length} addr ▾
                                         </button>
                                     </div>
                                 ) : (
-                                    <button type="button" onClick={() => onNavigateToGraph && onNavigateToGraph(alert.entity_id)} style={{ fontSize: '13px', fontWeight: '600', fontFamily: 'monospace', color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', textDecoration: 'underline', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
-                                        {truncate(alert.entity_id, 32)}
+                                    <button type="button" onClick={() => onNavigateToGraph && onNavigateToGraph(alert.entity_id)} style={{ fontSize: '11px', fontFamily: 'monospace', color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', textDecoration: 'underline', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                                        {truncate(alert.entity_id, 28)}
                                     </button>
                                 )}
                                 <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>{alert.address_count} addresses</div>
                             </div>
 
-                            {/* Behaviors — all shown, color by rank */}
+                            {/* Behaviors */}
                             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                                 {(() => {
                                     const allB = (alert.all_behaviors || alert.behaviors || []).filter(b => b && !_BANNED.has(String(b).toLowerCase()));

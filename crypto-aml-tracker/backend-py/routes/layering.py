@@ -243,7 +243,26 @@ async def _fetch_addresses_map(run_id: str, entity_ids: list[str]) -> dict[str, 
     return address_map
 
 
-def _layering_payload(row: dict, addresses: list[str]) -> dict:
+async def _fetch_names_map(addresses: list[str]) -> dict[str, str]:
+    if not addresses:
+        return {}
+    placeholders = ", ".join(["%s"] * len(addresses))
+    try:
+        rows = await fetch_all(
+            f"""
+            SELECT ola.address, ol.full_name
+            FROM owner_list_addresses ola
+            JOIN owner_list ol ON ol.id = ola.owner_list_id
+            WHERE ola.address IN ({placeholders})
+            """,
+            tuple(addresses),
+        )
+        return {row["address"]: row["full_name"] for row in rows}
+    except Exception:
+        return {}
+
+
+def _layering_payload(row: dict, addresses: list[str], names_map: dict | None = None) -> dict:
     method_scores = _decode_json(row.get("method_scores_json"), {})
     methods = _decode_json(row.get("methods_json"), [])
     reasons = _decode_json(row.get("reasons_json"), [])
@@ -266,6 +285,7 @@ def _layering_payload(row: dict, addresses: list[str]) -> dict:
     )
     return {
         "entity_id": row.get("entity_id"),
+        "entity_name": next((names_map.get(addr) for addr in ([row.get("entity_id")] + addresses) if names_map and names_map.get(addr)), None),
         "entity_type": row.get("entity_type"),
         "addresses": addresses,
         "address_count": len(addresses),
@@ -366,13 +386,15 @@ async def get_layering_alerts(
     )
     entity_ids = [row["entity_id"] for row in rows]
     address_map = await _fetch_addresses_map(run["id"], entity_ids)
+    all_addresses = [addr for addrs in address_map.values() for addr in addrs] + entity_ids
+    names_map = await _fetch_names_map(all_addresses)
 
     return {
         "run_id": run["id"],
         "generated_at": _format_ts(run.get("completed_at")),
         "summary": _decode_json(run.get("summary_json"), {}),
         "items": [
-            _layering_payload(row, address_map.get(row["entity_id"], []))
+            _layering_payload(row, address_map.get(row["entity_id"], []), names_map)
             for row in rows
         ],
     }

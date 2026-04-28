@@ -412,8 +412,11 @@ export default function Layering({ onNavigateToGraph }) {
                             ) : visibleAlerts.map((alert) => (
                                 <tr key={alert.entity_id}>
                                     <td style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', verticalAlign: 'top' }}>
-                                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{truncate(alert.entity_id, 22)}</div>
-                                        <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                                        <div style={{ fontWeight: 700, color: alert.entity_name ? '#0f172a' : '#94a3b8', fontStyle: alert.entity_name ? 'normal' : 'italic', marginBottom: '2px' }}>
+                                            {alert.entity_name || 'Unknown'}
+                                        </div>
+                                        <div style={{ fontSize: '11px', fontFamily: 'monospace', color: '#64748b' }}>{truncate(alert.entity_id, 22)}</div>
+                                        <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
                                             {alert.address_count} address{alert.address_count === 1 ? '' : 'es'}
                                         </div>
                                     </td>
@@ -422,21 +425,21 @@ export default function Layering({ onNavigateToGraph }) {
                                             {getHighlightedMethods(alert).map(({ method }, index) => {
                                                 const palette = paletteForMethod(method);
                                                 return (
-                                                <span
-                                                    key={method}
-                                                    style={{
-                                                        padding: '4px 10px',
-                                                        borderRadius: '999px',
-                                                        background: palette.background,
-                                                        color: palette.color,
-                                                        border: `1px solid ${palette.border}`,
-                                                        fontSize: '12px',
-                                                        fontWeight: index === 0 ? 800 : 700,
-                                                        opacity: index === 0 ? 1 : 0.5,
-                                                    }}
-                                                >
-                                                    {formatMethod(method)}
-                                                </span>
+                                                    <span
+                                                        key={method}
+                                                        style={{
+                                                            padding: '4px 10px',
+                                                            borderRadius: '999px',
+                                                            background: palette.background,
+                                                            color: palette.color,
+                                                            border: `1px solid ${palette.border}`,
+                                                            fontSize: '12px',
+                                                            fontWeight: index === 0 ? 800 : 700,
+                                                            opacity: index === 0 ? 1 : 0.5,
+                                                        }}
+                                                    >
+                                                        {formatMethod(method)}
+                                                    </span>
                                                 );
                                             })}
                                         </div>
