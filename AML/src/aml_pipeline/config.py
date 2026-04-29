@@ -181,7 +181,7 @@ def load_config() -> Config:
         ),
         eth_network=_get_env("ETH_NETWORK", default="mainnet"),
         eth_start_block=_get_int("ETH_START_BLOCK", default=23849990),
-        eth_batch_size=_get_int("ETH_BATCH_SIZE", "BATCH_SIZE", default=5),
+        eth_batch_size=_get_int("ETH_BATCH_SIZE", "BATCH_SIZE", default=10),
         batch_size=_get_int("BATCH_SIZE", default=1000),
         batch_size_transform=_get_int("BATCH_SIZE_TRANSFORM", "TRANSFORM_BATCH_SIZE", default=300),
         high_value_threshold_eth=_get_float(
