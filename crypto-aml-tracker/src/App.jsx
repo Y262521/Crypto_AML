@@ -5,6 +5,7 @@ import GraphExplorer from './pages/GraphExplorer'
 import Analytics from './pages/Analytics'
 import Layering from './pages/Layering'
 import Placement from './pages/Placement'
+import Integration from './pages/Integration'
 import Clusters from './pages/Clusters'
 import { getLatestTransactions } from './services/transactionService'
 import {
@@ -163,9 +164,11 @@ function App() {
                 ? <Placement onNavigateToGraph={(address) => navigate('graph', { address })} />
                 : activePage === 'layering'
                   ? <Layering onNavigateToGraph={(address) => navigate('graph', { address })} />
-                : activePage === 'clusters'
-                  ? <Clusters onAddressClick={handleAddressClick} />
-                  : null
+                  : activePage === 'integration'
+                    ? <Integration onNavigateToGraph={(address) => navigate('graph', { address })} />
+                    : activePage === 'clusters'
+                      ? <Clusters onAddressClick={handleAddressClick} />
+                      : null
         }
       </main>
     </div>

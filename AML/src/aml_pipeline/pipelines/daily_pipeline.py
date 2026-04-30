@@ -27,9 +27,10 @@ def run_daily_pipeline(
     run_clustering: bool = True,
     run_placement: bool = True,
     run_layering: bool = True,
+    run_integration: bool = True,
     cfg: Config | None = None,
 ) -> dict:
-    """Run extract, transform, load, clustering, placement, and layering analytics."""
+    """Run extract, transform, load, clustering, placement, layering, and integration analytics."""
     cfg = cfg or load_config()
     setup_logging(cfg.log_level)
 
@@ -134,6 +135,37 @@ def run_daily_pipeline(
             logger.warning("Layering stage failed (non-fatal): %s", exc)
             layering_summary = {"error": str(exc)}
 
+    integration_summary = None
+    if run_integration:
+        try:
+            from ..analytics.integration import IntegrationAnalysisEngine
+            integration_engine = IntegrationAnalysisEngine(cfg=cfg)
+            layering_result_for_integration = (
+                layering_result if run_layering and "layering_result" in dir() else None
+            )
+            integration_result = integration_engine.run(
+                source="mariadb",
+                persist=True,
+                layering_result=layering_result_for_integration,
+            )
+            integration_summary = {
+                "run_id": integration_result.run_id,
+                "alerts_found": len(integration_result.alerts),
+                "high_confidence": integration_result.summary.get("high_confidence_alerts", 0),
+                "convergence_signals": integration_result.summary.get("convergence_signals", 0),
+                "dormancy_signals": integration_result.summary.get("dormancy_signals", 0),
+                "terminal_signals": integration_result.summary.get("terminal_signals", 0),
+                "reaggregation_signals": integration_result.summary.get("reaggregation_signals", 0),
+            }
+            logger.info(
+                "Integration analytics complete: %d alerts (%d high-confidence)",
+                integration_summary["alerts_found"],
+                integration_summary["high_confidence"],
+            )
+        except Exception as exc:
+            logger.warning("Integration stage failed (non-fatal): %s", exc)
+            integration_summary = {"error": str(exc)}
+
     logger.info(
         "Load stage complete | MariaDB transactions: %s | Neo4j edges: %s | Mongo backup: %s",
         0 if mariadb_summary is None else mariadb_summary["transactions_loaded"],
@@ -149,4 +181,5 @@ def run_daily_pipeline(
         "clustering": clustering_summary,
         "placement": placement_summary,
         "layering": layering_summary,
+        "integration": integration_summary,
     }

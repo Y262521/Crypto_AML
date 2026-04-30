@@ -5,6 +5,7 @@ const navItems = [
     // { id: 'analytics', label: 'Analytics', icon: '◉' },
     { id: 'placement', label: 'Placement Alerts', icon: '⟁' },
     { id: 'layering', label: 'Layering Alerts', icon: '⧉' },
+    { id: 'integration', label: 'Integration Alerts', icon: '💰' },
     { id: 'clusters', label: 'Wallet Clusters', icon: '⬡' },
     { id: 'graph', label: 'Transaction Network', icon: '❋' },
 ];
