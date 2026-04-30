@@ -5,6 +5,7 @@ export const PAGE_ROUTES = Object.freeze({
   layering: '/layering',
   clusters: '/clusters',
   graph: '/graph',
+  risk: '/risk',
 })
 
 export const DEFAULT_PAGE = 'feed'

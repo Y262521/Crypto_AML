@@ -7,6 +7,7 @@ const navItems = [
     { id: 'layering', label: 'Layering Alerts', icon: '⧉' },
     { id: 'clusters', label: 'Wallet Clusters', icon: '⬡' },
     { id: 'graph', label: 'Transaction Network', icon: '❋' },
+    { id: 'risk', label: 'Risk Intelligence', icon: '⚡' },
 ];
 
 const Sidebar = ({ activePage, onNavigate }) => {

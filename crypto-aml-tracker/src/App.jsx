@@ -6,6 +6,7 @@ import Analytics from './pages/Analytics'
 import Layering from './pages/Layering'
 import Placement from './pages/Placement'
 import Clusters from './pages/Clusters'
+import RiskIntelligence from './pages/RiskIntelligence'
 import { getLatestTransactions } from './services/transactionService'
 import {
   DEFAULT_PAGE,
@@ -165,7 +166,9 @@ function App() {
                   ? <Layering onNavigateToGraph={(address) => navigate('graph', { address })} />
                 : activePage === 'clusters'
                   ? <Clusters onAddressClick={handleAddressClick} />
-                  : null
+                  : activePage === 'risk'
+                    ? <RiskIntelligence />
+                    : null
         }
       </main>
     </div>
