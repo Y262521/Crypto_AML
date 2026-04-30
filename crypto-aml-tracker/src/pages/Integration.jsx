@@ -1,5 +1,6 @@
 import { useDeferredValue, useEffect, useState } from 'react';
 import Loader from '../components/common/Loader';
+import ChainOfCustodyModal from '../components/ChainOfCustodyModal';
 import { getIntegrationAlerts, getIntegrationRuns, getIntegrationSummary } from '../services/transactionService';
 
 const MOCK_DORMANCY_ALERTS = [
@@ -244,6 +245,7 @@ export default function Integration({ onNavigateToGraph }) {
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 10;
     const deferredSearch = useDeferredValue(search);
+    const [custodyEntity, setCustodyEntity] = useState(null);
 
     // Load runs on mount
     useEffect(() => {
@@ -309,10 +311,10 @@ export default function Integration({ onNavigateToGraph }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
             {/* Header */}
-            <div style={{ background: 'linear-gradient(135deg, #1a0533 0%, #2d0a5e 100%)', borderRadius: '16px', padding: '28px 32px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+            <div style={{ background: '#0f172a', borderRadius: '16px', padding: '28px 32px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
                 <div>
-                    <div style={{ fontSize: '22px', fontWeight: '700' }}>💰 Integration Stage Review</div>
-                    <div style={{ fontSize: '13px', color: '#c4b5fd', marginTop: '6px' }}>
+                    <div style={{ fontSize: '24px', fontWeight: '700' }}>Integration Stage Alerts</div>
+                    <div style={{ fontSize: '13px', color: '#cbd5e1', marginTop: '6px' }}>
                         Flagged entities at the final money-laundering integration stage — funds re-entering the legitimate economy.
                     </div>
                 </div>
@@ -356,20 +358,16 @@ export default function Integration({ onNavigateToGraph }) {
                     />
                 </div>
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    {['All', ...allSignals].map((s) => {
-                        const meta = s === 'All' ? null : signalMeta(s);
-                        const isActive = signalFilter === s;
-                        return (
-                            <button key={s} type="button" onClick={() => setSignalFilter(s)} style={{
-                                padding: '7px 14px', borderRadius: '999px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
-                                border: isActive ? `1px solid ${meta?.color || '#7c3aed'}` : '1px solid #e2e8f0',
-                                background: isActive ? (meta?.color || '#7c3aed') : '#fff',
-                                color: isActive ? '#fff' : '#64748b',
-                            }}>
-                                {s === 'All' ? 'All Signals' : `${meta?.icon} ${meta?.label}`}
-                            </button>
-                        );
-                    })}
+                    <select
+                        value={signalFilter === 'All' ? '' : signalFilter}
+                        onChange={(e) => setSignalFilter(e.target.value || 'All')}
+                        style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontSize: '13px', fontWeight: '600', cursor: 'pointer', outline: 'none' }}
+                    >
+                        <option value="">All Signals</option>
+                        {allSignals.map((s) => (
+                            <option key={s} value={s}>{s.replaceAll('_', ' ')}</option>
+                        ))}
+                    </select>
                 </div>
             </div>
 
@@ -439,7 +437,7 @@ export default function Integration({ onNavigateToGraph }) {
                         <div
                             key={alert.entity_id}
                             style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1.5fr 1fr', padding: '14px 20px', borderBottom: idx < visibleAlerts.length - 1 ? '1px solid #f1f5f9' : 'none', background: idx % 2 === 0 ? '#fff' : '#fafbfc', borderLeft: '3px solid transparent', alignItems: 'center' }}
-                            onMouseEnter={(e) => { e.currentTarget.style.background = '#faf5ff'; e.currentTarget.style.borderLeft = '3px solid #7c3aed'; }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = '#f0f9ff'; e.currentTarget.style.borderLeft = '3px solid #0f6578'; }}
                             onMouseLeave={(e) => { e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafbfc'; e.currentTarget.style.borderLeft = '3px solid transparent'; }}
                         >
                             {/* Entity */}
@@ -451,7 +449,7 @@ export default function Integration({ onNavigateToGraph }) {
                                 <button
                                     type="button"
                                     onClick={() => onNavigateToGraph && onNavigateToGraph(alert.entity_id)}
-                                    style={{ fontSize: '11px', fontFamily: 'monospace', color: '#7c3aed', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', textDecoration: 'underline', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}
+                                    style={{ fontSize: '11px', fontFamily: 'monospace', color: '#0f6578', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', textDecoration: 'underline', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}
                                 >
                                     {truncate(alert.entity_id, 30)}
                                 </button>
@@ -499,9 +497,18 @@ export default function Integration({ onNavigateToGraph }) {
                                         {formatNumber((alert.integration_score || 0) * 100, 0)}%
                                     </span>
                                 </div>
-                                <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '999px', background: sc.bg, color: sc.text, border: `1px solid ${sc.border}`, fontWeight: '700', alignSelf: 'flex-start' }}>
-                                    {(alert.integration_score || 0) >= 0.70 ? 'HIGH' : (alert.integration_score || 0) >= 0.50 ? 'MEDIUM' : 'LOW'}
-                                </span>
+                                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '999px', background: sc.bg, color: sc.text, border: `1px solid ${sc.border}`, fontWeight: '700' }}>
+                                        {(alert.integration_score || 0) >= 0.70 ? 'HIGH' : (alert.integration_score || 0) >= 0.50 ? 'MEDIUM' : 'LOW'}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCustodyEntity(alert.entity_id)}
+                                        style={{ fontSize: '10px', padding: '1px 7px', borderRadius: '999px', background: '#e6f6f8', color: '#0f6578', border: '1px solid #b3dde5', cursor: 'pointer', fontWeight: '700' }}
+                                    >
+                                        🔗 Chain
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     );
@@ -518,6 +525,9 @@ export default function Integration({ onNavigateToGraph }) {
                     </div>
                 )}
             </div>
+            {custodyEntity && (
+                <ChainOfCustodyModal entityId={custodyEntity} onClose={() => setCustodyEntity(null)} />
+            )}
         </div>
     );
 }

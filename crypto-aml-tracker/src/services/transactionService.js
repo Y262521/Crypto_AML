@@ -200,3 +200,20 @@ export const getIntegrationSummary = async (runId = null) => {
   if (!res.ok) throw new Error(`Backend error: ${res.status}`);
   return await res.json();
 };
+
+
+export const getChainOfCustody = async (entityId) => {
+  const res = await fetch(`${API_BASE_URL}/chain-of-custody/${encodeURIComponent(entityId)}`);
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};
+
+export const postIntegrationFeedback = async (entityId, payload) => {
+  const res = await fetch(`${API_BASE_URL}/chain-of-custody/${encodeURIComponent(entityId)}/feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};
