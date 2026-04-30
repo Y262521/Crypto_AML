@@ -125,6 +125,13 @@ class Config:
     layering_depth_max_latency_seconds: int
     layering_depth_min_score: float
 
+    # Integration analytics
+    integration_convergence_min_senders: int
+    integration_dormancy_min_seconds: int
+    integration_dormancy_min_activation_eth: float
+    integration_reaggregation_min_inputs: int
+    integration_reaggregation_min_ratio: float
+
 
 def load_config() -> Config:
     base_dir = Path(__file__).resolve().parents[2]
@@ -366,5 +373,25 @@ def load_config() -> Config:
         layering_depth_min_score=_get_float(
             "LAYERING_DEPTH_MIN_SCORE",
             default=0.58,
+        ),
+        integration_convergence_min_senders=_get_int(
+            "INTEGRATION_CONVERGENCE_MIN_SENDERS",
+            default=5,
+        ),
+        integration_dormancy_min_seconds=_get_int(
+            "INTEGRATION_DORMANCY_MIN_SECONDS",
+            default=2592000,   # 30 days
+        ),
+        integration_dormancy_min_activation_eth=_get_float(
+            "INTEGRATION_DORMANCY_MIN_ACTIVATION_ETH",
+            default=1.0,
+        ),
+        integration_reaggregation_min_inputs=_get_int(
+            "INTEGRATION_REAGGREGATION_MIN_INPUTS",
+            default=4,
+        ),
+        integration_reaggregation_min_ratio=_get_float(
+            "INTEGRATION_REAGGREGATION_MIN_RATIO",
+            default=0.70,
         ),
     )

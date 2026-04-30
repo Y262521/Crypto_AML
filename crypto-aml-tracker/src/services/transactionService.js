@@ -173,3 +173,30 @@ export const getLayeringDetail = async (entityId, runId = null) => {
   if (!res.ok) throw new Error(`Backend error: ${res.status}`);
   return await res.json();
 };
+
+const INTEGRATION_URL = `${API_BASE_URL}/integration`;
+
+export const getIntegrationAlerts = async ({ limit = 200, minScore = 0, runId = null, beforeDate = null, signal = null } = {}) => {
+  const params = new URLSearchParams({ limit: String(limit), minScore: String(minScore) });
+  if (runId) params.set('run_id', runId);
+  if (beforeDate) params.set('beforeDate', beforeDate);
+  if (signal) params.set('signal', signal);
+  const res = await fetch(`${INTEGRATION_URL}/?${params.toString()}`);
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};
+
+export const getIntegrationRuns = async () => {
+  const res = await fetch(`${INTEGRATION_URL}/runs`);
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};
+
+export const getIntegrationSummary = async (runId = null) => {
+  const url = runId
+    ? `${INTEGRATION_URL}/summary?run_id=${encodeURIComponent(runId)}`
+    : `${INTEGRATION_URL}/summary`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};

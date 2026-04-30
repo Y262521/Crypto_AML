@@ -12,6 +12,7 @@ from routes.clusters import router as cluster_router
 from routes.layering import ensure_layering_schema, router as layering_router
 from routes.placement import ensure_placement_schema, router as placement_router
 from routes.risk import router as risk_router
+from routes.integration import ensure_integration_schema, router as integration_router
 from scheduler import create_scheduler, get_next_run_time, pipeline_status
 from settings import get_env
 
@@ -30,6 +31,7 @@ async def lifespan(app: FastAPI):
         await connect_mysql()
         await asyncio.to_thread(ensure_placement_schema)
         await asyncio.to_thread(ensure_layering_schema)
+        await asyncio.to_thread(ensure_integration_schema)
     except Exception as e:
         print(f"MariaDB schema bootstrap failed - processed transaction features may be unavailable: {e}")
 
@@ -56,11 +58,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(tx_router,       prefix="/api/transactions")
-app.include_router(cluster_router,  prefix="/api/clusters")
-app.include_router(placement_router,prefix="/api/placement")
-app.include_router(layering_router, prefix="/api/layering")
-app.include_router(risk_router,     prefix="/api/risk")
+app.include_router(tx_router,          prefix="/api/transactions")
+app.include_router(cluster_router,     prefix="/api/clusters")
+app.include_router(placement_router,   prefix="/api/placement")
+app.include_router(layering_router,    prefix="/api/layering")
+app.include_router(risk_router,        prefix="/api/risk")
+app.include_router(integration_router, prefix="/api/integration")
 
 
 @app.get("/api/status")

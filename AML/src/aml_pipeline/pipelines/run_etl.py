@@ -26,6 +26,11 @@ def main():
         help="Skip the address clustering stage",
     )
     parser.add_argument(
+        "--skip-integration",
+        action="store_true",
+        help="Skip the integration-stage analytics",
+    )
+    parser.add_argument(
         "--skip-placement",
         action="store_true",
         help="Skip the placement analytics stage",
@@ -46,6 +51,7 @@ def main():
         run_clustering=not args.skip_clustering,
         run_placement=not args.skip_placement,
         run_layering=not args.skip_layering,
+        run_integration=not args.skip_integration,
     )
 
 

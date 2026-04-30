@@ -5,6 +5,7 @@ import GraphExplorer from './pages/GraphExplorer'
 import Analytics from './pages/Analytics'
 import Layering from './pages/Layering'
 import Placement from './pages/Placement'
+import Integration from './pages/Integration'
 import Clusters from './pages/Clusters'
 import RiskIntelligence from './pages/RiskIntelligence'
 import { getLatestTransactions } from './services/transactionService'
@@ -164,11 +165,14 @@ function App() {
                 ? <Placement onNavigateToGraph={(address) => navigate('graph', { address })} />
                 : activePage === 'layering'
                   ? <Layering onNavigateToGraph={(address) => navigate('graph', { address })} />
+<<<<<<< HEAD
                 : activePage === 'clusters'
                   ? <Clusters onAddressClick={handleAddressClick} />
-                  : activePage === 'risk'
-                    ? <RiskIntelligence />
-                    : null
+                  : activePage === 'integration'
+                    ? <Integration onNavigateToGraph={(address) => navigate('graph', { address })} />
+                    : activePage === 'risk'
+                      ? <RiskIntelligence />
+                      : null
         }
       </main>
     </div>

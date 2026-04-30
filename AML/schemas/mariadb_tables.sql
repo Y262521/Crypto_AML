@@ -388,3 +388,42 @@ CREATE TABLE IF NOT EXISTS layering_alerts (
         FOREIGN KEY (run_id) REFERENCES layering_runs(id)
         ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── Integration stage tables ─────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS integration_runs (
+    id VARCHAR(64) PRIMARY KEY,
+    source VARCHAR(32) NOT NULL DEFAULT 'auto',
+    status VARCHAR(32) NOT NULL DEFAULT 'completed',
+    started_at DATETIME NULL,
+    completed_at DATETIME NULL,
+    summary_json LONGTEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_integration_runs_completed_at (completed_at),
+    KEY idx_integration_runs_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS integration_alerts (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    run_id VARCHAR(64) NOT NULL,
+    entity_id VARCHAR(64) NOT NULL,
+    entity_type VARCHAR(16) NOT NULL,
+    integration_score DECIMAL(6,4) NOT NULL DEFAULT 0,
+    confidence_score DECIMAL(6,4) NOT NULL DEFAULT 0,
+    signals_fired_json LONGTEXT NULL,
+    signal_scores_json LONGTEXT NULL,
+    reasons_json LONGTEXT NULL,
+    supporting_tx_hashes_json LONGTEXT NULL,
+    layering_score DECIMAL(6,4) NOT NULL DEFAULT 0,
+    placement_score DECIMAL(6,4) NOT NULL DEFAULT 0,
+    metrics_json LONGTEXT NULL,
+    first_seen_at DATETIME NULL,
+    last_seen_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_integration_alerts_run_entity (run_id, entity_id),
+    KEY idx_integration_alerts_run_id (run_id),
+    KEY idx_integration_alerts_score (integration_score),
+    CONSTRAINT fk_integration_alerts_run
+        FOREIGN KEY (run_id) REFERENCES integration_runs(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
