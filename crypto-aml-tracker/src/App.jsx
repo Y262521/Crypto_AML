@@ -165,7 +165,6 @@ function App() {
                 ? <Placement onNavigateToGraph={(address) => navigate('graph', { address })} />
                 : activePage === 'layering'
                   ? <Layering onNavigateToGraph={(address) => navigate('graph', { address })} />
-<<<<<<< HEAD
                 : activePage === 'clusters'
                   ? <Clusters onAddressClick={handleAddressClick} />
                   : activePage === 'integration'
