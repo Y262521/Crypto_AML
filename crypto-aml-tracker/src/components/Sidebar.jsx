@@ -2,12 +2,12 @@ import React from 'react';
 
 const navItems = [
     { id: 'feed', label: 'Transaction Table', icon: '▦' },
-    // { id: 'analytics', label: 'Analytics', icon: '◉' },
+    { id: 'analytics', label: 'Analytics', icon: '◉' },
     { id: 'placement', label: 'Placement Alerts', icon: '⟁' },
     { id: 'layering', label: 'Layering Alerts', icon: '⧉' },
     { id: 'integration', label: 'Integration Alerts', icon: '💰' },
     { id: 'clusters', label: 'Wallet Clusters', icon: '⬡' },
-    { id: 'graph', label: 'Transaction Network', icon: '❋' },
+   // { id: 'graph', label: 'Transaction Network', icon: '❋' },
 ];
 
 const Sidebar = ({ activePage, onNavigate }) => {
@@ -38,7 +38,7 @@ const Sidebar = ({ activePage, onNavigate }) => {
                     onError={e => { e.target.style.display = 'none'; }}
                 />
                 <div style={{ color: '#f7fff5ff', fontSize: '20px', textAlign: 'center', lineHeight: 1.4 }}>
-                    Wallet Cluster Tracker
+                   Aml in cryptocurrency
                 </div>
             </div>
 

@@ -170,13 +170,13 @@ def load_config() -> Config:
 
         mysql_host=_get_env("MYSQL_HOST", default="localhost"),
         mysql_port=_get_int("MYSQL_PORT", default=3306),
-        mysql_user=_get_env("MYSQL_USER", default="hakim"),
-        mysql_password=_get_env("MYSQL_PASSWORD", default="hakim22"),
+        mysql_user=_get_env("MYSQL_USER", default="root"),
+        mysql_password=_get_env("MYSQL_PASSWORD", default="root"),
         mysql_db=_get_env("MYSQL_DB", default="aml_db"),
 
         neo4j_uri=_get_env("NEO4J_URI", default="bolt://localhost:7687"),
         neo4j_user=_get_env("NEO4J_USER", default="neo4j"),
-        neo4j_password=_get_env("NEO4J_PASSWORD", default="hakimaj22"),
+        neo4j_password=_get_env("NEO4J_PASSWORD", default="yona@1221"),
         neo4j_database=_get_env("NEO4J_DATABASE", default="neo4j"),
         neo4j_batch_size=_get_int("NEO4J_BATCH_SIZE", default=500),
 
