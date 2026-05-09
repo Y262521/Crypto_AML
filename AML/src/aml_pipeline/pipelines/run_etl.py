@@ -26,9 +26,19 @@ def main():
         help="Skip the address clustering stage",
     )
     parser.add_argument(
+        "--skip-integration",
+        action="store_true",
+        help="Skip the integration-stage analytics",
+    )
+    parser.add_argument(
         "--skip-placement",
         action="store_true",
         help="Skip the placement analytics stage",
+    )
+    parser.add_argument(
+        "--skip-layering",
+        action="store_true",
+        help="Skip the layering analytics stage",
     )
 
     args = parser.parse_args()
@@ -40,6 +50,8 @@ def main():
         strict_neo4j=args.strict_neo4j,
         run_clustering=not args.skip_clustering,
         run_placement=not args.skip_placement,
+        run_layering=not args.skip_layering,
+        run_integration=not args.skip_integration,
     )
 
 

@@ -92,16 +92,39 @@ async def _latest_run() -> dict | None:
     )
 
 
-async def _latest_run_safe() -> dict | None:
+async def _get_run(run_id: str | None, before_date: str | None = None) -> dict | None:
+    """Return a specific run by ID, by date, or the latest."""
+    if run_id:
+        return await fetch_one(
+            "SELECT id, source, status, started_at, completed_at, summary_json FROM placement_runs WHERE id = %s",
+            (run_id,),
+        )
+    if before_date:
+        # Find the most recent completed run on or before the given date
+        return await fetch_one(
+            """
+            SELECT id, source, status, started_at, completed_at, summary_json
+            FROM placement_runs
+            WHERE status = 'completed'
+              AND DATE(completed_at) <= %s
+            ORDER BY completed_at DESC
+            LIMIT 1
+            """,
+            (before_date,),
+        )
+    return await _latest_run()
+
+
+async def _latest_run_safe(run_id: str | None = None, before_date: str | None = None) -> dict | None:
     ensure_placement_schema()
     try:
-        return await _latest_run()
+        return await _get_run(run_id, before_date)
     except ProgrammingError as exc:
         if exc.args and exc.args[0] == 1146:
             global _SCHEMA_READY
             _SCHEMA_READY = False
             ensure_placement_schema()
-            return await _latest_run()
+            return await _get_run(run_id, before_date)
         raise
 
 
@@ -152,7 +175,7 @@ async def _fetch_addresses_map(run_id: str, entity_ids: list[str]) -> dict[str, 
     return address_map
 
 
-def _placement_payload(row: dict, addresses: list[str]) -> dict:
+def _placement_payload(row: dict, addresses: list[str], names_map: dict | None = None) -> dict:
     behaviors = _decode_json(row.get("behaviors_json"), [])
     reasons = _decode_json(row.get("reasons_json"), [])
     linked_root_entities = _decode_json(row.get("linked_root_entities_json"), [])
@@ -161,13 +184,25 @@ def _placement_payload(row: dict, addresses: list[str]) -> dict:
     behavior_profile = metrics.get("behavior_profile") if isinstance(metrics, dict) else {}
     if not isinstance(behavior_profile, dict):
         behavior_profile = {}
-    # filter banned behaviors defensively
     banned = {"funneling", "funnel", "immediate_utilization", "immediate-utilization", "immediate utilization"}
     behaviors = [b for b in (behaviors or []) if (b or "").lower() not in banned]
     display_behaviors = [b for b in (behavior_profile.get("display_behaviors") or behaviors[:1]) if (b or "").lower() not in banned]
     primary_behavior = behavior_profile.get("primary_behavior") if (behavior_profile.get("primary_behavior") or "").lower() not in banned else (display_behaviors[0] if display_behaviors else None)
+
+    # Resolve entity name from owner_list
+    entity_name = None
+    if names_map:
+        entity_id = row.get("entity_id", "")
+        entity_name = names_map.get(entity_id)
+        if not entity_name:
+            for addr in addresses:
+                entity_name = names_map.get(addr)
+                if entity_name:
+                    break
+
     return {
         "entity_id": row.get("entity_id"),
+        "entity_name": entity_name,  # None = unlabeled → frontend shows "Unknown"
         "entity_type": row.get("entity_type"),
         "addresses": addresses,
         "address_count": len(addresses),
@@ -197,6 +232,26 @@ def _placement_payload(row: dict, addresses: list[str]) -> dict:
         "last_seen_at": _format_ts(row.get("last_seen_at")),
         "metrics": metrics,
     }
+
+
+async def _fetch_names_map(addresses: list[str]) -> dict[str, str]:
+    """Look up owner names for a list of addresses from owner_list_addresses."""
+    if not addresses:
+        return {}
+    placeholders = ", ".join(["%s"] * len(addresses))
+    try:
+        rows = await fetch_all(
+            f"""
+            SELECT ola.address, ol.full_name
+            FROM owner_list_addresses ola
+            JOIN owner_list ol ON ol.id = ola.owner_list_id
+            WHERE ola.address IN ({placeholders})
+            """,
+            tuple(addresses),
+        )
+        return {row["address"]: row["full_name"] for row in rows}
+    except Exception:
+        return {}
 
 
 def _build_trace_paths(
@@ -260,13 +315,45 @@ def _build_trace_paths(
     return trace_paths
 
 
+@router.get("/runs")
+async def get_placement_runs():
+    """Return the last 10 completed placement runs for the run selector."""
+    _require_mysql()
+    ensure_placement_schema()
+    try:
+        rows = await fetch_all(
+            """
+            SELECT id, source, status, started_at, completed_at, summary_json
+            FROM placement_runs
+            WHERE status = 'completed'
+            ORDER BY completed_at DESC, created_at DESC
+            LIMIT 10
+            """
+        )
+        return [
+            {
+                "id": row["id"],
+                "source": row.get("source"),
+                "completed_at": _format_ts(row.get("completed_at")),
+                "started_at": _format_ts(row.get("started_at")),
+                "summary": _decode_json(row.get("summary_json"), {}),
+            }
+            for row in rows
+        ]
+    except Exception as exc:
+        logger.warning("Failed to fetch placement runs: %s", exc)
+        return []
+
+
 @router.get("/")
 async def get_placements(
     limit: int = Query(50, ge=1, le=500),
     min_confidence: float = Query(0.0, ge=0.0, le=1.0),
+    run_id: str | None = Query(None),
+    before_date: str | None = Query(None),
 ):
     _require_mysql()
-    run = await _latest_run_safe()
+    run = await _latest_run_safe(run_id, before_date)
     if not run:
         return {
             "run_id": None,
@@ -307,13 +394,15 @@ async def get_placements(
     )
     entity_ids = [row["entity_id"] for row in rows]
     address_map = await _fetch_addresses_map(run["id"], entity_ids)
+    all_addresses = [addr for addrs in address_map.values() for addr in addrs] + entity_ids
+    names_map = await _fetch_names_map(all_addresses)
 
     return {
         "run_id": run["id"],
         "generated_at": _format_ts(run.get("completed_at")),
         "summary": _decode_json(run.get("summary_json"), {}),
         "items": [
-            _placement_payload(row, address_map.get(row["entity_id"], []))
+            _placement_payload(row, address_map.get(row["entity_id"], []), names_map)
             for row in rows
         ],
     }

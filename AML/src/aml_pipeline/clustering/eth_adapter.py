@@ -177,7 +177,7 @@ class EthereumAdapter(BlockchainAdapter):
                 to_address=to,
                 value_eth=_to_float(val.get("eth")),
                 is_contract_call=bool(forensics.get("is_contract")),
-                input_method_id="",
+                input_method_id=str(forensics.get("method_id") or "").lower().strip(),
                 gas_used=_to_int(doc.get("gas", {}).get("gas_used")),
             )
         client.close()
@@ -202,7 +202,7 @@ class EthereumAdapter(BlockchainAdapter):
                     to_address=to,
                     value_eth=_to_float(getattr(row, "value_eth", 0.0)),
                     is_contract_call=bool(getattr(row, "is_contract_call", False)),
-                    input_method_id="",
+                    input_method_id=str(getattr(row, "input_method_id", "") or "").lower().strip(),
                     gas_used=int(getattr(row, "gas_used", 0) or 0),
                     status=int(getattr(row, "status", 0) or 0),
                 )

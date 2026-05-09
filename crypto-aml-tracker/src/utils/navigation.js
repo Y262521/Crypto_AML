@@ -1,9 +1,11 @@
 export const PAGE_ROUTES = Object.freeze({
-  feed: '/',
-  analytics: '/analytics',
-  placement: '/placement',
-  clusters: '/clusters',
-  graph: '/graph',
+  feed:         '/',
+  placement:    '/placement',
+  layering:     '/layering',
+  integration:  '/integration',
+  clusters:     '/clusters',
+  graph:        '/graph',
+  'coming-soon': '/coming-soon',
 })
 
 export const DEFAULT_PAGE = 'feed'
@@ -13,16 +15,10 @@ export const normalizePage = (page) => (
 )
 
 export const getPageFromPathname = (pathname = '/') => {
-  const normalizedPath = pathname === '/'
-    ? pathname
-    : pathname.replace(/\/+$/, '')
-
+  const normalizedPath = pathname === '/' ? pathname : pathname.replace(/\/+$/, '')
   for (const [page, route] of Object.entries(PAGE_ROUTES)) {
-    if (route === normalizedPath) {
-      return page
-    }
+    if (route === normalizedPath) return page
   }
-
   return DEFAULT_PAGE
 }
 
@@ -33,10 +29,7 @@ export const getGraphAddressFromSearch = (search = '') => (
 export const buildPathForPage = (page, address = '') => {
   const nextPage = normalizePage(page)
   const route = PAGE_ROUTES[nextPage]
-  if (nextPage !== 'graph' || !address) {
-    return route
-  }
-
+  if (nextPage !== 'graph' || !address) return route
   const params = new URLSearchParams({ address })
   return `${route}?${params.toString()}`
 }
