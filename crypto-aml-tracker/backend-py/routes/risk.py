@@ -38,11 +38,14 @@ _MOCK_ENTITIES: list[dict] = [
     {
         "entity_id":       "MOCK_POI_001",
         "risk_score":      0.94,
-        "risk_breakdown":  {"label": 0.95, "behavior": 0.90, "propagation": 0.85, "temporal": 0.70, "exposure": 0.80},
-        "risk_version":    "mock-1.0",
+        "risk_breakdown":  {
+            "label": 0.95, "behavior": 0.88, "propagation": 0.80,
+            "temporal": 0.65, "exposure": 0.75, "integration": 0.90,
+        },
+        "risk_version":    "mock-v3.0",
         "last_risk_update": datetime.utcnow().isoformat(),
         "is_poi":          True,
-        "poi_reason":      "Sanctioned mixer — high-volume structuring detected across 5 addresses",
+        "poi_reason":      "Multi-factor POI: label=0.95, integration=0.90, behavior=0.88",
         "total_balance":   120.5,
         "risk_level":      "critical",
         "label_status":    "sanctioned",
@@ -61,11 +64,14 @@ _MOCK_ENTITIES: list[dict] = [
     {
         "entity_id":       "MOCK_POI_002",
         "risk_score":      0.88,
-        "risk_breakdown":  {"label": 0.80, "behavior": 0.92, "propagation": 0.75, "temporal": 0.65, "exposure": 0.70},
-        "risk_version":    "mock-1.0",
+        "risk_breakdown":  {
+            "label": 0.80, "behavior": 0.85, "propagation": 0.70,
+            "temporal": 0.60, "exposure": 0.65, "integration": 0.82,
+        },
+        "risk_version":    "mock-v3.0",
         "last_risk_update": datetime.utcnow().isoformat(),
         "is_poi":          True,
-        "poi_reason":      "Coordinated cashout pattern — linked to known scam cluster",
+        "poi_reason":      "Multi-factor POI: behavior=0.85, integration=0.82, label=0.80",
         "total_balance":   45.2,
         "risk_level":      "critical",
         "label_status":    "scam",
@@ -83,11 +89,14 @@ _MOCK_ENTITIES: list[dict] = [
     {
         "entity_id":       "MOCK_POI_003",
         "risk_score":      0.91,
-        "risk_breakdown":  {"label": 0.88, "behavior": 0.85, "propagation": 0.92, "temporal": 0.78, "exposure": 0.82},
-        "risk_version":    "mock-1.0",
+        "risk_breakdown":  {
+            "label": 0.88, "behavior": 0.82, "propagation": 0.88,
+            "temporal": 0.72, "exposure": 0.78, "integration": 0.85,
+        },
+        "risk_version":    "mock-v3.0",
         "last_risk_update": datetime.utcnow().isoformat(),
         "is_poi":          True,
-        "poi_reason":      "Peeling chain with bridge hopping — funds traced to darknet market",
+        "poi_reason":      "Multi-factor POI: propagation=0.88, integration=0.85, label=0.88",
         "total_balance":   78.9,
         "risk_level":      "critical",
         "label_status":    "darknet",
@@ -500,37 +509,80 @@ def _simple_simulate(
     override: dict,
 ) -> dict:
     """
-    Lightweight simulation used when the AML risk engine is unavailable.
-    Applies label/behavior overrides to the breakdown and recomputes a
-    weighted score. Does NOT write to the database.
+    Lightweight in-memory simulation matching the v3 engine formula.
+    Used when the AML risk engine Python module is unavailable.
+    Does NOT write to the database.
+
+    Formula: 0.25*label + 0.20*behavior + 0.15*propagation
+           + 0.10*temporal + 0.10*exposure + 0.20*integration
     """
-    WEIGHTS = {"label": 0.35, "behavior": 0.25, "propagation": 0.20, "temporal": 0.10, "exposure": 0.10}
-    LABEL_BOOST  = {"sanctioned": 0.95, "scam": 0.85, "mixer": 0.80, "darknet": 0.90, "ransomware": 0.88, "hack": 0.82, "high_risk": 0.75, "watchlist": 0.65}
-    BEHAVIOR_ADD = {"loop_detection": 0.20, "coordinated_cashout": 0.25, "peeling_chain": 0.15, "smurfing": 0.18, "bridge_hopping": 0.12, "mixing_interaction": 0.22}
+    import math
+
+    WEIGHTS = {
+        "label": 0.25, "behavior": 0.20, "propagation": 0.15,
+        "temporal": 0.10, "exposure": 0.10, "integration": 0.20,
+    }
+    LABEL_BOOST = {
+        "sanctioned": 1.00, "sanction": 1.00, "scam": 0.95, "fraud": 0.92,
+        "mixer": 0.90, "mixing": 0.90, "darknet": 0.88, "ransomware": 0.88,
+        "hack": 0.82, "exploit": 0.82, "high_risk": 0.75,
+        "watchlist": 0.55, "exchange": 0.15,
+    }
+    BEHAVIOR_ADD = {
+        "loop_detection": 0.40, "coordinated_cashout": 0.40,
+        "mixing_interaction": 0.35, "shell_wallet_network": 0.35,
+        "bridge_hopping": 0.30, "peeling_chain": 0.30,
+        "smurfing": 0.25, "structuring": 0.25,
+        "high_depth_transaction_chaining": 0.25,
+        "micro_funding": 0.15,
+    }
+    INTEGRATION_ADD = {
+        "terminal_node": 0.30, "convergence": 0.25,
+        "value_reaggregation": 0.20, "dormancy": 0.15,
+        "asset_transformation": 0.10,
+    }
 
     new_bd = dict(breakdown)
 
+    # Label override
     if "add_label" in override and override["add_label"]:
         new_bd["label"] = max(new_bd.get("label", 0), LABEL_BOOST.get(override["add_label"], 0.70))
+    if override.get("remove_label"):
+        new_bd["label"] = 0.0
 
+    # Behavior override — exponential normalization
     if "toggle_behavior" in override and override["toggle_behavior"]:
-        delta = BEHAVIOR_ADD.get(override["toggle_behavior"], 0.15)
-        new_bd["behavior"] = min(1.0, new_bd.get("behavior", 0) + delta)
+        bw = BEHAVIOR_ADD.get(override["toggle_behavior"], 0.15)
+        existing = new_bd.get("behavior", 0.0)
+        current_sum = -math.log(max(1.0 - existing, 1e-9)) if existing < 1.0 else 3.0
+        new_bd["behavior"] = min(1.0, 1.0 - math.exp(-(current_sum + bw)))
 
     if "weight_behavior" in override:
         new_bd["behavior"] = min(1.0, float(override["weight_behavior"]))
 
+    # Integration signal override
+    if "add_integration" in override and override["add_integration"]:
+        sig_w = INTEGRATION_ADD.get(override["add_integration"], 0.10)
+        new_bd["integration"] = min(1.0, new_bd.get("integration", 0.0) + sig_w)
+
     new_score = sum(new_bd.get(k, 0) * w for k, w in WEIGHTS.items())
     new_score = round(min(1.0, max(0.0, new_score)), 4)
 
-    changed = {k: round(new_bd.get(k, 0) - breakdown.get(k, 0), 4)
-               for k in WEIGHTS if abs(new_bd.get(k, 0) - breakdown.get(k, 0)) > 0.001}
+    changed = {
+        k: round(new_bd.get(k, 0) - breakdown.get(k, 0), 4)
+        for k in WEIGHTS
+        if abs(new_bd.get(k, 0) - breakdown.get(k, 0)) > 0.001
+    }
+
+    strong_factors = sum(1 for v in new_bd.values() if v >= 0.4)
+    would_be_poi = new_score >= 0.80 and strong_factors >= 2
 
     return {
         "new_risk_score":   new_score,
         "new_breakdown":    new_bd,
         "changed_factors":  changed,
-        "would_be_poi":     new_score >= 0.80,
+        "would_be_poi":     would_be_poi,
+        "strong_factors":   strong_factors,
     }
 
 
