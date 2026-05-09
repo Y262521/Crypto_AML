@@ -217,6 +217,7 @@ function ReasonPreview({ text, onExpand }) {
 export default function Layering({ onNavigateToGraph }) {
     const [runs, setRuns] = useState([]);
     const [selectedRunId, setSelectedRunId] = useState(null);
+    const [dateTimeInput, setDateTimeInput] = useState('');
     const [summary, setSummary] = useState(null);
     const [alerts, setAlerts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -234,6 +235,11 @@ export default function Layering({ onNavigateToGraph }) {
                 setRuns(data || []);
                 if (data && data.length > 0) {
                     setSelectedRunId(data[0].id);
+                    if (data[0].completed_at) {
+                        const dt = new Date(data[0].completed_at);
+                        const pad = (n) => String(n).padStart(2, '0');
+                        setDateTimeInput(`${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`);
+                    }
                 }
             })
             .catch((err) => setError(err.message));
@@ -303,18 +309,6 @@ export default function Layering({ onNavigateToGraph }) {
                     </div>
                 </div>
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                    <select
-                        value={selectedRunId || ''}
-                        onChange={(e) => setSelectedRunId(e.target.value || null)}
-                        style={{ padding: '10px 12px', borderRadius: '10px', border: '1px solid #334155', background: '#0b1220', color: '#fff' }}
-                    >
-                        {runs.length === 0 ? <option value="">No runs</option> : null}
-                        {runs.map((run) => (
-                            <option key={run.id} value={run.id}>
-                                {run.id}
-                            </option>
-                        ))}
-                    </select>
                 </div>
             </div>
 
@@ -368,6 +362,58 @@ export default function Layering({ onNavigateToGraph }) {
                 <div style={{ marginLeft: 'auto', fontSize: '12px', color: '#64748b' }}>
                     Showing {formatNumber(filteredAlerts.length, 0)} alerts
                 </div>
+            </div>
+
+            {/* Date/time picker with available runs */}
+            <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '14px 16px', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>📅 Filter by Analysis Date</div>
+                    <input
+                        type="datetime-local"
+                        value={dateTimeInput}
+                        max={new Date().toISOString().slice(0, 16)}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            setDateTimeInput(val);
+                            if (!val || runs.length === 0) return;
+                            const picked = new Date(val).getTime();
+                            const candidates = runs.filter((r) => r.completed_at && new Date(r.completed_at).getTime() <= picked);
+                            if (candidates.length > 0) {
+                                setSelectedRunId(candidates[0].id);
+                            } else {
+                                setSelectedRunId(runs[runs.length - 1].id);
+                            }
+                        }}
+                        style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontSize: '13px', fontWeight: '600', cursor: 'pointer', outline: 'none' }}
+                    />
+                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>Shows the run closest to the selected date</div>
+                </div>
+                {runs.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Available Runs</div>
+                        <select
+                            value={dateTimeInput}
+                            onChange={(e) => {
+                                const inputVal = e.target.value;
+                                setDateTimeInput(inputVal);
+                                const run = runs.find((r) => r.completed_at && new Date(r.completed_at).toISOString().slice(0, 16) === inputVal);
+                                if (run) setSelectedRunId(run.id);
+                            }}
+                            style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontSize: '13px', fontWeight: '600', cursor: 'pointer', outline: 'none', maxWidth: '320px' }}
+                        >
+                            {runs.map((run, i) => {
+                                const dt = run.completed_at ? new Date(run.completed_at) : null;
+                                const label = dt ? dt.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : run.id;
+                                const inputVal = dt ? dt.toISOString().slice(0, 16) : '';
+                                return (
+                                    <option key={run.id} value={inputVal}>
+                                        {i === 0 ? `★ LATEST — ${label}` : label}
+                                    </option>
+                                );
+                            })}
+                        </select>
+                    </div>
+                )}
             </div>
 
             <div style={{

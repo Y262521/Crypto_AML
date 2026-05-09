@@ -164,29 +164,50 @@ class ClusteringEngine:
         self.heuristics: List[BaseHeuristic] = [H(self.cfg) for H in heuristic_classes]
 
     def _find_pair_heuristics(self, G: nx.MultiDiGraph) -> Dict[tuple[str, str], List[str]]:
-        logger.info("Running %d heuristics", len(self.heuristics))
-        pair_heuristics: Dict[tuple[str, str], List[str]] = {}
+        """Run all heuristics in parallel using a thread pool.
 
-        for heuristic in self.heuristics:
-            logger.info("  -> %s", heuristic.name)
+        Each heuristic only reads G (never writes to it), so parallel execution
+        is completely safe. Results are merged single-threaded after all futures
+        complete.
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        logger.info("Running %d heuristics in parallel", len(self.heuristics))
+
+        def _run_one(heuristic):
             try:
                 links = heuristic.find_links(G)
+                logger.info("  -> %s produced %d links", heuristic.name, len(links))
+                return heuristic.name, links
             except Exception as exc:
                 logger.warning("Heuristic %s failed: %s", heuristic.name, exc)
-                continue
+                return heuristic.name, []
 
+        # Cap at 4 workers — graph traversal is CPU-bound and Python's GIL
+        # limits true parallelism, but I/O waits and independent subgraph
+        # traversals still benefit from threading
+        max_workers = min(len(self.heuristics), 4)
+        raw_results: list[tuple[str, list]] = []
+
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = {pool.submit(_run_one, h): h for h in self.heuristics}
+            for future in as_completed(futures):
+                raw_results.append(future.result())
+
+        # Merge into pair_heuristics dict — single-threaded, no race conditions
+        pair_heuristics: Dict[tuple[str, str], List[str]] = {}
+        for name, links in raw_results:
             unique_links = 0
             for a, b in links:
                 if a == b or not G.has_node(a) or not G.has_node(b):
                     continue
                 pair = tuple(sorted([a, b]))
                 pair_heuristics.setdefault(pair, [])
-                if heuristic.name in pair_heuristics[pair]:
+                if name in pair_heuristics[pair]:
                     continue
-                pair_heuristics[pair].append(heuristic.name)
+                pair_heuristics[pair].append(name)
                 unique_links += 1
-
-            logger.info("    %s retained %d unique address pairs", heuristic.name, unique_links)
+            logger.info("    %s retained %d unique address pairs", name, unique_links)
 
         return pair_heuristics
 

@@ -268,11 +268,16 @@ export default function Placement({ onNavigateToGraph }) {
                     <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search entity or address..." style={{ width: '100%', paddingLeft: '34px', paddingRight: '12px', paddingTop: '9px', paddingBottom: '9px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', background: '#f8fafc', outline: 'none', boxSizing: 'border-box' }} />
                 </div>
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    {['All', ...allBehaviors].map((b) => (
-                        <button key={b} type="button" onClick={() => setBehaviorFilter(b)} style={{ padding: '7px 14px', borderRadius: '999px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', border: behaviorFilter === b ? '1px solid #0f6578' : '1px solid #e2e8f0', background: behaviorFilter === b ? '#0f6578' : '#fff', color: behaviorFilter === b ? '#fff' : '#64748b' }}>
-                            {b === 'All' ? 'All Behaviors' : formatBehaviorLabel(b)}
-                        </button>
-                    ))}
+                    <select
+                        value={behaviorFilter === 'All' ? '' : behaviorFilter}
+                        onChange={(e) => setBehaviorFilter(e.target.value || 'All')}
+                        style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontSize: '13px', fontWeight: '600', cursor: 'pointer', outline: 'none' }}
+                    >
+                        <option value="">All Behaviors</option>
+                        {allBehaviors.map((b) => (
+                            <option key={b} value={b}>{formatBehaviorLabel(b)}</option>
+                        ))}
+                    </select>
                 </div>
             </div>
             {/* Date/time picker with available runs */}
