@@ -1,0 +1,25 @@
+[
+  {
+    "type": "watchlist_match",
+    "severity": "high",
+    "address": "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+    "chain": "bitcoin",
+    "details": {
+      "matches": [
+        {
+          "id": "8491c935-502c-43ce-989f-da9efd36c377",
+          "address": "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+          "chain": "bitcoin",
+          "category": "observed_wallet",
+          "source": "analyst_review",
+          "confidence": 0.9,
+          "reviewer_notes": "demo watchlist entry",
+          "label": "monitored",
+          "created_at": "2026-04-28T08:30:42.907535+00:00",
+          "updated_at": "2026-04-28T08:30:42.907535+00:00"
+        }
+      ]
+    },
+    "timestamp": "2026-04-28T08:31:27.942021+00:00"
+  }
+]

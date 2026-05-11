@@ -51,3 +51,11 @@ Thumbs.db
 # Python cache
 AML/src/aml_pipeline.egg-info/
 AML/venv/
+
+# Wallet Analysis — build cache and dependencies
+Wallet Analysis/CryptoCurrency-Spam-Detection--frontend/frontend/.next/
+Wallet Analysis/CryptoCurrency-Spam-Detection--frontend/frontend/node_modules/
+Wallet Analysis/CryptoCurrency-Spam-Detection--frontend/backend/node_modules/
+Wallet Analysis/CryptoCurrency-Spam-Detection--frontend/backend/dist/
+Wallet Analysis/CryptoCurrency-Spam-Detection--frontend/Blockchain/.venv/
+Wallet Analysis/CryptoCurrency-Spam-Detection--frontend/Blockchain/blockchain_engine.egg-info/

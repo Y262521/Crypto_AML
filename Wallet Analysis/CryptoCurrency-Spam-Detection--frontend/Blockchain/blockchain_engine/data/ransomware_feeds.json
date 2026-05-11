@@ -1,0 +1,26 @@
+[
+  {
+    "address": "13AM4VW2dhxYgXBGnSpxh7i7F5MDRiF5nF",
+    "category": "ransomware",
+    "source": "RansomwareTracker",
+    "score": 98,
+    "label": "WannaCry Ransomware",
+    "chain": "bitcoin"
+  },
+  {
+    "address": "12t9YDPgwueZ9NyMgw519p7AA8isjr6SMw",
+    "category": "ransomware",
+    "source": "RansomwareTracker",
+    "score": 98,
+    "label": "CryptoLocker",
+    "chain": "bitcoin"
+  },
+  {
+    "address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+    "category": "ransomware_related",
+    "source": "InternalAnalysis",
+    "score": 85,
+    "label": "Ransomware Cashout",
+    "chain": "ethereum"
+  }
+]

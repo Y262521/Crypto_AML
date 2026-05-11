@@ -1,0 +1,210 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import 'react-datepicker/dist/react-datepicker.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 64px;
+  --header-height: 56px;
+  --accent: #7c3aed;
+  --accent-light: #8b5cf6;
+  --accent-dim: rgba(124, 58, 237, 0.18);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #0b0b10;
+  color: #e5e7eb;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Scrollbar ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+@layer components {
+
+  /* ─── Glass card ──────────────────────────────────────────────────────────── */
+  .glass {
+    @apply rounded-2xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-xl;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 8px 24px rgba(0, 0, 0, 0.3);
+  }
+
+  .glass-hover {
+    @apply transition-all duration-200 hover:border-white/[0.14] hover:bg-white/[0.06];
+  }
+
+  /* ─── Buttons ─────────────────────────────────────────────────────────────── */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 select-none;
+  }
+
+  .btn-primary {
+    @apply btn text-white;
+    background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+  }
+
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    box-shadow: 0 4px 16px rgba(124, 58, 237, 0.4);
+    transform: translateY(-1px);
+  }
+
+  .btn-primary:active {
+    transform: translateY(0);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .btn-ghost {
+    @apply btn bg-white/[0.04] text-gray-200 hover:bg-white/[0.08] border border-white/[0.08] hover:border-white/[0.15];
+  }
+
+  .btn-danger {
+    @apply btn bg-rose-500/10 text-rose-300 border border-rose-500/20 hover:bg-rose-500/20;
+  }
+
+  /* ─── Input ───────────────────────────────────────────────────────────────── */
+  .input {
+    @apply w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2.5 text-sm text-gray-100 placeholder:text-gray-500 outline-none transition-all duration-200;
+  }
+
+  .input:focus {
+    border-color: rgba(124, 58, 237, 0.5);
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  /* ─── Pill / Badge ────────────────────────────────────────────────────────── */
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-xs text-gray-300;
+  }
+
+  /* ─── Sidebar nav item ────────────────────────────────────────────────────── */
+  .nav-item {
+    @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 cursor-pointer select-none;
+    color: rgba(156, 163, 175, 1);
+  }
+
+  .nav-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #e5e7eb;
+  }
+
+  .nav-item.active {
+    background: rgba(124, 58, 237, 0.18);
+    color: #c4b5fd;
+    border: 1px solid rgba(124, 58, 237, 0.25);
+  }
+
+  .nav-item.active .nav-icon {
+    color: #a78bfa;
+  }
+
+  /* ─── Section label ───────────────────────────────────────────────────────── */
+  .nav-section-label {
+    @apply px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600;
+  }
+
+  /* ─── Scrollbar hide ──────────────────────────────────────────────────────── */
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* ─── Page header ─────────────────────────────────────────────────────────── */
+  .page-header {
+    @apply text-xl font-semibold text-gray-100 tracking-tight;
+  }
+
+  .page-subheader {
+    @apply text-sm text-gray-500 mt-0.5;
+  }
+
+  /* ─── Stat card ───────────────────────────────────────────────────────────── */
+  .stat-card {
+    @apply glass p-4 flex flex-col gap-1;
+  }
+
+  .stat-label {
+    @apply text-xs font-medium text-gray-500 uppercase tracking-wide;
+  }
+
+  .stat-value {
+    @apply text-2xl font-bold text-gray-100 tabular-nums;
+  }
+}
+
+/* ─── react-datepicker dark overrides ──────────────────────────────────────── */
+.react-datepicker {
+  background-color: rgba(15, 15, 20, 0.98) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 16px !important;
+  overflow: hidden;
+  font-family: 'Inter', sans-serif !important;
+}
+
+.react-datepicker__header {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.react-datepicker__current-month,
+.react-datepicker-time__header,
+.react-datepicker-year-header {
+  color: #e5e7eb !important;
+}
+
+.react-datepicker__day-name,
+.react-datepicker__day,
+.react-datepicker__time-name {
+  color: #d1d5db !important;
+}
+
+.react-datepicker__day:hover {
+  background-color: rgba(124, 58, 237, 0.25) !important;
+  border-radius: 8px !important;
+}
+
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+  background-color: rgba(124, 58, 237, 0.8) !important;
+  color: white !important;
+  border-radius: 8px !important;
+}

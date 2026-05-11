@@ -1,0 +1,41 @@
+{
+  "global": [],
+  "ethereum": [
+    {
+      "address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+      "category": "ransomware_related",
+      "source": "InternalAnalysis",
+      "score": 85,
+      "label": "Ransomware Cashout"
+    },
+    {
+      "address": "0xd90e2f925da726b50c4ed8d0fb90ad053324f31b",
+      "category": "sanctioned",
+      "source": "FallbackSeed",
+      "score": 95,
+      "label": "Tornado Cash"
+    }
+  ],
+  "bitcoin": [
+    {
+      "address": "13AM4VW2dhxYgXBGnSpxh7i7F5MDRiF5nF",
+      "category": "ransomware",
+      "source": "RansomwareTracker",
+      "score": 98,
+      "label": "WannaCry Ransomware"
+    },
+    {
+      "address": "12t9YDPgwueZ9NyMgw519p7AA8isjr6SMw",
+      "category": "ransomware",
+      "source": "RansomwareTracker",
+      "score": 98,
+      "label": "CryptoLocker"
+    },
+    {
+      "address": "bc1qexamplepublicfeed0000000000000000000000000",
+      "category": "reported_ransomware",
+      "source": "PublicReport",
+      "score": 60
+    }
+  ]
+}

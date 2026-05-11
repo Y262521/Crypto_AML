@@ -1,0 +1,11 @@
+[
+  {
+    "source": "FallbackSeed",
+    "name": "Tornado Cash",
+    "program": "SeedList",
+    "remarks": "Fallback sanctioned address seed",
+    "addresses": [
+      "0xd90e2f925da726b50c4ed8d0fb90ad053324f31b"
+    ]
+  }
+]

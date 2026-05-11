@@ -35,8 +35,8 @@ const CSS = `
   }
 
   .lp-logo-size {
-    width: 140px;
-    height: 140px;
+    width: 200px;
+    height: 200px;
   }
 
   .lp-panel {
@@ -70,7 +70,7 @@ const CSS = `
 
   @media (max-width: 600px) {
     .lp-root { padding: 20px 16px; }
-    .lp-logo-size { width: 150px; height: 150px; }
+    .lp-logo-size { width: 160px; height: 160px; }
     .lp-panel { padding: 24px 20px; }
     .lp-card { max-width: 100%; }
   }
@@ -80,7 +80,7 @@ const CSS = `
   }
 
   @media (max-height: 700px) {
-    .lp-logo-size { width: 100px; height: 100px; }
+    .lp-logo-size { width: 150px; height: 150px; }
     .lp-root { padding: 16px 24px; }
   }
 `;
@@ -97,7 +97,7 @@ function LoadingOverlay({ workspace }) {
       </div>
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: '11px', color: '#C9A84C', fontWeight: '700', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '6px' }}>
-          {workspace === 'aml' ? 'Activating AML Workspace' : 'Loading Workspace'}
+          {workspace === 'aml' ? 'Activating AML Workspace' : workspace === 'cluster' ? 'Activating Wallet Analysis Workspace' : 'Loading Workspace'}
         </div>
         <div style={{ fontSize: '12px', color: '#4B5563' }}>National Bank of Ethiopia</div>
       </div>
@@ -182,7 +182,7 @@ function Card({ icon, title, subtitle, features, disabled, buttonLabel, onLaunch
   );
 }
 
-export default function LandingPage({ onEnterAML }) {
+export default function LandingPage({ onEnterAML, onEnterCluster }) {
   const [launching, setLaunching] = useState(null);
   const go = (type, cb) => { setLaunching(type); setTimeout(cb, 1800); };
 
@@ -248,8 +248,8 @@ export default function LandingPage({ onEnterAML }) {
               title="Wallet Analysis Workspace"
               subtitle="Graph intelligence, wallet clustering, ownership registry and entity investigation platform."
               features={['Wallet Clustering', 'Ownership Registry', 'Transaction Mapping', 'Graph Intelligence']}
-              disabled
-              buttonLabel="Awaiting Integration"
+              buttonLabel="Enter Workspace →"
+              onLaunch={() => go('cluster', onEnterCluster)}
               delay={350}
             />
           </div>

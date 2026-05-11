@@ -6,6 +6,8 @@ import Layering from './pages/Layering'
 import Placement from './pages/Placement'
 import Integration from './pages/Integration'
 import Clusters from './pages/Clusters'
+import Analytics from './pages/Analytics'
+import RiskIntelligence from './pages/RiskIntelligence'
 import LandingPage from './pages/LandingPage'
 import ComingSoon from './pages/ComingSoon'
 import { getLatestTransactions } from './services/transactionService'
@@ -73,14 +75,14 @@ function App() {
   const handleAddressClick = (address) => navigate('graph', { address })
 
   return (
-    <div style={{ display:'flex', width:'100vw', height:'100vh', overflow:'hidden', background:'#0F1829' }}>
+    <div style={{ display: 'flex', width: '100vw', height: '100vh', overflow: 'hidden', background: '#0F1829' }}>
 
       {/* Landing page */}
       {workspace === null && (
-        <div style={{ width:'100vw', height:'100vh', overflowY:'auto' }}>
+        <div style={{ width: '100vw', height: '100vh', overflowY: 'auto' }}>
           <LandingPage
             onEnterAML={() => { setWorkspace('aml'); navigate('feed') }}
-            onEnterCluster={() => { setWorkspace('cluster'); navigate('coming-soon') }}
+            onEnterCluster={() => { setWorkspace('cluster') }}
           />
         </div>
       )}
@@ -89,7 +91,7 @@ function App() {
       {workspace === 'aml' && (
         <>
           <Sidebar activePage={activePage} onNavigate={(page) => navigate(page)} onHome={() => setWorkspace(null)} />
-          <main style={{ flex:1, padding:'24px', overflowY: activePage === 'graph' ? 'hidden' : 'auto', overflowX:'hidden', minWidth:0, height:'100vh', boxSizing:'border-box', display:'flex', flexDirection:'column', background:'#0F1829' }}>
+          <main style={{ flex: 1, padding: '24px', overflowY: activePage === 'graph' ? 'hidden' : 'auto', overflowX: 'hidden', minWidth: 0, height: '100vh', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', background: '#0F1829' }}>
             {activePage === 'feed'
               ? <Dashboard transactions={transactions} loading={txLoading} loadingMore={txLoadingMore} error={txError} onInvestigate={handleInvestigate} onLoadMore={handleLoadMore} lastUpdated={lastUpdated} totalTransactions={txTotal} />
               : activePage === 'graph'
@@ -102,16 +104,33 @@ function App() {
                       ? <Clusters onAddressClick={handleAddressClick} />
                       : activePage === 'integration'
                         ? <Integration onNavigateToGraph={(address) => navigate('graph', { address })} />
-                        : null
+                        : activePage === 'analytics'
+                          ? <Analytics />
+                          : activePage === 'risk'
+                            ? <RiskIntelligence />
+                            : null
             }
           </main>
         </>
       )}
 
-      {/* Wallet Analysis Workspace — Coming Soon */}
+      {/* Wallet Analysis Workspace — embedded iframe */}
       {workspace === 'cluster' && (
-        <div style={{ width:'100vw', height:'100vh' }}>
-          <ComingSoon onBack={() => setWorkspace(null)} />
+        <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', background: '#0F1829' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 20px', borderBottom: '1px solid rgba(201,168,76,0.14)', background: '#0A1020', flexShrink: 0 }}>
+            <button
+              onClick={() => setWorkspace(null)}
+              style={{ padding: '6px 14px', background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '7px', color: '#C9A84C', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+            >
+              ← Home
+            </button>
+            <span style={{ fontSize: '12px', color: '#64748B' }}>Wallet Analysis Workspace</span>
+          </div>
+          <iframe
+            src="http://localhost:3000"
+            style={{ flex: 1, border: 'none', width: '100%' }}
+            title="Wallet Analysis Workspace"
+          />
         </div>
       )}
     </div>
