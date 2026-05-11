@@ -9,11 +9,473 @@
       "label": "Ransomware Cashout"
     },
     {
-      "address": "0xd90e2f925da726b50c4ed8d0fb90ad053324f31b",
+      "address": "0x098B716B8Aaf21512996dC57EB0615e2383E2f96",
       "category": "sanctioned",
-      "source": "FallbackSeed",
+      "source": "OFAC",
       "score": 95,
-      "label": "Tornado Cash"
+      "label": "LAZARUS GROUP"
+    },
+    {
+      "address": "0xa0e1c89Ef1a489c9C7dE96311eD5Ce5D32c20E4B",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LAZARUS GROUP"
+    },
+    {
+      "address": "0x3Cffd56B47B7b41c56258D9C7731ABaDc360E073",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LAZARUS GROUP"
+    },
+    {
+      "address": "0x53b6936513e738f44FB50d2b9476730C0Ab3Bfc1",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LAZARUS GROUP"
+    },
+    {
+      "address": "0x35fB6f6DB4fb05e6A4cE86f2C93691425626d4b1",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LAZARUS GROUP"
+    },
+    {
+      "address": "0xF7B31119c2682c88d88D455dBb9d5932c65Cf1bE",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LAZARUS GROUP"
+    },
+    {
+      "address": "0x3e37627dEAA754090fBFbb8bd226c1CE66D255e9",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LAZARUS GROUP"
+    },
+    {
+      "address": "0x08723392Ed15743cc38513C4925f5e6be5c17243",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LAZARUS GROUP"
+    },
+    {
+      "address": "0x7F367cC41522cE07553e823bf3be79A889DEbe1B",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "POTEKHIN, Danil"
+    },
+    {
+      "address": "0xd882cfc20f52f2599d84b8e8d58c7fb62cfe344b",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "KARASAVIDI, Dmitrii"
+    },
+    {
+      "address": "0x901bb9583b24d97e995513c6778dc6888ab6870e",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LIFSHITS, Artem Mikhaylovich"
+    },
+    {
+      "address": "0xa7e5d5a720f06526557c513402f2e6b5fa20b008",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LIFSHITS, Artem Mikhaylovich"
+    },
+    {
+      "address": "0x9f4cda013e354b8fc285bf4b9a60460cee7f7ea9",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SOUTHFRONT"
+    },
+    {
+      "address": "0x3cbded43efdaf0fc77b9c55f6fc9988fcc9b757d",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SOUTHFRONT"
+    },
+    {
+      "address": "0xfec8a60023265364d066a1212fde3930f6ae8da7",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "POLYANIN, Yevgeniy Igorevich"
+    },
+    {
+      "address": "0x7FF9cFad3877F21d41Da833E2F775dB0569eE3D9",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GARANTEX EUROPE OU"
+    },
+    {
+      "address": "0x8Dce2aAC0dE82bdCAf6b4373B79f94331b8e4995",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GARANTEX EUROPE OU"
+    },
+    {
+      "address": "0xf4377edA661e04B6DDA78969796Ed31658D602D4",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GARANTEX EUROPE OU"
+    },
+    {
+      "address": "0xb338962B92CD818D6aef0A32a9ECD01212a71f33",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GARANTEX EUROPE OU"
+    },
+    {
+      "address": "0x57EC89A0C056163A0314e413320f9B3ABe761259",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GARANTEX EUROPE OU"
+    },
+    {
+      "address": "0xD8500C631dC32FA18645B7436344a99E4825e10e",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GARANTEX EUROPE OU"
+    },
+    {
+      "address": "0x7CEd75026204aC29C34bEA98905D4C949F27361e",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GARANTEX EUROPE OU"
+    },
+    {
+      "address": "0xc2a3829F459B3Edd87791c74cD45402BA0a20Be3",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "TASK FORCE RUSICH"
+    },
+    {
+      "address": "0x3AD9dB589d201A710Ed237c829c7860Ba86510Fc",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "TASK FORCE RUSICH"
+    },
+    {
+      "address": "0x39D908dac893CBCB53Cc86e0ECc369aA4DeF1A29",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ZIMENKOV, Jonatan"
+    },
+    {
+      "address": "0x4f47bc496083c727c5fbe3ce9cdf2b0f6496270c",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SIM, Hyon Sop"
+    },
+    {
+      "address": "0xd04E33461FEA8302c5E1e13895b60cEe8AEfda7F",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SIM, Hyon Sop"
+    },
+    {
+      "address": "0x76EA76CA4Eb727f18956aB93445a94c5280412B9",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SIM, Hyon Sop"
+    },
+    {
+      "address": "0xFb3eFf152ea55D1BfA04Dbdd509A80fD7b72cdEB",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SIM, Hyon Sop"
+    },
+    {
+      "address": "0xFda1Ec4A6178d4916b001a065422D31EBE5F62FF",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SIM, Hyon Sop"
+    },
+    {
+      "address": "0x747AFB5c7A7fc34B547cD0FDEbf9b91759C5a52b",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SIM, Hyon Sop"
+    },
+    {
+      "address": "0x38735f03b30FbC022DdD06ABED01F0Ca823C6a94",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "HANAFIN, John Desmond"
+    },
+    {
+      "address": "0x97b1043abd9e6fc31681635166d430a458d14f9c",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "KIM, Sang Man"
+    },
+    {
+      "address": "0xb6f5ec1a0a9cd1526536d3f0426c429529471f40",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "KIM, Sang Man"
+    },
+    {
+      "address": "0x9c2bc757b66f24d60f016b6237f8cdd414a879fa",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "JIMENEZ CASTRO, Mario Alberto"
+    },
+    {
+      "address": "0xdcbEfFBECcE100cCE9E4b153C4e15cB885643193",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SEMENOV, Roman"
+    },
+    {
+      "address": "0x5f48c2a71b2cc96e3f0ccae4e39318ff0dc375b2",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SEMENOV, Roman"
+    },
+    {
+      "address": "0x5a7a51bfb49f190e5a6060a5bc6052ac14a3b59f",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SEMENOV, Roman"
+    },
+    {
+      "address": "0xed6e0a7e4ac94d976eebfb82ccf777a3c6bad921",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SEMENOV, Roman"
+    },
+    {
+      "address": "0x797d7ae72ebddcdea2a346c1834e04d1f8df102b",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SEMENOV, Roman"
+    },
+    {
+      "address": "0x931546D9e66836AbF687d2bc64B30407bAc8C568",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SEMENOV, Roman"
+    },
+    {
+      "address": "0x43fa21d92141BA9db43052492E0DeEE5aa5f0A93",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SEMENOV, Roman"
+    },
+    {
+      "address": "0x6be0ae71e6c41f2f9d0d1a3b8d0f75e6f6a0b46e",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SEMENOV, Roman"
+    },
+    {
+      "address": "0x530a64c0ce595026a4a556b703644228179e2d57",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SHEN, Xingbiao"
+    },
+    {
+      "address": "0x983a81ca6FB1e441266D2FbcB7D8E530AC2E05A2",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "VALERIAN LABS, INC."
+    },
+    {
+      "address": "0x961c5be54a2ffc17cf4cb021d863c42dacd47fc1",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ZHANG, Wei"
+    },
+    {
+      "address": "0xfac583c0cf07ea434052c49115a4682172ab6b4f",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WANG, Mingming"
+    },
+    {
+      "address": "0xE950DC316b836e4EeFb8308bf32Bf7C72a1358FF",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GAZA NOW"
+    },
+    {
+      "address": "0x21B8d56BDA776bbE68655A16895afd96F5534feD",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GAZA NOW"
+    },
+    {
+      "address": "0x175d44451403Edf28469dF03A9280c1197ADb92c",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GAZA NOW"
+    },
+    {
+      "address": "0xf3701f445b6bdafedbca97d1e477357839e4120d",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "KONDRATIEV, Ivan Gennadievich"
+    },
+    {
+      "address": "0x19F8f2B0915Daa12a3f5C9CF01dF9E24D53794F7",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "OKO DESIGN BUREAU"
+    },
+    {
+      "address": "0x0931cA4D13BB4ba75D9B7132AB690265D749a5E7",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CRYPTEX"
+    },
+    {
+      "address": "0x1999ef52700c34de7ec2b68a28aafb37db0c5ade",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "MAGOMEDOV, Khadzhi Murat Dalgatovich"
+    },
+    {
+      "address": "0xd5ED34b52AC4ab84d8FA8A231a3218bbF01Ed510",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "FUNNULL TECHNOLOGY INC"
+    },
+    {
+      "address": "0x12de548F79a50D2bd05481C8515C1eF5183666a9",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "OLD VECTOR LLC"
+    },
+    {
+      "address": "0xdb2720ebad55399117ddb4c4a4afd9a4ccada8fe",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "DERAKHSHAN, Alireza"
+    },
+    {
+      "address": "0xe3d35f68383732649669aa990832e017340dbca5",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ALIVAND, Arash Estaki"
+    },
+    {
+      "address": "0x532b77b33a040587e9fd1800088225f99b8b0e8a",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ALIVAND, Arash Estaki"
+    },
+    {
+      "address": "0x5d5b5dafecbf31bdb08bfd3edad4f2694372d0ef",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SOKOLOVSKI, Rolan"
+    },
+    {
+      "address": "0xc103b7dc095c904b92081eef0c1640081ec01c10",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SOKOLOVSKI, Rolan"
+    },
+    {
+      "address": "0xe1e4c5e5ed8f03ae61b581e2def126025f2b9401",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SOKOLOVSKI, Rolan"
+    },
+    {
+      "address": "0xb637f84b66876ebf609c2a4208905f9ddac9d075",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "YUN, Song Guk"
+    },
+    {
+      "address": "0x95584C303FCd48AF5c6B9873015f2AD0ca84EaE3",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "YUN, Song Guk"
+    },
+    {
+      "address": "0xcB74874f1e06Fcf80A306e06e5379A44B488bA2D",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "AMNOKGANG TECHNOLOGY DEVELOPMENT COMPANY"
+    },
+    {
+      "address": "0x0330070FD38Ec3bB94F58FA55D40368271E9e54A",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "AMNOKGANG TECHNOLOGY DEVELOPMENT COMPANY"
+    },
+    {
+      "address": "0x9Be599d7867f5E1a2D7Ec6dB9710dF2b98A15573",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "AMNOKGANG TECHNOLOGY DEVELOPMENT COMPANY"
     }
   ],
   "bitcoin": [
@@ -30,6 +492,1686 @@
       "source": "RansomwareTracker",
       "score": 98,
       "label": "CryptoLocker"
+    },
+    {
+      "address": "12QtD5BFwRsdNsAZY76UVE1xyCGNTojH9h",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "YAN, Xiaobing"
+    },
+    {
+      "address": "1Kuf2Rd8mDyAViwBozGTNYnvWL8uYFrkVo",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "YAN, Xiaobing"
+    },
+    {
+      "address": "13f59kUM5FU8MfTG7DCEugYarDhSD7XCoC",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "YAN, Xiaobing"
+    },
+    {
+      "address": "1P3ZfGFLezzYGg9k5SVzQmnjyh7nrUmF2y",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "YAN, Xiaobing"
+    },
+    {
+      "address": "1EpMiZkQVekM5ij12nMiEwttFPcDK9XhX6",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "YAN, Xiaobing"
+    },
+    {
+      "address": "1JREJdZupiFhE7ZzQPtASuMCvvpXC7wRsC",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "YAN, Xiaobing"
+    },
+    {
+      "address": "149w62rY42aZBox8fGcmqNsXUzSStKeq8C",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "KHORASHADIZADEH, Ali"
+    },
+    {
+      "address": "1AjZPMsnmpdK2Rv9KQNfMurTXinscVro9V",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GHORBANIYAN, Mohammad"
+    },
+    {
+      "address": "17ezuJoT3XBbdcwFZbkTnrXbup11F4uhiy",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ZHENG, Fujing"
+    },
+    {
+      "address": "1DH2xDH7TngrDU6LXciprKCBKNcPA1xX8A",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ZHENG, Fujing"
+    },
+    {
+      "address": "33Kja69SQVc8kozpoP7Qw6HFtGxHkiWzTz",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ZHENG, Guanghua"
+    },
+    {
+      "address": "3MkUNScqf21EcfWq6T4x2MFgBeSTqhB5t6",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ZHENG, Guanghua"
+    },
+    {
+      "address": "18uKfaUjgG52rVeXEi3wxnveww7zZuECtE",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ZHENG, Guanghua"
+    },
+    {
+      "address": "134r8iHv69xdT6p5qVKTsHrcUEuBVZAYak",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "TIAN, Yinyin"
+    },
+    {
+      "address": "15YK647qtoZQDzNrvY6HJL6QwXduLHfT28",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "TIAN, Yinyin"
+    },
+    {
+      "address": "1PfwHNxUnkpfkK9MKjMqzR3Xq3KCtq9u17",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "TIAN, Yinyin"
+    },
+    {
+      "address": "14kqryJUxM3a7aEi117KX9hoLUw592WsMR",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "TIAN, Yinyin"
+    },
+    {
+      "address": "1F2Gdug9ib9NQMhKMGGJczzMk5SuENoqrp",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "TIAN, Yinyin"
+    },
+    {
+      "address": "3F2sZ4jbhvDKQdGbHYPC6ZxFXEau2m5Lqj",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "TIAN, Yinyin"
+    },
+    {
+      "address": "1AXUTu9y3H8w4wYx4BjyFWgRhZKDhmcMrn",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "TIAN, Yinyin"
+    },
+    {
+      "address": "1Hn9ErTCPRP6j5UDBeuXPGuq5RtRjFJxJQ",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "TIAN, Yinyin"
+    },
+    {
+      "address": "1EfMVkxQQuZfBdocpJu6RUsCJvenQWbQyE",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LI, Jiadong"
+    },
+    {
+      "address": "17UVSMegvrzfobKC82dHXpZLtLcqzW9stF",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LI, Jiadong"
+    },
+    {
+      "address": "39eboeqYNFe2VoLC3mUGx4dh6GNhLB3D2q",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LI, Jiadong"
+    },
+    {
+      "address": "39fhoB2DohisGBbHvvfmkdPdShT75CNHdX",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LI, Jiadong"
+    },
+    {
+      "address": "3E6rY4dSCDW6y2bzJNwrjvTtdmMQjB6yeh",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LI, Jiadong"
+    },
+    {
+      "address": "3EeR8FbcPbkcGj77D6ttneJxmsr3Nu7KGV",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LI, Jiadong"
+    },
+    {
+      "address": "3HQRveQzPifZorZLDXHernc5zjoZax8U9f",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LI, Jiadong"
+    },
+    {
+      "address": "3JXKQ81JzBqVbB8VHdV9Jtd7auWokkdPgY",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LI, Jiadong"
+    },
+    {
+      "address": "3KHfXU24Bt3YD5Ef4J7uNp2buCuhrxfGen",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LI, Jiadong"
+    },
+    {
+      "address": "3LbDu1rUXHNyiz4i8eb3KwkSSBMf7C583D",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LI, Jiadong"
+    },
+    {
+      "address": "3MN8nYo1tt5hLxMwMbxDkXWd7Xu522hb9P",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LI, Jiadong"
+    },
+    {
+      "address": "3N6WeZ6i34taX8Ditser6LKWBcXmt2XXL4",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LI, Jiadong"
+    },
+    {
+      "address": "1Q9UAQbcDezmyouFrzt94t4dSMxgsUfW1X",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "POTEKHIN, Danil"
+    },
+    {
+      "address": "1Kys8fqDen8NGFUJ6AFcXfFW5qquuTH4eh",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "POTEKHIN, Danil"
+    },
+    {
+      "address": "1Q6saNmqKkyFB9mFR68Ck8F7Dp7dTopF2W",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "KARASAVIDI, Dmitrii"
+    },
+    {
+      "address": "1DDA93oZPn7wte2eR1ABwcFoxUFxkKMwCf",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "KARASAVIDI, Dmitrii"
+    },
+    {
+      "address": "12udabs2TkX7NXCSj6KpqXfakjE52ZPLhz",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LIFSHITS, Artem Mikhaylovich"
+    },
+    {
+      "address": "1DT3tenf14cxz9WFNxmYrXFbB6TFiVWA9U",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "LIFSHITS, Artem Mikhaylovich"
+    },
+    {
+      "address": "1Fz29BQp82pE3vXXcsZoMNQ3KSHfMzfMe3",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ANDREYEV, Anton Nikolaeyvich"
+    },
+    {
+      "address": "1AeSq93WDNdLoEJ92sex7T8xQZoYYm8BtS",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ANDREYEV, Anton Nikolaeyvich"
+    },
+    {
+      "address": "1AoxtfiBQ22DvbhqAN9Ctb8sULMRhrdwTr",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ANDREYEV, Anton Nikolaeyvich"
+    },
+    {
+      "address": "18Qj1THHuETfYhuRDZycXJbWwDMGw73Poa",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ANDREYEV, Anton Nikolaeyvich"
+    },
+    {
+      "address": "1MnbhWe5wr7Ut45ReyQsm96PwnM9jD7KaH",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ANDREYEV, Anton Nikolaeyvich"
+    },
+    {
+      "address": "1DYFJ6CuBvrxyoQSuBzVsNcetY9tvdsrag",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ANDREYEV, Anton Nikolaeyvich"
+    },
+    {
+      "address": "15Pt4NwZaUmMUwS2bQbyyncc7mzgWShtv8",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ANDREYEV, Anton Nikolaeyvich"
+    },
+    {
+      "address": "1PhqQpaGCrqSxQ6QDXcv14QCd1U98Zp34E",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ANDREYEV, Anton Nikolaeyvich"
+    },
+    {
+      "address": "13YBQr2Cp1YY3xqq2qngaPb7ca1o4ugeq6",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ANDREYEV, Anton Nikolaeyvich"
+    },
+    {
+      "address": "1KgudqxMfYaGzqAA7MS4DcsqejtMteqhix",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ANDREYEV, Anton Nikolaeyvich"
+    },
+    {
+      "address": "1FRyL9gmFGbzfYDAB4iY9836DJe3KSnjP9",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ANDREYEV, Anton Nikolaeyvich"
+    },
+    {
+      "address": "1DbShx4r8i2XesthoDBf5EkYWz5dsKEusV",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ANDREYEV, Anton Nikolaeyvich"
+    },
+    {
+      "address": "1NE2NiGhhbkFPSEyNWwj7hKGhGDedBtSrQ",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SECONDEYE SOLUTION"
+    },
+    {
+      "address": "19D8PHBjZH29uS1uPZ4m3sVyqqfF8UFG9o",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SECONDEYE SOLUTION"
+    },
+    {
+      "address": "1EYitrwBYNWuTBcjZFbEUdqHppe2raLpaF",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SECONDEYE SOLUTION"
+    },
+    {
+      "address": "1G9CKRHA3mx22DoT1QyNYrh85VSQ19Y1em",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SECONDEYE SOLUTION"
+    },
+    {
+      "address": "182NGZbPJXwg2WDrhrPpR7tpiGQkNPF844",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SECONDEYE SOLUTION"
+    },
+    {
+      "address": "1NayLEVF3bEEbDtdF2Cwso1VdEtvVNh2qX",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SECONDEYE SOLUTION"
+    },
+    {
+      "address": "16PhXY3hNNMTo8kpuJx2emh713KbWpkqci",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SECONDEYE SOLUTION"
+    },
+    {
+      "address": "1KSAbh5trMCTZwhiNsuUQvfTtSSTT8zqRk",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "RAZA, Mujtaba Ali"
+    },
+    {
+      "address": "1BiUFjzH6wsT73U3tfy4aXHCQsYQHzjk5h",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "RAZA, Mujtaba Ali"
+    },
+    {
+      "address": "3Gbs4rjcVUtQd8p3CiFUCxPLZwRqurezRZ",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SOUTHFRONT"
+    },
+    {
+      "address": "bc1qv7k70u2zynvem59u88ctdlaw7hc735d8xep9rq",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SOUTHFRONT"
+    },
+    {
+      "address": "bc1qw4cxpe6sxa5dg6sdwxjph959cw6yztrzl4r54s",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SOUTHFRONT"
+    },
+    {
+      "address": "17a5bpKvEp1j1Trs4qTbcNZrby53JbaS9C",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "FAYZIMATOV, Farrukh Furkatovitch"
+    },
+    {
+      "address": "1JPfVv5cWRLx1js9NWxg46dG2CGbeRz4th",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "HEBEI ATUN TRADING CO., LTD."
+    },
+    {
+      "address": "12HQDsicffSBaYdJ6BhnE22sfjTESmmzKx",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SUEX OTC, S.R.O."
+    },
+    {
+      "address": "1L4ncif9hh9TnUveqWq77HfWWt6CJWtrnb",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SUEX OTC, S.R.O."
+    },
+    {
+      "address": "13mnk8SvDGqsQTHbiGiHBXqtaQCUKfcsnP",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SUEX OTC, S.R.O."
+    },
+    {
+      "address": "1Edue8XZCWNoDBNZgnQkCCivDyr9GEo4x6",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SUEX OTC, S.R.O."
+    },
+    {
+      "address": "1ECeZBxCVJ8Wm2JSN3Cyc6rge2gnvD3W5K",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SUEX OTC, S.R.O."
+    },
+    {
+      "address": "1J9oGoAiHeRfeMZeUnJ9W7RpV55CdKtgYE",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SUEX OTC, S.R.O."
+    },
+    {
+      "address": "1295rkVyNfFpqZpXvKGhDqwhP1jZcNNDMV",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SUEX OTC, S.R.O."
+    },
+    {
+      "address": "1LiNmTUPSJEd92ZgVJjAV3RT9BzUjvUCkx",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SUEX OTC, S.R.O."
+    },
+    {
+      "address": "1LrxsRd7zNuxPJcL5rttnoeJFy1y4AffYY",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SUEX OTC, S.R.O."
+    },
+    {
+      "address": "1KUUJPkyDhamZXgpsyXqNGc3x1QPXtdhgz",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SUEX OTC, S.R.O."
+    },
+    {
+      "address": "1CF46Rfbp97absrs7zb7dFfZS6qBXUm9EP",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SUEX OTC, S.R.O."
+    },
+    {
+      "address": "1Df883c96LVauVsx9FEgnsourD8DELwCUQ",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SUEX OTC, S.R.O."
+    },
+    {
+      "address": "bc1qdt3gml5z5n50y5hm04u2yjdphefkm0fl2zdj68",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SUEX OTC, S.R.O."
+    },
+    {
+      "address": "3E7YbpXuhh3CWFks1jmvWoV8y5DvsfzE6n",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHATEX"
+    },
+    {
+      "address": "3NRJ8aXdUiZdHaiFX9ePX3DhGHzcEi14Fq",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHATEX"
+    },
+    {
+      "address": "3K7PMJyMNVnxqsfpmK9r9nJDtzDw9wNwNV",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHATEX"
+    },
+    {
+      "address": "3H3rh85qPaGLy2w6618yZNaH7i8asHv46B",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHATEX"
+    },
+    {
+      "address": "3MTrJTFhYK9v1C6pjHtuweZSopfZa4b1wb",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHATEX"
+    },
+    {
+      "address": "347QFbejDBdMZFTxpmn6evvvqyXiqZTCd7",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHATEX"
+    },
+    {
+      "address": "33xWfziVZesgo83U5izdNCBVTnrtBpSwK7",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHATEX"
+    },
+    {
+      "address": "32wdqwX3zCEX3DhAVEcKwXCEGdzgBnx1R9",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHATEX"
+    },
+    {
+      "address": "3N9YcPBDky9UsMx1RTk33tL4jDkZfSnsPk",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHATEX"
+    },
+    {
+      "address": "bc1q90zrdysy4flyacw7hsury3ajs9yzwtwp6guqpypx94w0d3p58hysvz6pde",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHATEX"
+    },
+    {
+      "address": "bc1qw7vfgv3r5vnehafl0y95sclg3uqsj87wxs9ad628yjjcq33cwessr6ndyw",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHATEX"
+    },
+    {
+      "address": "bc1q86tl9255vg5wldamfymaaz36uqxzm30gs7fhkljvzdlt9t38s3lqgdwdfq",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHATEX"
+    },
+    {
+      "address": "158treVZBGMBThoaympxccPdZPtqUfYrT9",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "POLYANIN, Yevgeniy Igorevich"
+    },
+    {
+      "address": "389Sft4nJFkPGhbagk9FN4jXncA9piYTuU",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "POLYANIN, Yevgeniy Igorevich"
+    },
+    {
+      "address": "39Te8MbphSgs7npDJPj2hbNzhke61NTcnB",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "POLYANIN, Yevgeniy Igorevich"
+    },
+    {
+      "address": "31p6woV4e55HUfC2aGynFhzQnGoJFW26cD",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "POLYANIN, Yevgeniy Igorevich"
+    },
+    {
+      "address": "3DNsaQnaUz7wkQny1ZDSmtz6QfbEShxoDD",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "POLYANIN, Yevgeniy Igorevich"
+    },
+    {
+      "address": "3AjyprBY5yhijiCjUC5NUJutGbwhd3AQdE",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "POLYANIN, Yevgeniy Igorevich"
+    },
+    {
+      "address": "35QpLWYkvD3ALhjbge5bK2kd7HfHYcDMu3",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "VASINSKYI, Yaroslav"
+    },
+    {
+      "address": "3NQ1aa9ceirMJ1JvRq3eXefvXj1L639fzX",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "VASINSKYI, Yaroslav"
+    },
+    {
+      "address": "3BsyZ7qRFSi3NsaoV1Ff724qAgrEpjVUHm",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "VASINSKYI, Yaroslav"
+    },
+    {
+      "address": "372Wk9NLrMkJzKgqJdatWJy4bYRfxFjgat",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "VASINSKYI, Yaroslav"
+    },
+    {
+      "address": "3Lpoy53K625zVeE47ZasiG5jGkAxJ27kh1",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GARANTEX EUROPE OU"
+    },
+    {
+      "address": "3E6ZCKRrsdPc35chA9Eftp1h3DLW18NFNV",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GARANTEX EUROPE OU"
+    },
+    {
+      "address": "3K4rjdh8A5yi6LWvft2rbmyZvqEbPSSSX4",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "HYDRA MARKET"
+    },
+    {
+      "address": "17mhyeBX617ABZ1ffThhUTJkHUcMvCkfd5",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "HYDRA MARKET"
+    },
+    {
+      "address": "35qwVtMEohWDdBWRiCSR7azoP5cbY8SG1Q",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "HYDRA MARKET"
+    },
+    {
+      "address": "35KAdTa2vqnJzitF2xiUzZn1Gmcas2Y465",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "HYDRA MARKET"
+    },
+    {
+      "address": "35LScRJ8hzDvvWh9t9UA8bHGnGNVz3YEfa",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "HYDRA MARKET"
+    },
+    {
+      "address": "1PJp8diNa89cVHpiT1VPu7EQ8LxYM5HX6v",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "HYDRA MARKET"
+    },
+    {
+      "address": "17V7THwHMiDJmDwZK4unhE5HgKFJKx7VCe",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "HYDRA MARKET"
+    },
+    {
+      "address": "3PiCnZrBvGfWAKQ9hr4cCpfaDjy64yNSpE",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "HYDRA MARKET"
+    },
+    {
+      "address": "14gM1HuLVDELNHaFU22qpabjtiWek4HhV1",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "HYDRA MARKET"
+    },
+    {
+      "address": "1GYuu9d5HPikafbys3k5Q3DRJq6debGsoB",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "HYDRA MARKET"
+    },
+    {
+      "address": "3GXdtA6kbb4M5aqzZm5qqxcFDFRMW8LqdJ",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "HYDRA MARKET"
+    },
+    {
+      "address": "3K35dyL85fR9ht7UgzPfd1gLRRXQtNTqE3",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "BLENDER.IO"
+    },
+    {
+      "address": "3Q5dGfLKkWqWSwYtbMUyc8xGjN5LrRviK4",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "BLENDER.IO"
+    },
+    {
+      "address": "3EPqGUw2q89pwPZ1UF8FJspE2AyojSTjdu",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "BLENDER.IO"
+    },
+    {
+      "address": "3LhnVMcBq4gsR7aDaRr9XmUo17CuYBV4FN",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "BLENDER.IO"
+    },
+    {
+      "address": "3F6bbvS1krsc1qR8FsbTDfYQyvkMm3QvmR",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "BLENDER.IO"
+    },
+    {
+      "address": "3JHMz3mTna1gVCZSPp8NgRFiY7phkv5mA8",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "BLENDER.IO"
+    },
+    {
+      "address": "32DaxSzUhLBHY2WGSWQYiBSHnRsfQZrrRp",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "BLENDER.IO"
+    },
+    {
+      "address": "3MTRvM5QrYZHKo8gh5qKcrPK3RLjxcDCZE",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "BLENDER.IO"
+    },
+    {
+      "address": "34pFGsSYbWEritXncW9unZtQQE9dKSvKku",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "BLENDER.IO"
+    },
+    {
+      "address": "38ncxqt932N9CcfNfYuHGZgCyR85hDkWBW",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "BLENDER.IO"
+    },
+    {
+      "address": "3F6bbvS1krsc1qR8FsbTDfYQyvkMm",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "BLENDER.IO"
+    },
+    {
+      "address": "1H939dom7i4WDLCKyGbXUp3fs9CSTNRzgL",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "KHATIBI AGHADA, Ahmad"
+    },
+    {
+      "address": "bc1q3y5v2khlyvemcz042wl98dzflywr8ghglqws6s",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "KHATIBI AGHADA, Ahmad"
+    },
+    {
+      "address": "bc1qx3e2axj3wsfn0ndtvlwmkghmmgm4583nqg8ngk",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "KHATIBI AGHADA, Ahmad"
+    },
+    {
+      "address": "1H939dom7i4WDLCKyGbXUp3fs9CSTNRzgL",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "NIKAEEN RAVARI, Amir Hossein"
+    },
+    {
+      "address": "bc1qsxf77cvwcd6jv6j8d8j3uhh4g0xqw4meswmwuc",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "NIKAEEN RAVARI, Amir Hossein"
+    },
+    {
+      "address": "bc1q9lvynkfpaw330uhqmunzdz6gmafsvapv7y3zty",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "NIKAEEN RAVARI, Amir Hossein"
+    },
+    {
+      "address": "bc1qpaly5nm7pfka9v92d6qvl4fc2l9xzee8a6ys3s",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "NIKAEEN RAVARI, Amir Hossein"
+    },
+    {
+      "address": "bc1ql7dlyh8xz6tpqk92vztrhqh88dmjvcwrmsemrm",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "TASK FORCE RUSICH"
+    },
+    {
+      "address": "bc1q2lpgjntr348pfvxhfy33ehmdzy3gmx8w4052z6",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "TASK FORCE RUSICH"
+    },
+    {
+      "address": "1DbvK8P6imBuLcwh2Vruis4xsUb8YAwJQF",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "PEIJNENBURG, Alex Adrianus Martinus"
+    },
+    {
+      "address": "1G6DuwDKNHiUWqks2Lgu44cesu7ffFbLK7",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "PEIJNENBURG, Alex Adrianus Martinus"
+    },
+    {
+      "address": "3AQSmMk5n3c6TKEg9B2WyzYAPm33gJJAA4",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "PEIJNENBURG, Alex Adrianus Martinus"
+    },
+    {
+      "address": "129zKFLoVad9JtxSmDKeJoLCsjhGR7b3vr",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "PEIJNENBURG, Alex Adrianus Martinus"
+    },
+    {
+      "address": "12YyR9EpvHxBjjKjTWqfKqeyoWnvcraxpW",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "PEIJNENBURG, Alex Adrianus Martinus"
+    },
+    {
+      "address": "1KctQENEX5QkQMpnMC3Zh9yRAzkMBLpPcr",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "PEIJNENBURG, Alex Adrianus Martinus"
+    },
+    {
+      "address": "3HqA7i3ttECLvgqvq69HNxxUP5BL7Z5YgA",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "PEIJNENBURG, Alex Adrianus Martinus"
+    },
+    {
+      "address": "1G9A8WRjGXdnYY4TNEVRrcaHsMtana4ncF",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "PEIJNENBURG, Alex Adrianus Martinus"
+    },
+    {
+      "address": "1Js6goCey2NaqPQptiLANLQGuk4d6mowjP",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "PEIJNENBURG, Alex Adrianus Martinus"
+    },
+    {
+      "address": "13RH4JaFhaCxDGPyYE9emjp2aDxdX18uBA",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "PEIJNENBURG, Alex Adrianus Martinus"
+    },
+    {
+      "address": "1FE2cuvkq8n5VGwj5hi8YYQxskwJpovPyV",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "PEIJNENBURG, Alex Adrianus Martinus"
+    },
+    {
+      "address": "1DJoEMvp95yJYWyxAZy8DDBzuvjnrTVrsN",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "PEIJNENBURG, Alex Adrianus Martinus"
+    },
+    {
+      "address": "1LpYKb3SXZPve9hsH2QEJZFX279wJVGowi",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GRIMM, Matthew Simon"
+    },
+    {
+      "address": "15uqdxqNXQwVf5H7yZPz4TmEGeSccCwdor",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GRIMM, Matthew Simon"
+    },
+    {
+      "address": "1FjubFHV4mpYjBmvjsEhZssyiiA4TNmnm2",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GRIMM, Matthew Simon"
+    },
+    {
+      "address": "1LAh7PQwpd1uGiLHae5C5Xz9QXse3y2phq",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GRIMM, Matthew Simon"
+    },
+    {
+      "address": "15yqWQ4sqr7jzCwDtZ3U1KaCa8WMEy7Mm2",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GRIMM, Matthew Simon"
+    },
+    {
+      "address": "19GrL5jnUkGmHXVcraB1Etv5rXCANeLWpq",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GRIMM, Matthew Simon"
+    },
+    {
+      "address": "39NG2LcGRHXxSr1irpEVnJMw4ydL231sEn",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GRIMM, Matthew Simon"
+    },
+    {
+      "address": "3He6EyDaCUgmdr4GXqhxbeTQukaGLCByU2",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GRIMM, Matthew Simon"
+    },
+    {
+      "address": "12NpCkhddSNiDkD9rRYUCHsTT9ReMNiJjG",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GRIMM, Matthew Simon"
+    },
+    {
+      "address": "32jgFkZsTEjMFaBvxJnYvJEeTNKTmq5b32",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GRIMM, Matthew Simon"
+    },
+    {
+      "address": "1Hpj6qm9i7nMF3VkKfBFtjhEDpEjxHWvgv",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GRIMM, Matthew Simon"
+    },
+    {
+      "address": "bc1qfg4gfg0y6t6xjnpmlhuwx5k0wlw6nmfzxn2psc",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ZIMENKOV, Jonatan"
+    },
+    {
+      "address": "3PKiHs4GY4rFg8dpppNVPXGPqMX6K2cBML",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WANG, Hongfei"
+    },
+    {
+      "address": "1986rYHckYbJpGQJy6ornuMyD2N5MTqwDt",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WU, Huihui"
+    },
+    {
+      "address": "125W5ek3DT6Zqy5S2iPt4FHQdNMCbZA3FU",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WU, Huihui"
+    },
+    {
+      "address": "1Kc6egXevyLEaeTxLFA1Zyw7GuhCN8jQtt",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WU, Huihui"
+    },
+    {
+      "address": "12w6v1qAaBc4W8h8C2Cu5SKFaKDSv3erUW",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WU, Huihui"
+    },
+    {
+      "address": "1CPJak9ZyddbawMGJPyEhCiJLXXb4sYv8N",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WU, Huihui"
+    },
+    {
+      "address": "1DJoVLgn1foJHHngduRPJvRbwpaFEKxvxd",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WU, Huihui"
+    },
+    {
+      "address": "15kZobLkD6HZgEECtz4oS2Vz21XHTnNfSg",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WU, Huihui"
+    },
+    {
+      "address": "15qyVrZvvVGvB7GWiAZ82TNcZ6QWMKu3kx",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WU, Huihui"
+    },
+    {
+      "address": "12YCfVAEzkEZXBYhUTyJJaRkgMXiFxJgcu",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WU, Huihui"
+    },
+    {
+      "address": "1MkCnCa9agS5t6V1B15bzusBgYECB4LfWp",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WU, Huihui"
+    },
+    {
+      "address": "1NuBZQXJPyYQGfoBib8wWBDpZmbtkJa5Ba",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WU, Huihui"
+    },
+    {
+      "address": "14rjAD8ZP5xaL571cMRE98qgxxbg1S8mAN",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WU, Huihui"
+    },
+    {
+      "address": "18yWCu6agTxYqAerMxiz9sgHrK3ViezzGa",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WU, Huihui"
+    },
+    {
+      "address": "1D6gG9iKEhPitTcWRJiniuj1jYM2hNeAfJ",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "KIM, Sang Man"
+    },
+    {
+      "address": "1FCNgfZWpYMeYhy9t18AAkTBu8AsdoAc1Z",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "KIM, Sang Man"
+    },
+    {
+      "address": "bc1q4namcagg5wljs0u20z6h2sqgsq4q5lts8rt2rr",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WANG, Yunhe"
+    },
+    {
+      "address": "bc1qdpazd6smrkq5hmw6lupq98za2fqtgmq3azv3av",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WANG, Yunhe"
+    },
+    {
+      "address": "bc1qwz0l2ceddckwdy5rh6zyrm3x4ha6gn5f2da5zg",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WANG, Yunhe"
+    },
+    {
+      "address": "bc1qw8evftpgc8wsmkemd8yl5fg2husza5z802xaym",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WANG, Yunhe"
+    },
+    {
+      "address": "bc1qv4krhj2qmpd9qz9xj9nhvj99fq8s9xsw05d485",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WANG, Yunhe"
+    },
+    {
+      "address": "bc1qu5vngdtcx8nc9d68pq8nv7pzcjrswsy87s66gk",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WANG, Yunhe"
+    },
+    {
+      "address": "bc1qtsl3ufenrv3zgrgm9z8xarcx22x8mfztuartyn",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WANG, Yunhe"
+    },
+    {
+      "address": "bc1qtrrfhr0f3ufsrjxfv8a7p3yuqj0spe4cm6vaws",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WANG, Yunhe"
+    },
+    {
+      "address": "bc1qte9ret332gwrk6e7vqc87d807npzvdj5savg4h",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WANG, Yunhe"
+    },
+    {
+      "address": "bc1qtdupwe722vcc5e0vh94cgwfs0ep4gzwyfsf75q",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WANG, Yunhe"
+    },
+    {
+      "address": "bc1qnykkrlk67f9kdqvzyw2ndu3xmef5z2e52886yl",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WANG, Yunhe"
+    },
+    {
+      "address": "bc1qq7p0es3dv5hcynjjf40f2xjjr6qp5py47d2f6n847vduuq9gvnyq7y9ecd",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SINBAD"
+    },
+    {
+      "address": "1JHdQHkBZiim1cb4hyUh2PbzEbbg6z2TrF",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SINBAD"
+    },
+    {
+      "address": "1Ljk8RNNabkZ9bfDYQBn98XfFozJhTjqcZ",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ZHDANOVA, Ekaterina Valeryevna"
+    },
+    {
+      "address": "3685sEusmTwZBiKJ4cgV73EAhpVD1nbgbe",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ZHDANOVA, Ekaterina Valeryevna"
+    },
+    {
+      "address": "39p8qWp1bkBNhi4vPpFTetKPtH7goqNDZf",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ZHDANOVA, Ekaterina Valeryevna"
+    },
+    {
+      "address": "3B7S6zrgxQVQUHTU8wstM23tB9afE7ojuX",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SHEN, Xingbiao"
+    },
+    {
+      "address": "bc1qardcxz845jw83vgfvcmewhuxa0ag9gchjwmcfd",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "VALERIAN LABS, INC."
+    },
+    {
+      "address": "3NNcbBcMZokPB2JC2dxYuZrpgcetvyGeJn",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WANG, Jiantong"
+    },
+    {
+      "address": "38TftW1heYPqvKbiAhT4ttNBqkUPpooXad",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "XIA, Fengbing"
+    },
+    {
+      "address": "bc1qkfqh5p2qsakseg5gnwen6zh5xf3elmku2xaup29mw3l0wnncy3es880dss",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "XIA, Fengbing"
+    },
+    {
+      "address": "3NU9zkD8CCVGVmYnNNSN7PbU9sSFQBm5UV",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ZHANG, Wei"
+    },
+    {
+      "address": "1MLPqwaFFUBZePTjpR3nxRoK19Cv9mPCc7",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WANG, Mingming"
+    },
+    {
+      "address": "3HePkztPU6UsdENxnyQHFrdZA6eVKeMtvz",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "WANG, Mingming"
+    },
+    {
+      "address": "19D1iGzDr7FyAdiy3ZZdxMd6ttHj1kj6WW",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "BUY CASH MONEY AND MONEY TRANSFER COMPANY"
+    },
+    {
+      "address": "3Q8H2ZWMtc4R1M3mkmhnTjCoYKTeCFigDP",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "GAZA NOW"
+    },
+    {
+      "address": "18gaXypKj9M23S2zT9qZfL9iPbLFM372Q5",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SUNGATOV, Artur Ravilevich"
+    },
+    {
+      "address": "bc1q5jqgm7nvrhaw2rh2vk0dk8e4gg5g373g0vz07r",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "KONDRATIEV, Ivan Gennadievich"
+    },
+    {
+      "address": "32pTjxTNi7snk8sodrgfmdKao3DEn1nVJM",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "KONDRATIEV, Ivan Gennadievich"
+    },
+    {
+      "address": "15cRqR3TXS1JehBGWERuxFE8NhWZzfoeeU",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "KONDRATIEV, Ivan Gennadievich"
+    },
+    {
+      "address": "1A7SKE2dQtezLktCY8peLsdAtkqxV9r1dC",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "KONDRATIEV, Ivan Gennadievich"
+    },
+    {
+      "address": "bc1q8ew45w2agdffrnwp6adt2gqrc9n4mkev9ns29c",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "KONDRATIEV, Ivan Gennadievich"
+    },
+    {
+      "address": "bc1qagp0gy58v8hqvw4p2wsphcxg067rrppp45hexr",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "KONDRATIEV, Ivan Gennadievich"
+    },
+    {
+      "address": "bc1qn6segn8km4nfdp9vueu6msfjsaxaqgun9h60n9",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "KONDRATIEV, Ivan Gennadievich"
+    },
+    {
+      "address": "bc1qx9upga7f09tsetqf78wa3qrmcjar58mkwz6ng6",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "KONDRATIEV, Ivan Gennadievich"
+    },
+    {
+      "address": "13fhnkmpBBWXUQucJd6efWvXdEj78DKavk",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "OKO DESIGN BUREAU"
+    },
+    {
+      "address": "bc1qvhnfknw852ephxyc5hm4q520zmvf9maphetc9z",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "KHOROSHEV, Dmitry Yuryevich"
+    },
+    {
+      "address": "13JtX4h7G5ZuNK5mFudKGq9DHLvvMFuNuz",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CRYPTEX"
+    },
+    {
+      "address": "3NEcQKZ8RwL2eDNhmMPpZ4td9vPsQh9JwM",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "HUANG, Xiaojun"
+    },
+    {
+      "address": "1M5N4sJ1NHb4fviLVZA5MZLKhLZqU4CPZz",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ZSERVERS"
+    },
+    {
+      "address": "1Gekw8ACSs37oXcc5XQHvoux3iKoVFtpF4",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ZSERVERS"
+    },
+    {
+      "address": "bc1q4yzd2rjmshm8ucrwy6dzj5rna20j0zlf8hf8vz",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ZSERVERS"
+    },
+    {
+      "address": "3FfRvC3kSo2SxiQe5e7SSuNdegwgq8iusL",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "MISHIN, Alexander Igorevich"
+    },
+    {
+      "address": "bc1q3q2lz3cmt4u2f49ugxz5q34xrs0m2z4w2gmkp5",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "PARSARAD, Behrouz"
+    },
+    {
+      "address": "bc1qj2ffj6pepc80sfqpx2k2pd3q278q72dpqv2ens",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "PARSARAD, Behrouz"
+    },
+    {
+      "address": "bc1qjwr3rgww7a8ut7a4x8jqh3vswcue3xvp6dm7qe",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "PARSARAD, Behrouz"
+    },
+    {
+      "address": "bc1qvxlwpgcw260sc97a0u6dm0cjxv027clhd67fvx",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "PARSARAD, Behrouz"
+    },
+    {
+      "address": "bc1qwtswqzvaxl6lyw3keqqzwt8z937psta3wg9sjy",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "PARSARAD, Behrouz"
+    },
+    {
+      "address": "bc1qyqvyupkpl6tm60zdecef925y220ssjuagpxsm0",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "PARSARAD, Behrouz"
+    },
+    {
+      "address": "bc1q45cxufu7x6s5v9adzm9t38k80gwawse75xffwe",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "PARSARAD, Behrouz"
+    },
+    {
+      "address": "bc1qmzmx8res2fgzd2wttyvf2ajqqqtcnxxrgkqc2t",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "PARSARAD, Behrouz"
+    },
+    {
+      "address": "18dLDAWi8LmrHbEq3QzDJb9SLxCf4uimXB",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "VOLOSOVIK, Aleksandr Aleksandrovich"
+    },
+    {
+      "address": "1HmqvgSXUVES1jn4TQPzk9dxo1NE8wim2T",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "ANDREYEV, Vitaliy Sergeyevich"
+    },
+    {
+      "address": "bc1qeth6n6ryxexvkx34wnx3nuynun4474h3j0gkhw",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHEN, Zhi"
+    },
+    {
+      "address": "bc1q2we5eqjj8je6lz9xwjattpc3pn4jejc5h0s70f",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHEN, Zhi"
+    },
+    {
+      "address": "bc1qnujzvts45qka3cr2eqqw8ur3q6g6s0ze2wlk5m",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHEN, Zhi"
+    },
+    {
+      "address": "bc1qw4fxztd5u3sl7vrcqwk2a8v5zh5dllvckx3tlt",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHEN, Zhi"
+    },
+    {
+      "address": "3EynPFpoGTPxU9m5bPaEDEUxUanzh7vgQP",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHEN, Zhi"
+    },
+    {
+      "address": "3FoD1f6Tfnq3s8MYHgJqFPWv9cUrtUdBSv",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHEN, Zhi"
+    },
+    {
+      "address": "3MKXKqPXf6VxTLkVSXuDKzaTiZZaz5AmiK",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHEN, Zhi"
+    },
+    {
+      "address": "386sPhHBbLidzPnoxUH74jiiYkHYtobefQ",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHEN, Zhi"
+    },
+    {
+      "address": "35irs2AU6pVgenYbWvMRz22avDBLC9XMkd",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHEN, Zhi"
+    },
+    {
+      "address": "36ia8qAE1k1PKQePdXENCm1YKLXxZyVnnc",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHEN, Zhi"
+    },
+    {
+      "address": "374RguZDMNW5Zh5ouW3KhKDcrerKusmsuk",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "CHEN, Zhi"
+    },
+    {
+      "address": "37fKFZQGMqdBkjSUub1jCDWGgSHwv9VxfZ",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SOKOLOVSKI, Rolan"
+    },
+    {
+      "address": "1JPqJ8sxLBvdHBqMqSFBmUkoh2vAuCUNvs",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "SOKOLOVSKI, Rolan"
+    },
+    {
+      "address": "bc1qyy5pt5cx3zth8xlj92lq5y87dh8xv3nwgs4ncq",
+      "category": "sanctioned",
+      "source": "OFAC",
+      "score": 95,
+      "label": "HOANG, Minh Quang"
     },
     {
       "address": "bc1qexamplepublicfeed0000000000000000000000000",
