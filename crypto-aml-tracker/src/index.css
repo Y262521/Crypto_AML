@@ -78,3 +78,95 @@ body {
     min-height: 100vh !important;
   }
 }
+
+/* Prevent table elements from showing white backgrounds */
+table {
+  background: transparent;
+}
+
+tbody tr {
+  background: transparent;
+}
+
+/* ── NBE Global Input / Select / DateTime Fixes ── */
+
+/* Search bar text color → white */
+input[type="text"],
+input[type="search"] {
+  color: #E2D9C8 !important;
+  background: rgba(10, 16, 32, 0.85) !important;
+  border-color: rgba(201, 168, 76, 0.18) !important;
+}
+
+input[type="text"]::placeholder,
+input[type="search"]::placeholder {
+  color: #4B5E72 !important;
+}
+
+input[type="text"]:focus,
+input[type="search"]:focus {
+  border-color: rgba(201, 168, 76, 0.45) !important;
+  outline: none !important;
+}
+
+/* Dropdown / select → dark with gold text */
+select {
+  color: #E2D9C8 !important;
+  background: rgba(10, 16, 32, 0.85) !important;
+  border-color: rgba(201, 168, 76, 0.18) !important;
+}
+
+select option {
+  background: #0D1628 !important;
+  color: #E2D9C8 !important;
+}
+
+/* Datetime-local input → dark */
+input[type="datetime-local"] {
+  color: #C9A84C !important;
+  background: rgba(10, 16, 32, 0.85) !important;
+  border-color: rgba(201, 168, 76, 0.18) !important;
+  color-scheme: dark;
+}
+
+/* Timestamp text in transaction table → gold */
+.nbe-timestamp {
+  color: #C9A84C !important;
+}
+
+/* Force all td font color to light so timestamps show correctly */
+td {
+  color: #8A9DB5;
+}
+
+/* ── ReactFlow Controls & MiniMap — dark NBE theme ── */
+.react-flow__controls {
+  background: #101D32 !important;
+  border: 1px solid rgba(201,168,76,0.25) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4) !important;
+}
+.react-flow__controls-button {
+  background: #101D32 !important;
+  border-bottom: 1px solid rgba(201,168,76,0.15) !important;
+  color: #C9A84C !important;
+  fill: #C9A84C !important;
+}
+.react-flow__controls-button:hover {
+  background: rgba(201,168,76,0.14) !important;
+}
+.react-flow__controls-button svg {
+  fill: #C9A84C !important;
+}
+.react-flow__minimap {
+  background: #0D1628 !important;
+  border: 1px solid rgba(201,168,76,0.20) !important;
+  border-radius: 8px !important;
+}
+.react-flow__attribution {
+  background: rgba(10,16,32,0.7) !important;
+  color: #4B5E72 !important;
+}
+.react-flow__attribution a {
+  color: #4B5E72 !important;
+}

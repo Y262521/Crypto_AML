@@ -56,7 +56,7 @@ class ScannerConfig:
             os.getenv("BLOCKCHAIN_DATA_DIR", "./blockchain_engine/data")
         ).resolve()
     )
-    request_timeout: int = 10
+    request_timeout: int = int(os.getenv("REQUEST_TIMEOUT", "60"))
     max_rpc_scan_blocks: int = int(os.getenv("MAX_RPC_SCAN_BLOCKS", "10"))
     request_retries: int = int(os.getenv("REQUEST_RETRIES", "1"))
     request_backoff_seconds: float = float(os.getenv("REQUEST_BACKOFF_SECONDS", "1.0"))

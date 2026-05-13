@@ -78,8 +78,8 @@ const buildGraphFromEdges = (edges, addresses) => {
             label: edge.value_eth > 0 ? `${Number(edge.value_eth).toFixed(4)} ETH` : '',
             style: { stroke: SEND_EDGE, strokeWidth: 2 },
             markerEnd: { type: 'arrowclosed', color: SEND_EDGE, width: 20, height: 20 },
-            labelStyle: { fontSize: '10px', fill: '#1e3a5f', fontWeight: '600' },
-            labelBgStyle: { fill: '#eff6ff', fillOpacity: 0.8 },
+            labelStyle: { fontSize: '10px', fill: '#bfdbfe', fontWeight: '600' },
+            labelBgStyle: { fill: '#0D1628', fillOpacity: 0.9 },
         });
     });
 
@@ -106,13 +106,14 @@ const GraphPanel = ({ edges, addresses }) => {
     }
 
     return (
-        <div style={{ width: '100%', height: '320px', background: '#f9fafb', borderRadius: '10px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+        <div style={{ width: '100%', height: '320px', background: '#0D1628', borderRadius: '10px', border: '1px solid #1e3a5f', overflow: 'hidden' }}>
             <ReactFlow
                 nodes={nodes} edges={edgesState}
                 onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
                 fitView fitViewOptions={{ padding: 0.2 }}
+                style={{ background: '#0D1628' }}
             >
-                <Background />
+                <Background gap={20} color="#1e3a5f" />
                 <Controls />
             </ReactFlow>
         </div>

@@ -211,7 +211,7 @@ export default function LandingPage({ onEnterAML, onEnterCluster }) {
               <div style={{ position: 'absolute', inset: '10px', borderRadius: '50%', border: '1px solid rgba(201,168,76,0.1)' }} />
               <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'linear-gradient(145deg,rgba(201,168,76,0.07) 0%,rgba(10,16,28,0.9) 100%)', backdropFilter: 'blur(10px)' }} />
               <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '18px' }}>
-                <img src="/logo.png" alt="National Bank of Ethiopia" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                <img src="/logo.png" alt="National Bank of Ethiopia" style={{ width: '150%', height: '150%', objectFit: 'contain', borderRadius: '50%' }} />
               </div>
             </div>
           </div>
@@ -238,7 +238,7 @@ export default function LandingPage({ onEnterAML, onEnterCluster }) {
               icon="🛡"
               title="AML Investigation Workspace"
               subtitle="Financial crime monitoring, placement & layering detection, integration analysis and real-time risk intelligence."
-              features={['Transaction Table', 'Wallet Clusters', 'Placement Alerts', 'Layering Alerts', 'Integration Alerts']}
+              features={[]}
               buttonLabel="Enter Workspace →"
               onLaunch={() => go('aml', onEnterAML)}
               delay={250}
@@ -247,7 +247,7 @@ export default function LandingPage({ onEnterAML, onEnterCluster }) {
               icon="⬡"
               title="Wallet Analysis Workspace"
               subtitle="Graph intelligence, wallet clustering, ownership registry and entity investigation platform."
-              features={['Wallet Clustering', 'Ownership Registry', 'Transaction Mapping', 'Graph Intelligence']}
+              features={[]}
               buttonLabel="Enter Workspace →"
               onLaunch={() => go('cluster', onEnterCluster)}
               delay={350}

@@ -28,19 +28,22 @@ const EMPTY_OWNER_FORM = {
 };
 
 const LABEL_STYLES = {
-    matched: { color: '#166534', background: '#dcfce7', border: '1px solid #86efac' },
-    unlabeled: { color: '#475569', background: '#e2e8f0', border: '1px solid #cbd5e1' },
-    conflict: { color: '#92400e', background: '#fef3c7', border: '1px solid #fcd34d' },
+    matched: { color: '#4ADE80', background: 'rgba(74,222,128,0.10)', border: '1px solid rgba(74,222,128,0.25)' },
+    unlabeled: { color: '#8A9DB5', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' },
+    conflict: { color: '#FBBF24', background: 'rgba(251,191,36,0.10)', border: '1px solid rgba(251,191,36,0.25)' },
 };
 
 const StatCard = ({ label, value, sub, color }) => (
     <div style={{
-        background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0',
+        background: 'linear-gradient(145deg,#101D32,#0D1628)',
+        borderRadius: '12px',
+        border: '1px solid rgba(201,168,76,0.12)',
         padding: '18px 22px', flex: 1, minWidth: '160px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
     }}>
-        <div style={{ fontSize: '24px', fontWeight: '700', color: color || '#0f172a' }}>{value}</div>
-        <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>{label}</div>
-        {sub && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>{sub}</div>}
+        <div style={{ fontSize: '24px', fontWeight: '700', color: color || '#C9A84C' }}>{value}</div>
+        <div style={{ fontSize: '12px', color: '#8A9DB5', marginTop: '4px' }}>{label}</div>
+        {sub && <div style={{ fontSize: '11px', color: '#4B5E72', marginTop: '2px' }}>{sub}</div>}
     </div>
 );
 
@@ -90,18 +93,18 @@ const BLOCKCHAIN_NETWORKS = [
 
 const FormField = ({ label, children, hint }) => (
     <label style={{ display: 'grid', gap: '8px' }}>
-        <span style={{ fontSize: '12px', fontWeight: '700', color: '#334155' }}>{label}</span>
+        <span style={{ fontSize: '12px', fontWeight: '700', color: '#C8B98A' }}>{label}</span>
         {children}
-        {hint ? <span style={{ fontSize: '11px', color: '#64748b' }}>{hint}</span> : null}
+        {hint ? <span style={{ fontSize: '11px', color: '#6B7E94' }}>{hint}</span> : null}
     </label>
 );
 
 const inputStyle = {
     width: '100%',
     borderRadius: '10px',
-    border: '1px solid #cbd5e1',
-    background: '#fff',
-    color: '#0f172a',
+    border: '1px solid rgba(201,168,76,0.18)',
+    background: 'rgba(10,16,32,0.8)',
+    color: '#E2D9C8',
     padding: '11px 14px',
     fontSize: '13px',
     boxSizing: 'border-box',
@@ -162,9 +165,15 @@ const buildPreviewGraph = (edgesData, centerId) => {
                 data: { label: labelFor(sender) },
                 position: { x: 0, y: 0 },
                 style: {
-                    background: '#22c55e', color: '#fff', borderRadius: '50%',
-                    padding: '12px 18px', fontSize: '11px', fontWeight: '700',
-                    border: sender === centerId ? '3px solid #1d4ed8' : '2px solid #15803d',
+                    background: sender === centerId ? '#ef4444' : '#22c55e',
+                    color: '#fff',
+                    borderRadius: '50%',
+                    padding: '12px 18px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    border: sender === centerId ? '3px solid #7f1d1d' : '2px solid #15803d',
+                    minWidth: '90px',
+                    textAlign: 'center',
                 },
             });
         }
@@ -174,9 +183,15 @@ const buildPreviewGraph = (edgesData, centerId) => {
                 data: { label: labelFor(receiver) },
                 position: { x: 0, y: 0 },
                 style: {
-                    background: '#0ea5e9', color: '#fff', borderRadius: '50%',
-                    padding: '12px 18px', fontSize: '11px', fontWeight: '700',
-                    border: '2px solid #0284c7',
+                    background: receiver === centerId ? '#ef4444' : '#22c55e',
+                    color: '#fff',
+                    borderRadius: '50%',
+                    padding: '12px 18px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    border: receiver === centerId ? '3px solid #7f1d1d' : '2px solid #15803d',
+                    minWidth: '90px',
+                    textAlign: 'center',
                 },
             });
         }
@@ -188,10 +203,10 @@ const buildPreviewGraph = (edgesData, centerId) => {
             type: 'default',
             animated: false,
             label: `${Number(tx.amount || 0).toFixed(4)} ETH`,
-            style: { stroke: '#2563eb', strokeWidth: 1.8 },
+            style: { stroke: '#2563eb', strokeWidth: 2 },
             markerEnd: { type: 'arrowclosed', color: '#2563eb', width: 16, height: 16 },
-            labelStyle: { fontSize: '9px', fill: '#1e3a5f', fontWeight: '600' },
-            labelBgStyle: { fill: '#eff6ff', fillOpacity: 0.9 },
+            labelStyle: { fontSize: '9px', fill: '#bfdbfe', fontWeight: '600' },
+            labelBgStyle: { fill: '#0D1628', fillOpacity: 0.9 },
         });
     });
 
@@ -238,30 +253,30 @@ function ConfirmationDialog({ conflicts, onConfirm, onCancel, submitting }) {
             borderRadius: '20px',
         }}>
             <div style={{
-                background: '#fff',
+                background: 'linear-gradient(145deg,#101D32,#0D1628)',
                 borderRadius: '16px',
                 padding: '28px',
                 maxWidth: '440px',
                 width: '100%',
-                boxShadow: '0 16px 48px rgba(0,0,0,0.3)',
-                border: '1px solid #e2e8f0',
+                boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
+                border: '1px solid rgba(201,168,76,0.15)',
                 margin: '24px',
             }}>
-                <div style={{ fontSize: '16px', fontWeight: '700', color: '#0f172a', marginBottom: '12px' }}>
+                <div style={{ fontSize: '16px', fontWeight: '700', color: '#E2D9C8', marginBottom: '12px' }}>
                     Address Already Assigned
                 </div>
-                <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6', marginBottom: '16px' }}>
+                <div style={{ fontSize: '13px', color: '#8A9DB5', lineHeight: '1.6', marginBottom: '16px' }}>
                     One or more addresses you entered are already assigned to an existing owner. Do you want to reassign them to this new entity?
                 </div>
                 {conflicts && conflicts.length > 0 && (
                     <div style={{
-                        background: '#fef3c7',
-                        border: '1px solid #fcd34d',
+                        background: 'rgba(251,191,36,0.10)',
+                        border: '1px solid rgba(251,191,36,0.25)',
                         borderRadius: '10px',
                         padding: '12px 14px',
                         marginBottom: '20px',
                         fontSize: '12px',
-                        color: '#92400e',
+                        color: '#FBBF24',
                     }}>
                         {conflicts.map((c, i) => (
                             <div key={i} style={{ marginBottom: i < conflicts.length - 1 ? '6px' : 0 }}>
@@ -338,9 +353,9 @@ function OwnerListModal({
                 maxHeight: 'calc(100vh - 48px)',
                 overflow: 'hidden',
                 borderRadius: '20px',
-                background: '#f8fafc',
-                boxShadow: '0 32px 100px rgba(0, 0, 0, 0.4)',
-                border: '1px solid #e2e8f0',
+                background: 'linear-gradient(180deg,#101D32,#0D1628)',
+                boxShadow: '0 32px 100px rgba(0, 0, 0, 0.6)',
+                border: '1px solid rgba(201,168,76,0.15)',
             }}>
                 {conflictData && (
                     <ConfirmationDialog
@@ -471,10 +486,10 @@ function OwnerListModal({
                             gap: '16px',
                             padding: '18px',
                             borderRadius: '14px',
-                            background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
-                            border: '1px solid #e2e8f0',
+                            background: 'rgba(201,168,76,0.04)',
+                            border: '1px solid rgba(201,168,76,0.12)',
                         }}>
-                            <div style={{ fontSize: '12px', fontWeight: '700', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                            <div style={{ fontSize: '12px', fontWeight: '700', color: '#C9A84C', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                                 Physical Address
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
@@ -559,8 +574,8 @@ function OwnerListModal({
                         </FormField>
 
                         {/* Footer */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', alignItems: 'center', paddingTop: '4px', borderTop: '1px solid #e2e8f0' }}>
-                            <div style={{ fontSize: '11px', color: '#64748b', lineHeight: '1.5' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', alignItems: 'center', paddingTop: '4px', borderTop: '1px solid rgba(201,168,76,0.10)' }}>
+                            <div style={{ fontSize: '11px', color: '#6B7E94', lineHeight: '1.5' }}>
                                 Saving will immediately relabel any cluster containing the submitted address.
                             </div>
                             <div style={{ display: 'flex', gap: '10px' }}>
@@ -570,9 +585,9 @@ function OwnerListModal({
                                     style={{
                                         padding: '10px 16px',
                                         borderRadius: '10px',
-                                        border: '1px solid #cbd5e1',
-                                        background: '#fff',
-                                        color: '#334155',
+                                        border: '1px solid rgba(201,168,76,0.20)',
+                                        background: 'transparent',
+                                        color: '#8A9DB5',
                                         fontSize: '13px',
                                         fontWeight: '600',
                                         cursor: 'pointer',
@@ -586,9 +601,9 @@ function OwnerListModal({
                                     style={{
                                         padding: '10px 20px',
                                         borderRadius: '10px',
-                                        border: 'none',
-                                        background: submitting ? '#94a3b8' : '#0d1b2e',
-                                        color: '#fff',
+                                        border: '1px solid rgba(201,168,76,0.30)',
+                                        background: submitting ? 'rgba(255,255,255,0.05)' : 'rgba(201,168,76,0.14)',
+                                        color: submitting ? '#4B5E72' : '#C9A84C',
                                         fontSize: '13px',
                                         fontWeight: '700',
                                         cursor: submitting ? 'not-allowed' : 'pointer',
@@ -822,11 +837,12 @@ export default function Clusters({ onAddressClick }) {
 
     const th = {
         textAlign: 'left', padding: '10px 14px',
-        borderBottom: '2px solid #e2e8f0',
-        color: '#475569', fontSize: '11px', fontWeight: '600',
-        textTransform: 'uppercase', letterSpacing: '0.05em',
+        borderBottom: '1px solid rgba(201,168,76,0.10)',
+        color: '#4B5E72', fontSize: '11px', fontWeight: '700',
+        textTransform: 'uppercase', letterSpacing: '0.07em',
+        background: 'rgba(201,168,76,0.04)',
     };
-    const td = { padding: '10px 14px', borderBottom: '1px solid #f1f5f9', fontSize: '12px', color: '#334155' };
+    const td = { padding: '10px 14px', borderBottom: '1px solid rgba(201,168,76,0.06)', fontSize: '12px', color: '#8A9DB5' };
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
@@ -845,25 +861,25 @@ export default function Clusters({ onAddressClick }) {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                 <div>
-                    <div style={{ fontSize: '18px', fontWeight: '700', color: '#0f172a' }}>Wallet Clusters</div>
-                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                    <div style={{ fontSize: '18px', fontWeight: '700', color: '#C8B98A' }}>Wallet Clusters</div>
+                    <div style={{ fontSize: '12px', color: '#8A9DB5', marginTop: '2px' }}>
                         {clusters.length} clusters · owner-list driven labeling
                     </div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <button onClick={() => openOwnerModal(null)} style={{
-                        padding: '8px 14px', borderRadius: '8px', border: '1px solid #bfdbfe',
-                        background: '#eff6ff', color: '#1d4ed8', fontSize: '12px', fontWeight: '700',
+                        padding: '8px 14px', borderRadius: '8px', border: '1px solid rgba(201,168,76,0.25)',
+                        background: 'rgba(201,168,76,0.08)', color: '#C9A84C', fontSize: '12px', fontWeight: '700',
                         cursor: 'pointer',
                     }}>Add Owner / Entity</button>
                     <button onClick={loadData} style={{
-                        padding: '8px 14px', borderRadius: '8px', border: '1px solid #e2e8f0',
-                        background: '#fff', color: '#334155', fontSize: '12px', fontWeight: '600',
+                        padding: '8px 14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)',
+                        background: 'transparent', color: '#8A9DB5', fontSize: '12px', fontWeight: '600',
                         cursor: 'pointer',
                     }}>Refresh</button>
                     <button onClick={handleRunClustering} disabled={running} style={{
-                        padding: '8px 16px', borderRadius: '8px', border: 'none',
-                        background: running ? '#94a3b8' : '#0d1b2e', color: '#fff',
+                        padding: '8px 16px', borderRadius: '8px', border: '1px solid rgba(201,168,76,0.30)',
+                        background: running ? 'transparent' : 'rgba(201,168,76,0.14)', color: running ? '#4B5E72' : '#C9A84C',
                         fontSize: '12px', fontWeight: '600', cursor: running ? 'not-allowed' : 'pointer',
                     }}>{running ? 'Clustering…' : 'Run Clustering'}</button>
                 </div>
@@ -872,9 +888,9 @@ export default function Clusters({ onAddressClick }) {
             {ownerSuccess ? (
                 <div style={{
                     borderRadius: '14px',
-                    background: '#ecfdf5',
-                    border: '1px solid #a7f3d0',
-                    color: '#166534',
+                    background: 'rgba(74,222,128,0.10)',
+                    border: '1px solid rgba(74,222,128,0.25)',
+                    color: '#4ADE80',
                     padding: '14px 16px',
                     fontSize: '13px',
                 }}>
@@ -894,15 +910,15 @@ export default function Clusters({ onAddressClick }) {
                 </div>
             )}
 
-            <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+            <div style={{ background: 'linear-gradient(180deg,#101D32,#0D1628)', borderRadius: '12px', border: '1px solid rgba(201,168,76,0.12)', overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.35)' }}>
                 {clusters.length === 0 ? (
-                    <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+                    <div style={{ padding: '40px', textAlign: 'center', color: '#4B5E72' }}>
                         No clusters available yet. Run clustering to generate ownership groups.
                     </div>
                 ) : (
                     <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                         <thead>
-                            <tr style={{ background: '#e2e8f0' }}>
+                            <tr>
                                 <th style={{ ...th, width: '18%' }}>Cluster ID</th>
                                 <th style={{ ...th, width: '22%' }}>Owner</th>
                                 <th style={{ ...th, width: '26%' }}>Location</th>
@@ -911,17 +927,17 @@ export default function Clusters({ onAddressClick }) {
                             </tr>
                         </thead>
                         <tbody>
-                            {clusters.map((cluster) => {
+                            {clusters.map((cluster, idx) => {
                                 const memberCount = cluster.addresses?.length ?? cluster.cluster_size ?? 0;
                                 return (
                                     <tr
                                         key={cluster.cluster_id}
                                         onClick={() => openClusterDrawer(cluster)}
-                                        style={{ cursor: 'pointer' }}
-                                        onMouseEnter={(event) => { event.currentTarget.style.background = '#f8fafc'; }}
-                                        onMouseLeave={(event) => { event.currentTarget.style.background = ''; }}
+                                        style={{ cursor: 'pointer', background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}
+                                        onMouseEnter={(event) => { event.currentTarget.style.background = 'rgba(201,168,76,0.04)'; }}
+                                        onMouseLeave={(event) => { event.currentTarget.style.background = idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)'; }}
                                     >
-                                        <td style={{ ...td, fontFamily: 'monospace', fontSize: '11px' }} title={cluster.cluster_id}>
+                                        <td style={{ ...td, fontFamily: 'monospace', fontSize: '11px', color: '#C9A84C' }} title={cluster.cluster_id}>
                                             {`${cluster.cluster_id.slice(0, 10)}...${cluster.cluster_id.slice(-6)}`}
                                         </td>
                                         <td style={td}>
@@ -929,7 +945,7 @@ export default function Clusters({ onAddressClick }) {
                                                 onClick={(event) => { event.stopPropagation(); openClusterDrawer(cluster); }}
                                                 style={{
                                                     background: 'transparent', border: 'none', padding: 0, margin: 0,
-                                                    color: cluster.label_status === 'matched' ? '#1d4ed8' : '#334155',
+                                                    color: cluster.label_status === 'matched' ? '#C9A84C' : '#8A9DB5',
                                                     fontWeight: '700', cursor: 'pointer',
                                                     textAlign: 'left', fontSize: '12px',
                                                 }}
@@ -941,17 +957,17 @@ export default function Clusters({ onAddressClick }) {
                                                 <StatusPill status={cluster.label_status} />
                                             </div>
                                         </td>
-                                        <td style={{ ...td, fontSize: '11px', color: '#64748b' }} title={formatLocation(cluster.owner, cluster.label_status)}>
+                                        <td style={{ ...td, fontSize: '11px', color: '#6B7E94' }} title={formatLocation(cluster.owner, cluster.label_status)}>
                                             {truncate(formatLocation(cluster.owner, cluster.label_status), 52)}
                                         </td>
-                                        <td style={td}>{memberCount}</td>
+                                        <td style={{ ...td, color: '#E2D9C8' }}>{memberCount}</td>
                                         <td style={{ ...td, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <span style={{ fontWeight: '700', color: '#0f172a' }}>{formatEth(cluster.total_balance)} ETH</span>
+                                            <span style={{ fontWeight: '700', color: '#4ADE80' }}>{formatEth(cluster.total_balance)} ETH</span>
                                             <button
                                                 onClick={(event) => { event.stopPropagation(); openClusterDrawer(cluster); }}
                                                 style={{
-                                                    border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px 10px',
-                                                    background: '#fff', color: '#334155', fontSize: '11px', fontWeight: '600',
+                                                    border: '1px solid rgba(201,168,76,0.20)', borderRadius: '8px', padding: '6px 10px',
+                                                    background: 'rgba(201,168,76,0.06)', color: '#C9A84C', fontSize: '11px', fontWeight: '600',
                                                     cursor: 'pointer',
                                                 }}
                                             >
@@ -972,58 +988,54 @@ export default function Clusters({ onAddressClick }) {
                         onClick={closeDrawer}
                         style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.26)' }}
                     />
-                    <aside style={{ position: 'relative', width: 'min(560px,100%)', maxWidth: '560px', height: '100%', background: '#fff', boxShadow: '-24px 0 80px rgba(15, 23, 42, 0.18)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                        <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '16px' }}>
+                    <aside style={{ position: 'relative', width: 'min(560px,100%)', maxWidth: '560px', height: '100%', background: 'linear-gradient(180deg,#101D32,#0D1628)', boxShadow: '-24px 0 80px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderLeft: '1px solid rgba(201,168,76,0.15)' }}>
+                        <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(201,168,76,0.10)', display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '16px' }}>
                             <div>
-                                <div style={{ fontSize: '18px', fontWeight: '700', color: '#0f172a' }}>Cluster details</div>
-                                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>Cluster ID: {selectedCluster.cluster_id}</div>
+                                <div style={{ fontSize: '18px', fontWeight: '700', color: '#C8B98A' }}>Cluster details</div>
+                                <div style={{ fontSize: '12px', color: '#6B7E94', marginTop: '4px' }}>Cluster ID: {selectedCluster.cluster_id}</div>
                             </div>
-                            <button onClick={closeDrawer} style={{ border: 'none', background: 'transparent', color: '#475569', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}>Close</button>
+                            <button onClick={closeDrawer} style={{ border: '1px solid rgba(201,168,76,0.15)', background: 'transparent', color: '#8A9DB5', fontSize: '13px', fontWeight: '700', cursor: 'pointer', borderRadius: '8px', padding: '6px 12px' }}>Close</button>
                         </div>
                         <div style={{ padding: '24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '24px' }}>
                             <section style={{ display: 'grid', gap: '14px' }}>
-                                <div style={{ fontSize: '12px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Owner Profile</div>
+                                <div style={{ fontSize: '12px', fontWeight: '700', color: '#4B5E72', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Owner Profile</div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'start', flexWrap: 'wrap' }}>
                                     <div>
-                                        <div style={{ fontSize: '18px', fontWeight: '700', color: '#0f172a' }}>
+                                        <div style={{ fontSize: '18px', fontWeight: '700', color: '#E2D9C8' }}>
                                             {formatOwner(selectedCluster.owner, selectedCluster.label_status)}
                                         </div>
-                                        <div style={{ marginTop: '8px', color: '#64748b', fontSize: '13px', lineHeight: '1.6' }}>
+                                        <div style={{ marginTop: '8px', color: '#8A9DB5', fontSize: '13px', lineHeight: '1.6' }}>
                                             {formatLocation(selectedCluster.owner, selectedCluster.label_status)}
                                         </div>
                                     </div>
                                     <StatusPill status={selectedCluster.label_status} />
                                 </div>
                                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-                                    <div style={{ padding: '12px 14px', borderRadius: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', minWidth: '140px' }}>
-                                        <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '6px' }}>Members</div>
-                                        <div style={{ fontSize: '16px', fontWeight: '700', color: '#0f172a' }}>{selectedCluster.addresses?.length ?? selectedCluster.cluster_size}</div>
-                                    </div>
-                                    <div style={{ padding: '12px 14px', borderRadius: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', minWidth: '140px' }}>
-                                        <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '6px' }}>Total Balance</div>
-                                        <div style={{ fontSize: '16px', fontWeight: '700', color: '#0f172a' }}>{formatEth(selectedCluster.total_balance)} ETH</div>
-                                    </div>
-                                    <div style={{ padding: '12px 14px', borderRadius: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', minWidth: '140px' }}>
-                                        <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '6px' }}>Internal Flow</div>
-                                        <div style={{ fontSize: '16px', fontWeight: '700', color: '#0f172a' }}>{formatEth(selectedCluster.activity.total_in)} in / {formatEth(selectedCluster.activity.total_out)} out</div>
-                                    </div>
+                                    {[
+                                        { label: 'Members', value: selectedCluster.addresses?.length ?? selectedCluster.cluster_size },
+                                        { label: 'Total Balance', value: `${formatEth(selectedCluster.total_balance)} ETH` },
+                                        { label: 'Internal Flow', value: `${formatEth(selectedCluster.activity.total_in)} in / ${formatEth(selectedCluster.activity.total_out)} out` },
+                                    ].map(({ label, value }) => (
+                                        <div key={label} style={{ padding: '12px 14px', borderRadius: '14px', background: 'rgba(201,168,76,0.05)', border: '1px solid rgba(201,168,76,0.12)', minWidth: '140px' }}>
+                                            <div style={{ fontSize: '11px', color: '#6B7E94', marginBottom: '6px' }}>{label}</div>
+                                            <div style={{ fontSize: '15px', fontWeight: '700', color: '#C8B98A' }}>{value}</div>
+                                        </div>
+                                    ))}
                                 </div>
-                                <div style={{ display: 'grid', gap: '10px', padding: '16px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                                    <div style={{ fontSize: '12px', color: '#334155' }}>
-                                        <strong>Matched address:</strong> {selectedCluster.matched_owner_address || 'No address match recorded'}
-                                    </div>
-                                    <div style={{ fontSize: '12px', color: '#334155' }}>
-                                        <strong>Entity type:</strong> {selectedCluster.owner?.entity_type || 'Not assigned'}
-                                    </div>
-                                    <div style={{ fontSize: '12px', color: '#334155' }}>
-                                        <strong>List category:</strong> {selectedCluster.owner?.list_category || 'Not assigned'}
-                                    </div>
-                                    <div style={{ fontSize: '12px', color: '#334155' }}>
-                                        <strong>Source:</strong> {selectedCluster.owner?.source_reference || 'Not recorded'}
-                                    </div>
+                                <div style={{ display: 'grid', gap: '10px', padding: '16px', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(201,168,76,0.10)' }}>
+                                    {[
+                                        { label: 'Matched address', value: selectedCluster.matched_owner_address || 'No address match recorded' },
+                                        { label: 'Entity type', value: selectedCluster.owner?.entity_type || 'Not assigned' },
+                                        { label: 'List category', value: selectedCluster.owner?.list_category || 'Not assigned' },
+                                        { label: 'Source', value: selectedCluster.owner?.source_reference || 'Not recorded' },
+                                    ].map(({ label, value }) => (
+                                        <div key={label} style={{ fontSize: '12px', color: '#8A9DB5' }}>
+                                            <strong style={{ color: '#C8B98A' }}>{label}:</strong> {value}
+                                        </div>
+                                    ))}
                                     {selectedCluster.owner?.notes ? (
-                                        <div style={{ fontSize: '12px', color: '#334155', lineHeight: '1.6' }}>
-                                            <strong>Notes:</strong> {selectedCluster.owner.notes}
+                                        <div style={{ fontSize: '12px', color: '#8A9DB5', lineHeight: '1.6' }}>
+                                            <strong style={{ color: '#C8B98A' }}>Notes:</strong> {selectedCluster.owner.notes}
                                         </div>
                                     ) : null}
                                 </div>
@@ -1032,11 +1044,11 @@ export default function Clusters({ onAddressClick }) {
                                         type="button"
                                         onClick={() => openOwnerModal(selectedCluster)}
                                         style={{
-                                            border: '1px solid #bfdbfe',
+                                            border: '1px solid rgba(201,168,76,0.25)',
                                             borderRadius: '10px',
                                             padding: '10px 14px',
-                                            background: '#eff6ff',
-                                            color: '#1d4ed8',
+                                            background: 'rgba(201,168,76,0.08)',
+                                            color: '#C9A84C',
                                             fontSize: '12px',
                                             fontWeight: '700',
                                             cursor: 'pointer',
@@ -1048,33 +1060,33 @@ export default function Clusters({ onAddressClick }) {
                             </section>
 
                             <section style={{ display: 'grid', gap: '12px' }}>
-                                <div style={{ fontSize: '12px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Activity / Behavior</div>
-                                <div style={{ display: 'grid', gap: '10px', padding: '16px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                                <div style={{ fontSize: '12px', fontWeight: '700', color: '#4B5E72', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Activity / Behavior</div>
+                                <div style={{ display: 'grid', gap: '10px', padding: '16px', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(201,168,76,0.10)' }}>
                                     {getActivityHighlights(selectedCluster.activity, selectedCluster.risk_level).map((line, idx) => (
                                         <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                                            <div style={{ width: '6px', height: '6px', marginTop: '8px', borderRadius: '50%', background: '#0f172a' }} />
-                                            <div style={{ fontSize: '13px', color: '#334155', lineHeight: '1.5' }}>{line}</div>
+                                            <div style={{ width: '6px', height: '6px', marginTop: '8px', borderRadius: '50%', background: '#C9A84C', flexShrink: 0 }} />
+                                            <div style={{ fontSize: '13px', color: '#8A9DB5', lineHeight: '1.5' }}>{line}</div>
                                         </div>
                                     ))}
-                                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>Total transactions: {selectedCluster.activity.total_tx_count}</div>
+                                    <div style={{ fontSize: '12px', color: '#4B5E72', marginTop: '4px' }}>Total transactions: {selectedCluster.activity.total_tx_count}</div>
                                 </div>
                             </section>
 
                             <section style={{ display: 'grid', gap: '14px' }}>
-                                <div style={{ fontSize: '12px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Address List</div>
+                                <div style={{ fontSize: '12px', fontWeight: '700', color: '#4B5E72', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Address List</div>
                                 {selectedCluster.addresses?.length ? (
                                     <div style={{ display: 'grid', gap: '10px' }}>
                                         {(showAllAddresses ? selectedCluster.addresses : selectedCluster.addresses.slice(0, 5)).map((item) => (
-                                            <div key={item.address} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#fff' }}>
+                                            <div key={item.address} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', padding: '14px', borderRadius: '14px', border: '1px solid rgba(201,168,76,0.12)', background: 'rgba(255,255,255,0.02)' }}>
                                                 <div>
-                                                    <div style={{ fontFamily: 'monospace', fontSize: '12px', color: '#0f172a' }} title={item.address}>{truncate(item.address, 28)}</div>
-                                                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                                                    <div style={{ fontFamily: 'monospace', fontSize: '12px', color: '#C9A84C' }} title={item.address}>{truncate(item.address, 28)}</div>
+                                                    <div style={{ fontSize: '11px', color: '#6B7E94', marginTop: '4px' }}>
                                                         {formatEth(item.total_in)} in · {formatEth(item.total_out)} out
                                                     </div>
                                                 </div>
                                                 <button
                                                     onClick={() => onAddressClick && onAddressClick(item.address)}
-                                                    style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '8px 12px', background: '#f8fafc', color: '#0f172a', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+                                                    style={{ border: '1px solid rgba(201,168,76,0.20)', borderRadius: '10px', padding: '8px 12px', background: 'rgba(201,168,76,0.06)', color: '#C9A84C', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
                                                 >
                                                     Graph
                                                 </button>
@@ -1082,7 +1094,7 @@ export default function Clusters({ onAddressClick }) {
                                         ))}
                                         {selectedCluster.addresses.length > 5 && (
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                                                <div style={{ fontSize: '11px', color: '#64748b' }}>
+                                                <div style={{ fontSize: '11px', color: '#6B7E94' }}>
                                                     {showAllAddresses
                                                         ? `Showing all ${selectedCluster.addresses.length} addresses`
                                                         : `Showing 5 of ${selectedCluster.addresses.length} addresses`}
@@ -1090,7 +1102,7 @@ export default function Clusters({ onAddressClick }) {
                                                 <button
                                                     type="button"
                                                     onClick={(event) => { event.stopPropagation(); setShowAllAddresses((prev) => !prev); }}
-                                                    style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px 10px', background: '#fff', color: '#334155', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+                                                    style={{ border: '1px solid rgba(201,168,76,0.15)', borderRadius: '8px', padding: '6px 10px', background: 'transparent', color: '#8A9DB5', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
                                                 >
                                                     {showAllAddresses ? 'Show less' : `Show all ${selectedCluster.addresses.length}`}
                                                 </button>
@@ -1098,15 +1110,15 @@ export default function Clusters({ onAddressClick }) {
                                         )}
                                     </div>
                                 ) : (
-                                    <div style={{ padding: '16px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#64748b' }}>
+                                    <div style={{ padding: '16px', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(201,168,76,0.10)', color: '#4B5E72' }}>
                                         No addresses are attached to this cluster yet.
                                     </div>
                                 )}
                             </section>
 
                             <section style={{ display: 'grid', gap: '14px' }}>
-                                <div style={{ fontSize: '12px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Graph Preview</div>
-                                <div style={{ padding: '18px', borderRadius: '18px', border: '1px solid #e2e8f0', background: '#f8fafc', minHeight: '260px', position: 'relative' }}>
+                                <div style={{ fontSize: '12px', fontWeight: '700', color: '#4B5E72', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Graph Preview</div>
+                                <div style={{ padding: '18px', borderRadius: '18px', border: '1px solid rgba(201,168,76,0.12)', background: 'rgba(255,255,255,0.02)', minHeight: '260px', position: 'relative' }}>
                                     {previewLoading ? (
                                         <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: '#64748b', fontSize: '13px' }}>
                                             Loading cluster preview…
@@ -1128,9 +1140,9 @@ export default function Clusters({ onAddressClick }) {
                                                     panOnScroll={false}
                                                     fitView
                                                     fitViewOptions={{ padding: 0.12 }}
-                                                    style={{ width: '100%', height: '100%', background: '#ffffff' }}
+                                                    style={{ width: '100%', height: '100%', background: '#0D1628' }}
                                                 >
-                                                    <Background gap={20} color="#e2e8f0" />
+                                                    <Background gap={20} color="#1e3a5f" />
                                                     <Controls showInteractive={false} />
                                                 </ReactFlow>
                                             </div>

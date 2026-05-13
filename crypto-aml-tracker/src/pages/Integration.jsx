@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useState } from 'react';
+﻿import { useDeferredValue, useEffect, useState } from 'react';
 import Loader from '../components/common/Loader';
 import ChainOfCustodyModal from '../components/ChainOfCustodyModal';
 import { getIntegrationAlerts, getIntegrationRuns, getIntegrationSummary } from '../services/transactionService';
@@ -210,18 +210,18 @@ const truncate = (value, maxLength = 20) => {
 
 const SIGNAL_META = {
     convergence: { label: 'Convergence', icon: '🔀', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
-    dormancy: { label: 'Dormancy', icon: '💤', color: '#0369a1', bg: '#f0f9ff', border: '#bae6fd' },
-    terminal_node: { label: 'Terminal Node', icon: '🚪', color: '#b91c1c', bg: '#fef2f2', border: '#fecaca' },
-    reaggregation: { label: 'Reaggregation', icon: '🔁', color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
+    dormancy: { label: 'Dormancy', icon: '💤', color: '#0369a1', bg: 'rgba(96,165,250,0.12)', border: 'rgba(96,165,250,0.3)' },
+    terminal_node: { label: 'Terminal Node', icon: '🚪', color: '#b91c1c', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.3)' },
+    reaggregation: { label: 'Reaggregation', icon: '🔁', color: '#d97706', bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.3)' },
 };
 
 const signalMeta = (signal) =>
-    SIGNAL_META[signal] || { label: signal?.replaceAll('_', ' ') || signal, icon: '⚡', color: '#475569', bg: '#f8fafc', border: '#e2e8f0' };
+    SIGNAL_META[signal] || { label: signal?.replaceAll('_', ' ') || signal, icon: '⚡', color: '#8A9DB5', bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.12)' };
 
 const scoreColor = (score) => {
-    if (score >= 0.70) return { text: '#b91c1c', bg: '#fef2f2', border: '#fecaca' };
-    if (score >= 0.50) return { text: '#d97706', bg: '#fffbeb', border: '#fde68a' };
-    return { text: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' };
+    if (score >= 0.70) return { text: '#b91c1c', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.3)' };
+    if (score >= 0.50) return { text: '#d97706', bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.3)' };
+    return { text: '#4ADE80', bg: 'rgba(74,222,128,0.10)', border: 'rgba(74,222,128,0.25)' };
 };
 
 const humanizeReason = (reasons = [], primarySignal = '') => {
@@ -311,7 +311,7 @@ export default function Integration({ onNavigateToGraph }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
             {/* Header */}
-            <div style={{ background: '#0f172a', borderRadius: '16px', padding: '28px 32px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+            <div style={{ background: 'linear-gradient(135deg,#0D1628,#132240)', border: '1px solid rgba(201,168,76,0.12)', borderRadius: '16px', padding: '28px 32px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
                 <div>
                     <div style={{ fontSize: '24px', fontWeight: '700' }}>Integration Stage Alerts</div>
                     <div style={{ fontSize: '13px', color: '#cbd5e1', marginTop: '6px' }}>
@@ -331,11 +331,11 @@ export default function Integration({ onNavigateToGraph }) {
                     { label: 'Reaggregation', value: formatNumber(summaryBody.reaggregation_signals || 0, 0), icon: '🔁', tone: 'accent', sub: 'Fund reassembly' },
                 ].map(({ label, value, icon, tone, sub }) => {
                     const c = {
-                        danger: { bg: '#fef2f2', border: '#fecaca', text: '#b91c1c', num: '#dc2626' },
-                        warning: { bg: '#fffbeb', border: '#fde68a', text: '#92400e', num: '#d97706' },
-                        accent: { bg: '#f0f9ff', border: '#bae6fd', text: '#0c4a6e', num: '#0284c7' },
-                        purple: { bg: '#f5f3ff', border: '#ddd6fe', text: '#5b21b6', num: '#7c3aed' },
-                        blue: { bg: '#eff6ff', border: '#bfdbfe', text: '#1e40af', num: '#2563eb' },
+                        danger: { bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.3)', text: '#b91c1c', num: '#dc2626' },
+                        warning: { bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.3)', text: '#92400e', num: '#d97706' },
+                        accent: { bg: 'rgba(96,165,250,0.12)', border: 'rgba(96,165,250,0.3)', text: '#0c4a6e', num: '#0284c7' },
+                        purple: { bg: 'rgba(167,139,250,0.10)', border: 'rgba(167,139,250,0.25)', text: '#A78BFA', num: '#A78BFA' },
+                        blue: { bg: 'rgba(96,165,250,0.10)', border: 'rgba(96,165,250,0.25)', text: '#60A5FA', num: '#60A5FA' },
                     }[tone];
                     return (
                         <div key={label} style={{ background: c.bg, border: `1px solid ${c.border}`, borderRadius: '14px', padding: '16px 18px' }}>
@@ -348,20 +348,20 @@ export default function Integration({ onNavigateToGraph }) {
             </div>
 
             {/* Search + signal filter */}
-            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '14px 16px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ background: 'linear-gradient(145deg,#101D32,#0D1628)', border: '1px solid rgba(201,168,76,0.12)', borderRadius: '14px', padding: '14px 16px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
                     <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>🔎</span>
                     <input
                         type="text" value={search} onChange={(e) => setSearch(e.target.value)}
                         placeholder="Search entity address..."
-                        style={{ width: '100%', paddingLeft: '34px', paddingRight: '12px', paddingTop: '9px', paddingBottom: '9px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', background: '#f8fafc', outline: 'none', boxSizing: 'border-box' }}
+                        style={{ width: '100%', paddingLeft: '34px', paddingRight: '12px', paddingTop: '9px', paddingBottom: '9px', borderRadius: '10px', border: '1px solid rgba(201,168,76,0.12)', fontSize: '13px', background: 'rgba(201,168,76,0.04)', outline: 'none', boxSizing: 'border-box' }}
                     />
                 </div>
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     <select
                         value={signalFilter === 'All' ? '' : signalFilter}
                         onChange={(e) => setSignalFilter(e.target.value || 'All')}
-                        style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontSize: '13px', fontWeight: '600', cursor: 'pointer', outline: 'none' }}
+                        style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid rgba(201,168,76,0.12)', background: 'rgba(201,168,76,0.04)', color: '#E2D9C8', fontSize: '13px', fontWeight: '600', cursor: 'pointer', outline: 'none' }}
                     >
                         <option value="">All Signals</option>
                         {allSignals.map((s) => (
@@ -372,19 +372,19 @@ export default function Integration({ onNavigateToGraph }) {
             </div>
 
             {/* Run selector */}
-            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '14px 16px', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <div style={{ background: 'linear-gradient(145deg,#101D32,#0D1628)', border: '1px solid rgba(201,168,76,0.12)', borderRadius: '14px', padding: '14px 16px', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>📅 Filter by Analysis Date</div>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#6B7E94', textTransform: 'uppercase', letterSpacing: '0.1em' }}>📅 Filter by Analysis Date</div>
                     <input
                         type="datetime-local" value={dateTimeInput} max={new Date().toISOString().slice(0, 16)}
                         onChange={(e) => { setDateTimeInput(e.target.value); setSelectedRunId(null); }}
-                        style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontSize: '13px', fontWeight: '600', cursor: 'pointer', outline: 'none' }}
+                        style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid rgba(201,168,76,0.12)', background: 'rgba(201,168,76,0.04)', color: '#E2D9C8', fontSize: '13px', fontWeight: '600', cursor: 'pointer', outline: 'none' }}
                     />
-                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>Shows the run closest to the selected date</div>
+                    <div style={{ fontSize: '11px', color: '#4B5E72' }}>Shows the run closest to the selected date</div>
                 </div>
                 {runs.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
-                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Available Runs</div>
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#6B7E94', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Available Runs</div>
                         <select
                             value={dateTimeInput}
                             onChange={(e) => {
@@ -393,7 +393,7 @@ export default function Integration({ onNavigateToGraph }) {
                                 const run = runs.find(r => r.completed_at && new Date(r.completed_at).toISOString().slice(0, 16) === inputVal);
                                 if (run) setSelectedRunId(run.id);
                             }}
-                            style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontSize: '13px', fontWeight: '600', cursor: 'pointer', outline: 'none', maxWidth: '320px' }}
+                            style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid rgba(201,168,76,0.12)', background: 'rgba(201,168,76,0.04)', color: '#E2D9C8', fontSize: '13px', fontWeight: '600', cursor: 'pointer', outline: 'none', maxWidth: '320px' }}
                         >
                             {runs.map((run, i) => {
                                 const dt = run.completed_at ? new Date(run.completed_at) : null;
@@ -411,18 +411,18 @@ export default function Integration({ onNavigateToGraph }) {
             </div>
 
             {/* Alert table */}
-            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1.5fr 1fr', padding: '10px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+            <div style={{ background: 'linear-gradient(145deg,#101D32,#0D1628)', border: '1px solid rgba(201,168,76,0.12)', borderRadius: '16px', overflow: 'hidden' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1.5fr 1fr', padding: '10px 20px', background: '#132240', borderBottom: '1px solid rgba(201,168,76,0.10)' }}>
                     {['Entity', 'Signals Fired', 'Reason', 'Score'].map((h) => (
-                        <div key={h} style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{h}</div>
+                        <div key={h} style={{ fontSize: '11px', fontWeight: '800', color: '#6B7E94', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{h}</div>
                     ))}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 20px', borderBottom: '1px solid #f1f5f9', background: '#fafbfc' }}>
-                    <span style={{ fontSize: '12px', color: '#94a3b8' }}>{filteredAlerts.length} alerts — page {page} of {totalPages}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 20px', borderBottom: '1px solid rgba(201,168,76,0.06)', background: '#101D32' }}>
+                    <span style={{ fontSize: '12px', color: '#4B5E72' }}>{filteredAlerts.length} alerts — page {page} of {totalPages}</span>
                 </div>
 
                 {visibleAlerts.length === 0 ? (
-                    <div style={{ padding: '48px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
+                    <div style={{ padding: '48px 20px', textAlign: 'center', color: '#4B5E72', fontSize: '13px' }}>
                         {alerts.length === 0
                             ? 'No integration alerts found. Run the ETL pipeline to generate integration analysis.'
                             : 'No alerts match the current filters.'}
@@ -436,24 +436,24 @@ export default function Integration({ onNavigateToGraph }) {
                     return (
                         <div
                             key={alert.entity_id}
-                            style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1.5fr 1fr', padding: '14px 20px', borderBottom: idx < visibleAlerts.length - 1 ? '1px solid #f1f5f9' : 'none', background: idx % 2 === 0 ? '#fff' : '#fafbfc', borderLeft: '3px solid transparent', alignItems: 'center' }}
-                            onMouseEnter={(e) => { e.currentTarget.style.background = '#f0f9ff'; e.currentTarget.style.borderLeft = '3px solid #0f6578'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafbfc'; e.currentTarget.style.borderLeft = '3px solid transparent'; }}
+                            style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1.5fr 1fr', padding: '14px 20px', borderBottom: idx < visibleAlerts.length - 1 ? '1px solid rgba(201,168,76,0.06)' : 'none', background: idx % 2 === 0 ? '#0D1628' : '#101D32', borderLeft: '3px solid transparent', alignItems: 'center' }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = '#132240'; e.currentTarget.style.borderLeft = '3px solid rgba(201,168,76,0.4)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = idx % 2 === 0 ? '#0D1628' : '#101D32'; e.currentTarget.style.borderLeft = '3px solid transparent'; }}
                         >
                             {/* Entity */}
                             <div style={{ minWidth: 0 }}>
-                                <div style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '3px' }}>📍 Address</div>
+                                <div style={{ fontSize: '10px', fontWeight: '700', color: '#4B5E72', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '3px' }}>📍 Address</div>
                                 <div style={{ fontSize: '13px', fontWeight: '700', color: alert.entity_name ? '#0f172a' : '#94a3b8', marginBottom: '2px', fontStyle: alert.entity_name ? 'normal' : 'italic' }}>
                                     {alert.entity_name || 'Unknown'}
                                 </div>
                                 <button
                                     type="button"
                                     onClick={() => onNavigateToGraph && onNavigateToGraph(alert.entity_id)}
-                                    style={{ fontSize: '11px', fontFamily: 'monospace', color: '#0f6578', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', textDecoration: 'underline', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}
+                                    style={{ fontSize: '11px', fontFamily: 'monospace', color: '#C9A84C', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', textDecoration: 'underline', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}
                                 >
                                     {truncate(alert.entity_id, 30)}
                                 </button>
-                                <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                                <div style={{ fontSize: '11px', color: '#4B5E72', marginTop: '2px' }}>
                                     {alert.layering_score > 0 && <span style={{ marginRight: '8px' }}>Layering: {formatNumber(alert.layering_score * 100, 0)}%</span>}
                                     {alert.placement_score > 0 && <span>Placement: {formatNumber(alert.placement_score * 100, 0)}%</span>}
                                 </div>
@@ -483,14 +483,14 @@ export default function Integration({ onNavigateToGraph }) {
                             </div>
 
                             {/* Reason */}
-                            <div style={{ fontSize: '11px', color: '#64748b', lineHeight: 1.5, paddingRight: '12px' }}>
+                            <div style={{ fontSize: '11px', color: '#6B7E94', lineHeight: 1.5, paddingRight: '12px' }}>
                                 {truncatedReason}
                             </div>
 
                             {/* Score */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <div style={{ flex: 1, height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
+                                    <div style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
                                         <div style={{ width: `${Math.round((alert.integration_score || 0) * 100)}%`, height: '100%', background: sc.text, borderRadius: '3px' }} />
                                     </div>
                                     <span style={{ fontSize: '12px', fontWeight: '800', color: sc.text, minWidth: '36px' }}>
@@ -504,7 +504,7 @@ export default function Integration({ onNavigateToGraph }) {
                                     <button
                                         type="button"
                                         onClick={() => setCustodyEntity(alert.entity_id)}
-                                        style={{ fontSize: '10px', padding: '1px 7px', borderRadius: '999px', background: '#e6f6f8', color: '#0f6578', border: '1px solid #b3dde5', cursor: 'pointer', fontWeight: '700' }}
+                                        style={{ fontSize: '10px', padding: '1px 7px', borderRadius: '999px', background: 'rgba(201,168,76,0.10)', color: '#C9A84C', border: '1px solid rgba(201,168,76,0.25)', cursor: 'pointer', fontWeight: '700' }}
                                     >
                                         🔗 Chain
                                     </button>
@@ -516,12 +516,12 @@ export default function Integration({ onNavigateToGraph }) {
 
                 {/* Pagination */}
                 {totalPages > 1 && (
-                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '14px 20px', borderTop: '1px solid #f1f5f9' }}>
-                        <button onClick={() => setPage(1)} disabled={page === 1} style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid #e2e8f0', background: page === 1 ? '#f8fafc' : '#fff', color: page === 1 ? '#94a3b8' : '#475569', cursor: page === 1 ? 'not-allowed' : 'pointer', fontSize: '12px' }}>«</button>
-                        <button onClick={() => setPage(p => p - 1)} disabled={page === 1} style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid #e2e8f0', background: page === 1 ? '#f8fafc' : '#fff', color: page === 1 ? '#94a3b8' : '#475569', cursor: page === 1 ? 'not-allowed' : 'pointer', fontSize: '12px' }}>‹</button>
-                        <span style={{ fontSize: '12px', color: '#64748b', padding: '0 8px' }}>Page {page} / {totalPages}</span>
-                        <button onClick={() => setPage(p => p + 1)} disabled={page === totalPages} style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid #e2e8f0', background: page === totalPages ? '#f8fafc' : '#fff', color: page === totalPages ? '#94a3b8' : '#475569', cursor: page === totalPages ? 'not-allowed' : 'pointer', fontSize: '12px' }}>›</button>
-                        <button onClick={() => setPage(totalPages)} disabled={page === totalPages} style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid #e2e8f0', background: page === totalPages ? '#f8fafc' : '#fff', color: page === totalPages ? '#94a3b8' : '#475569', cursor: page === totalPages ? 'not-allowed' : 'pointer', fontSize: '12px' }}>»</button>
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '14px 20px', borderTop: '1px solid rgba(201,168,76,0.08)' }}>
+                        <button onClick={() => setPage(1)} disabled={page === 1} style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid rgba(201,168,76,0.12)', background: 'transparent', color: page === 1 ? '#4B5E72' : '#C9A84C', cursor: page === 1 ? 'not-allowed' : 'pointer', fontSize: '12px' }}>«</button>
+                        <button onClick={() => setPage(p => p - 1)} disabled={page === 1} style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid rgba(201,168,76,0.12)', background: 'transparent', color: page === 1 ? '#4B5E72' : '#C9A84C', cursor: page === 1 ? 'not-allowed' : 'pointer', fontSize: '12px' }}>‹</button>
+                        <span style={{ fontSize: '12px', color: '#6B7E94', padding: '0 8px' }}>Page {page} / {totalPages}</span>
+                        <button onClick={() => setPage(p => p + 1)} disabled={page === totalPages} style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid rgba(201,168,76,0.12)', background: 'transparent', color: page === totalPages ? '#4B5E72' : '#C9A84C', cursor: page === totalPages ? 'not-allowed' : 'pointer', fontSize: '12px' }}>›</button>
+                        <button onClick={() => setPage(totalPages)} disabled={page === totalPages} style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid rgba(201,168,76,0.12)', background: 'transparent', color: page === totalPages ? '#4B5E72' : '#C9A84C', cursor: page === totalPages ? 'not-allowed' : 'pointer', fontSize: '12px' }}>»</button>
                     </div>
                 )}
             </div>

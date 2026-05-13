@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import './styles/nbe-theme.css'
 import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
 import GraphExplorer from './pages/GraphExplorer'

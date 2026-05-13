@@ -1,7 +1,7 @@
 export default function ComingSoon({ onBack }) {
   return (
     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', gap:'24px', background:'#0F1829', fontFamily:"'Inter', system-ui, sans-serif" }}>
-      <img src="/logo.png" alt="NBE" style={{ width:'72px', height:'72px', objectFit:'contain', opacity:0.85 }} />
+      <img src="/logo.png" alt="NBE" style={{ width:'72px', height:'72px', objectFit:'contain', opacity:0.85,borderRadius:'50%' }} />
       <div style={{ textAlign:'center', maxWidth:'420px' }}>
         <div style={{ display:'inline-block', fontSize:'10px', fontWeight:'700', color:'#C9A84C', letterSpacing:'0.14em', textTransform:'uppercase', background:'rgba(201,168,76,0.08)', border:'1px solid rgba(201,168,76,0.2)', borderRadius:'999px', padding:'4px 14px', marginBottom:'18px' }}>Awaiting Integration</div>
         <h2 style={{ fontSize:'24px', fontWeight:'700', color:'#E2E8F0', marginBottom:'12px' }}>Wallet Analysis Workspace</h2>

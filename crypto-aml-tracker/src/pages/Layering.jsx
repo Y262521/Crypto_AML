@@ -1,3 +1,4 @@
+﻿// NBE Theme — Layering Stage Alerts
 import { useDeferredValue, useEffect, useRef, useState } from 'react';
 import Loader from '../components/common/Loader';
 import { getLayeringAlerts, getLayeringRuns, getLayeringSummary } from '../services/transactionService';
@@ -25,14 +26,15 @@ const METHOD_LABELS = {
 const formatMethod = (value) => METHOD_LABELS[value] || (value || '').replaceAll('_', ' ');
 
 const cardStyle = {
-    background: '#ffffff',
-    border: '1px solid #e2e8f0',
+    background: 'linear-gradient(145deg, #101D32, #0D1628)',
+    border: '1px solid rgba(201,168,76,0.12)',
     borderRadius: '14px',
     padding: '18px 20px',
     display: 'flex',
     flexDirection: 'column',
     gap: '6px',
     minWidth: '160px',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
 };
 
 const toneForMethod = (method) => {
@@ -45,12 +47,12 @@ const toneForMethod = (method) => {
 };
 
 const paletteForMethod = (method) => {
-    if (method === 'peeling_chain') return { background: '#fef2f2', border: '#fecaca', color: '#b91c1c' };
-    if (method === 'mixing_interaction') return { background: '#fffbeb', border: '#fde68a', color: '#92400e' };
-    if (method === 'bridge_hopping') return { background: '#f0f9ff', border: '#bae6fd', color: '#0369a1' };
-    if (method === 'shell_wallet_network') return { background: '#f0fdf4', border: '#bbf7d0', color: '#166534' };
-    if (method === 'high_depth_transaction_chaining') return { background: '#eef2ff', border: '#c7d2fe', color: '#312e81' };
-    return { background: '#f8fafc', border: '#cbd5e1', color: '#334155' };
+    if (method === 'peeling_chain') return { background: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.3)', color: '#F87171' };
+    if (method === 'mixing_interaction') return { background: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.3)', color: '#FBBF24' };
+    if (method === 'bridge_hopping') return { background: 'rgba(96,165,250,0.12)', border: 'rgba(96,165,250,0.3)', color: '#60A5FA' };
+    if (method === 'shell_wallet_network') return { background: 'rgba(74,222,128,0.10)', border: 'rgba(74,222,128,0.25)', color: '#4ADE80' };
+    if (method === 'high_depth_transaction_chaining') return { background: 'rgba(167,139,250,0.12)', border: 'rgba(167,139,250,0.3)', color: '#A78BFA' };
+    return { background: 'rgba(201,168,76,0.08)', border: 'rgba(201,168,76,0.25)', color: '#C9A84C' };
 };
 
 const getHighlightedMethods = (alert) => {
@@ -171,7 +173,7 @@ function ReasonPreview({ text, onExpand }) {
             <div
                 ref={containerRef}
                 style={{
-                    color: '#334155',
+                    color: '#C8B98A',
                     lineHeight: 1.5,
                     fontSize: '14px',
                     overflowWrap: 'anywhere',
@@ -292,19 +294,21 @@ export default function Layering({ onNavigateToGraph }) {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{
-                background: '#0f172a',
+                background: 'linear-gradient(135deg, #0D1628 0%, #132240 60%, #0F1E38 100%)',
+                border: '1px solid rgba(201,168,76,0.12)',
                 borderRadius: '16px',
                 padding: '28px 32px',
-                color: '#ffffff',
+                color: '#E2D9C8',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'flex-start',
                 gap: '16px',
                 flexWrap: 'wrap',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(201,168,76,0.08)',
             }}>
                 <div>
-                    <div style={{ fontSize: '24px', fontWeight: 700 }}>Layering Stage Alerts</div>
-                    <div style={{ fontSize: '13px', color: '#cbd5e1', marginTop: '6px' }}>
+                    <div style={{ fontSize: '24px', fontWeight: 700, color: '#C8B98A' }}>Layering Stage Alerts</div>
+                    <div style={{ fontSize: '13px', color: '#8A9DB5', marginTop: '6px' }}>
                         Deterministic graph and flow heuristics triggered after placement-stage seeding.
                     </div>
                 </div>
@@ -314,25 +318,25 @@ export default function Layering({ onNavigateToGraph }) {
 
             <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
                 <div style={cardStyle}>
-                    <div style={{ fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Seeds</div>
-                    <div style={{ fontSize: '26px', fontWeight: 700, color: '#0f172a' }}>{formatNumber(summaryBody.seeds_analyzed || 0, 0)}</div>
-                    <div style={{ fontSize: '12px', color: '#64748b' }}>Placement seeds analyzed</div>
+                    <div style={{ fontSize: '12px', color: '#6B7E94', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Seeds</div>
+                    <div style={{ fontSize: '26px', fontWeight: 700, color: '#E2D9C8' }}>{formatNumber(summaryBody.seeds_analyzed || 0, 0)}</div>
+                    <div style={{ fontSize: '12px', color: '#6B7E94' }}>Placement seeds analyzed</div>
                 </div>
                 <div style={cardStyle}>
-                    <div style={{ fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Alerts</div>
-                    <div style={{ fontSize: '26px', fontWeight: 700, color: '#0f172a' }}>{formatNumber(summaryBody.alerts || 0, 0)}</div>
-                    <div style={{ fontSize: '12px', color: '#64748b' }}>Final layering alerts</div>
+                    <div style={{ fontSize: '12px', color: '#6B7E94', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Alerts</div>
+                    <div style={{ fontSize: '26px', fontWeight: 700, color: '#E2D9C8' }}>{formatNumber(summaryBody.alerts || 0, 0)}</div>
+                    <div style={{ fontSize: '12px', color: '#6B7E94' }}>Final layering alerts</div>
                 </div>
                 <div style={cardStyle}>
-                    <div style={{ fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Bridge Pairs</div>
-                    <div style={{ fontSize: '26px', fontWeight: 700, color: '#0f172a' }}>{formatNumber(summaryBody.bridge_pairs || 0, 0)}</div>
-                    <div style={{ fontSize: '12px', color: '#64748b' }}>Matched bridge hop records</div>
+                    <div style={{ fontSize: '12px', color: '#6B7E94', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Bridge Pairs</div>
+                    <div style={{ fontSize: '26px', fontWeight: 700, color: '#E2D9C8' }}>{formatNumber(summaryBody.bridge_pairs || 0, 0)}</div>
+                    <div style={{ fontSize: '12px', color: '#6B7E94' }}>Matched bridge hop records</div>
                 </div>
             </div>
 
             <div style={{
-                background: '#ffffff',
-                border: '1px solid #e2e8f0',
+                background: 'linear-gradient(145deg,#101D32,#0D1628)',
+                border: '1px solid rgba(201,168,76,0.12)',
                 borderRadius: '14px',
                 padding: '18px 20px',
                 display: 'flex',
@@ -345,12 +349,12 @@ export default function Layering({ onNavigateToGraph }) {
                     placeholder="Search entity or address"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    style={{ minWidth: '260px', flex: '1 1 260px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1' }}
+                    style={{ minWidth: '260px', flex: '1 1 260px', padding: '10px 12px', borderRadius: '10px', border: '1px solid rgba(201,168,76,0.15)', background: 'rgba(10,16,32,0.8)', color: '#E2D9C8', outline: 'none' }}
                 />
                 <select
                     value={methodFilter}
                     onChange={(e) => setMethodFilter(e.target.value)}
-                    style={{ padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1' }}
+                    style={{ padding: '10px 12px', borderRadius: '10px', border: '1px solid rgba(201,168,76,0.15)', background: 'rgba(10,16,32,0.8)', color: '#E2D9C8', outline: 'none', cursor: 'pointer' }}
                 >
                     <option value="All">All methods</option>
                     {allMethods.map((method) => (
@@ -359,15 +363,15 @@ export default function Layering({ onNavigateToGraph }) {
                         </option>
                     ))}
                 </select>
-                <div style={{ marginLeft: 'auto', fontSize: '12px', color: '#64748b' }}>
+                <div style={{ marginLeft: 'auto', fontSize: '12px', color: '#6B7E94' }}>
                     Showing {formatNumber(filteredAlerts.length, 0)} alerts
                 </div>
             </div>
 
             {/* Date/time picker with available runs */}
-            <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '14px 16px', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <div style={{ background: 'linear-gradient(145deg,#101D32,#0D1628)', border: '1px solid rgba(201,168,76,0.12)', borderRadius: '14px', padding: '14px 16px', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>📅 Filter by Analysis Date</div>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#6B7E94', textTransform: 'uppercase', letterSpacing: '0.1em' }}>📅 Filter by Analysis Date</div>
                     <input
                         type="datetime-local"
                         value={dateTimeInput}
@@ -384,13 +388,13 @@ export default function Layering({ onNavigateToGraph }) {
                                 setSelectedRunId(runs[runs.length - 1].id);
                             }
                         }}
-                        style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontSize: '13px', fontWeight: '600', cursor: 'pointer', outline: 'none' }}
+                        style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid rgba(201,168,76,0.12)', background: 'rgba(201,168,76,0.04)', color: '#E2D9C8', fontSize: '13px', fontWeight: '600', cursor: 'pointer', outline: 'none' }}
                     />
-                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>Shows the run closest to the selected date</div>
+                    <div style={{ fontSize: '11px', color: '#4B5E72' }}>Shows the run closest to the selected date</div>
                 </div>
                 {runs.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
-                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Available Runs</div>
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#6B7E94', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Available Runs</div>
                         <select
                             value={dateTimeInput}
                             onChange={(e) => {
@@ -399,7 +403,7 @@ export default function Layering({ onNavigateToGraph }) {
                                 const run = runs.find((r) => r.completed_at && new Date(r.completed_at).toISOString().slice(0, 16) === inputVal);
                                 if (run) setSelectedRunId(run.id);
                             }}
-                            style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontSize: '13px', fontWeight: '600', cursor: 'pointer', outline: 'none', maxWidth: '320px' }}
+                            style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid rgba(201,168,76,0.12)', background: 'rgba(201,168,76,0.04)', color: '#E2D9C8', fontSize: '13px', fontWeight: '600', cursor: 'pointer', outline: 'none', maxWidth: '320px' }}
                         >
                             {runs.map((run, i) => {
                                 const dt = run.completed_at ? new Date(run.completed_at) : null;
@@ -417,8 +421,8 @@ export default function Layering({ onNavigateToGraph }) {
             </div>
 
             <div style={{
-                background: '#ffffff',
-                border: '1px solid #e2e8f0',
+                background: 'linear-gradient(145deg,#101D32,#0D1628)',
+                border: '1px solid rgba(201,168,76,0.12)',
                 borderRadius: '14px',
                 overflow: 'hidden',
             }}>
@@ -428,45 +432,49 @@ export default function Layering({ onNavigateToGraph }) {
                     alignItems: 'center',
                     gap: '12px',
                     padding: '12px 16px',
-                    borderBottom: '1px solid #e2e8f0',
-                    background: '#fafbfc',
+                    borderBottom: '1px solid rgba(201,168,76,0.10)',
+                    background: 'rgba(255,255,255,0.02)',
                     flexWrap: 'wrap',
                 }}>
-                    <div style={{ fontSize: '12px', color: '#64748b' }}>
+                    <div style={{ fontSize: '12px', color: '#6B7E94' }}>
                         {formatNumber(filteredAlerts.length, 0)} alerts, page {page} of {totalPages}
                     </div>
                 </div>
                 <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '980px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '980px', background: 'transparent' }}>
                         <thead>
-                            <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
-                                <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Entity</th>
-                                <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Methods</th>
-                                <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Placement Seed</th>
-                                <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Evidence</th>
-                                <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Reason</th>
-                                <th style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>Action</th>
+                            <tr style={{ background: 'rgba(201,168,76,0.04)', textAlign: 'left' }}>
+                                <th style={{ padding: '14px 16px', borderBottom: '1px solid rgba(201,168,76,0.10)', fontSize: '12px', color: '#8A9DB5' }}>Entity</th>
+                                <th style={{ padding: '14px 16px', borderBottom: '1px solid rgba(201,168,76,0.10)', fontSize: '12px', color: '#8A9DB5' }}>Methods</th>
+                                <th style={{ padding: '14px 16px', borderBottom: '1px solid rgba(201,168,76,0.10)', fontSize: '12px', color: '#8A9DB5' }}>Placement Seed</th>
+                                <th style={{ padding: '14px 16px', borderBottom: '1px solid rgba(201,168,76,0.10)', fontSize: '12px', color: '#8A9DB5' }}>Evidence</th>
+                                <th style={{ padding: '14px 16px', borderBottom: '1px solid rgba(201,168,76,0.10)', fontSize: '12px', color: '#8A9DB5' }}>Reason</th>
+                                <th style={{ padding: '14px 16px', borderBottom: '1px solid rgba(201,168,76,0.10)', fontSize: '12px', color: '#8A9DB5' }}>Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filteredAlerts.length === 0 ? (
                                 <tr>
-                                    <td colSpan="6" style={{ padding: '28px 16px', textAlign: 'center', color: '#64748b' }}>
+                                    <td colSpan="6" style={{ padding: '28px 16px', textAlign: 'center', color: '#6B7E94' }}>
                                         No layering alerts match the current filters.
                                     </td>
                                 </tr>
                             ) : visibleAlerts.map((alert) => (
-                                <tr key={alert.entity_id}>
-                                    <td style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', verticalAlign: 'top' }}>
-                                        <div style={{ fontWeight: 700, color: alert.entity_name ? '#0f172a' : '#94a3b8', fontStyle: alert.entity_name ? 'normal' : 'italic', marginBottom: '2px' }}>
+                                <tr key={alert.entity_id}
+                                    style={{ background: 'transparent' }}
+                                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(201,168,76,0.04)'}
+                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                >
+                                    <td style={{ padding: '16px', borderBottom: '1px solid rgba(201,168,76,0.10)', verticalAlign: 'top' }}>
+                                        <div style={{ fontWeight: 700, color: alert.entity_name ? '#E2D9C8' : '#4B5E72', fontStyle: alert.entity_name ? 'normal' : 'italic', marginBottom: '2px' }}>
                                             {alert.entity_name || 'Unknown'}
                                         </div>
-                                        <div style={{ fontSize: '11px', fontFamily: 'monospace', color: '#64748b' }}>{truncate(alert.entity_id, 22)}</div>
-                                        <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
+                                        <div style={{ fontSize: '11px', fontFamily: 'monospace', color: '#6B7E94' }}>{truncate(alert.entity_id, 22)}</div>
+                                        <div style={{ fontSize: '12px', color: '#4B5E72', marginTop: '4px' }}>
                                             {alert.address_count} address{alert.address_count === 1 ? '' : 'es'}
                                         </div>
                                     </td>
-                                    <td style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', verticalAlign: 'top' }}>
+                                    <td style={{ padding: '16px', borderBottom: '1px solid rgba(201,168,76,0.10)', verticalAlign: 'top' }}>
                                         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                                             {getHighlightedMethods(alert).map(({ method }, index) => {
                                                 const palette = paletteForMethod(method);
@@ -490,33 +498,33 @@ export default function Layering({ onNavigateToGraph }) {
                                             })}
                                         </div>
                                     </td>
-                                    <td style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>
+                                    <td style={{ padding: '16px', borderBottom: '1px solid rgba(201,168,76,0.10)', color: '#E2D9C8' }}>
                                         <div>{formatNumber(alert.placement_score)}</div>
-                                        <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                                        <div style={{ fontSize: '12px', color: '#6B7E94', marginTop: '4px' }}>
                                             seed conf {formatNumber(alert.placement_confidence)}
                                         </div>
                                     </td>
-                                    <td style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>
+                                    <td style={{ padding: '16px', borderBottom: '1px solid rgba(201,168,76,0.10)', color: '#E2D9C8' }}>
                                         <div>{formatNumber(alert.evidence_count || 0, 0)} evidence items</div>
-                                        <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                                        <div style={{ fontSize: '12px', color: '#6B7E94', marginTop: '4px' }}>
                                             {formatNumber((alert.supporting_tx_hashes || []).length, 0)} linked txs
                                         </div>
                                     </td>
-                                    <td style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', maxWidth: '340px' }}>
+                                    <td style={{ padding: '16px', borderBottom: '1px solid rgba(201,168,76,0.10)', maxWidth: '340px' }}>
                                         <ReasonPreview
                                             text={alert.reason}
                                             onExpand={() => setReasonPopup({ entityId: alert.entity_id, reason: alert.reason })}
                                         />
                                     </td>
-                                    <td style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>
+                                    <td style={{ padding: '16px', borderBottom: '1px solid rgba(201,168,76,0.10)' }}>
                                         <button
                                             onClick={() => onNavigateToGraph((alert.addresses || [])[0] || alert.entity_id)}
                                             style={{
                                                 padding: '8px 12px',
                                                 borderRadius: '8px',
-                                                border: '1px solid #1d4ed8',
-                                                background: '#eff6ff',
-                                                color: '#1d4ed8',
+                                                border: '1px solid rgba(201,168,76,0.25)',
+                                                background: 'rgba(201,168,76,0.08)',
+                                                color: '#C9A84C',
                                                 cursor: 'pointer',
                                                 fontWeight: 600,
                                             }}
@@ -530,7 +538,7 @@ export default function Layering({ onNavigateToGraph }) {
                     </table>
                 </div>
                 {totalPages > 1 ? (
-                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '14px 20px', borderTop: '1px solid #f1f5f9', background: '#fafbfc', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '14px 20px', borderTop: '1px solid rgba(201,168,76,0.08)', background: 'rgba(255,255,255,0.02)', flexWrap: 'wrap' }}>
                         {[
                             { label: '« First', action: () => setPage(1), disabled: page === 1 },
                             { label: '‹ Prev', action: () => setPage((current) => Math.max(1, current - 1)), disabled: page === 1 },
@@ -539,7 +547,7 @@ export default function Layering({ onNavigateToGraph }) {
                             { label: 'Last »', action: () => setPage(totalPages), disabled: page === totalPages },
                         ].map((button) => (
                             button === null ? (
-                                <span key="counter" style={{ fontSize: '12px', color: '#64748b', minWidth: '90px', textAlign: 'center' }}>
+                                <span key="counter" style={{ fontSize: '12px', color: '#6B7E94', minWidth: '90px', textAlign: 'center' }}>
                                     {page} / {totalPages}
                                 </span>
                             ) : (
@@ -551,9 +559,9 @@ export default function Layering({ onNavigateToGraph }) {
                                     style={{
                                         padding: '6px 14px',
                                         borderRadius: '8px',
-                                        border: '1px solid #e2e8f0',
-                                        background: button.disabled ? '#f8fafc' : '#fff',
-                                        color: button.disabled ? '#cbd5e1' : '#0f6578',
+                                        border: '1px solid rgba(201,168,76,0.12)',
+                                        background: button.disabled ? 'transparent' : 'rgba(201,168,76,0.06)',
+                                        color: button.disabled ? '#4B5E72' : '#C9A84C',
                                         fontSize: '12px',
                                         fontWeight: '700',
                                         cursor: button.disabled ? 'not-allowed' : 'pointer',
@@ -581,34 +589,34 @@ export default function Layering({ onNavigateToGraph }) {
                             bottom: 0,
                             width: '420px',
                             maxWidth: '100%',
-                            background: '#fff',
+                            background: 'linear-gradient(145deg,#101D32,#0D1628)',
                             zIndex: 1000,
                             boxShadow: '-8px 0 32px rgba(0,0,0,0.15)',
                             display: 'flex',
                             flexDirection: 'column',
                         }}
                     >
-                        <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', background: 'linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%)' }}>
+                        <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(201,168,76,0.10)', background: 'linear-gradient(135deg,#0D1628,#132240)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
                                 <div>
-                                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#0f6578', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>
+                                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#C9A84C', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>
                                         Layering Reason
                                     </div>
-                                    <div style={{ fontSize: '12px', fontFamily: 'monospace', color: '#0f172a', wordBreak: 'break-all' }}>
+                                    <div style={{ fontSize: '12px', fontFamily: 'monospace', color: '#E2D9C8', wordBreak: 'break-all' }}>
                                         {reasonPopup.entityId}
                                     </div>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={() => setReasonPopup(null)}
-                                    style={{ border: '1px solid #e2e8f0', background: '#fff', borderRadius: '8px', padding: '4px 10px', cursor: 'pointer', fontSize: '14px', color: '#64748b', flexShrink: 0 }}
+                                    style={{ border: '1px solid rgba(201,168,76,0.12)', background: 'rgba(201,168,76,0.06)', borderRadius: '8px', padding: '4px 10px', cursor: 'pointer', fontSize: '14px', color: '#C9A84C', flexShrink: 0 }}
                                 >
                                     ✕
                                 </button>
                             </div>
                         </div>
                         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
-                            <div style={{ padding: '14px 16px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#0f172a', lineHeight: 1.7 }}>
+                            <div style={{ padding: '14px 16px', borderRadius: '12px', background: 'rgba(201,168,76,0.04)', border: '1px solid rgba(201,168,76,0.12)', color: '#E2D9C8', lineHeight: 1.7 }}>
                                 {reasonPopup.reason}
                             </div>
                         </div>
