@@ -124,11 +124,11 @@ const humanizeReason = (reasons = [], primaryBehavior = '') => {
         return 'Flagged by placement detection algorithm.';
     }
     const map = {
-        'earliest reachable entity in traced suspicious flow': 'Origin point of a traced suspicious money flow � funds entered the system through this entity.',
-        'downstream suspicious behavior: smurfing': 'Downstream addresses receiving funds from this entity show smurfing � splitting large amounts into many small transactions.',
-        'downstream suspicious behavior: structuring': 'Downstream addresses show structuring � transactions deliberately kept below reporting thresholds.',
-        'downstream suspicious behavior: micro_funding': 'Downstream addresses show micro-funding � many tiny deposits aggregating into larger amounts.',
-        'no prior suspicious history observed upstream in analyzed graph': 'No suspicious history found upstream � this entity appears to be a clean entry point for illicit funds.',
+        'earliest reachable entity in traced suspicious flow': 'Origin point of a traced suspicious money flow funds entered the system through this entity.',
+        'downstream suspicious behavior: smurfing': 'Downstream addresses receiving funds from this entity show smurfing splitting large amounts into many small transactions.',
+        'downstream suspicious behavior: structuring': 'Downstream addresses show structuring transactions deliberately kept below reporting thresholds.',
+        'downstream suspicious behavior: micro_funding': 'Downstream addresses show micro-funding many tiny deposits aggregating into larger amounts.',
+        'no prior suspicious history observed upstream in analyzed graph': 'No suspicious history found upstream this entity appears to be a clean entry point for illicit funds.',
         'suspicious history observed upstream in analyzed graph': 'Upstream addresses feeding this entity also have suspicious transaction history.',
         'high placement score from graph position analysis': 'Graph position analysis identified this entity as a likely placement-stage entry point.',
         'entity validated as placement origin': 'Confirmed as a placement-stage origin by the validation engine.',
@@ -237,7 +237,7 @@ export default function Placement({ onNavigateToGraph }) {
             {/* Header */}
             <div style={{ background: 'linear-gradient(135deg, #0d1b2e 0%, #0f2744 100%)', borderRadius: '16px', padding: '28px 32px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
                 <div>
-                    <div style={{ fontSize: '22px', fontWeight: '700' }}>?? Placement Stage Review</div>
+                    <div style={{ fontSize: '22px', fontWeight: '700' }}> Placement Stage Review</div>
                     <div style={{ fontSize: '13px', color: '#4B5E72', marginTop: '6px' }}>Flagged entities at the money-laundering placement stage.</div>
                 </div>
 
@@ -247,7 +247,7 @@ export default function Placement({ onNavigateToGraph }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
                 {[
                     { label: 'Placement Alerts', value: formatNumber(summaryBody.placements || 0, 0), icon: '??', tone: 'danger', sub: 'Entities above threshold' },
-                    { label: 'Behavior Hits', value: formatNumber(Object.values(summaryBody.behaviors || {}).reduce((t, c) => t + Number(c || 0), 0), 0), icon: '??', tone: 'warning', sub: 'Structuring � Smurfing � Micro-funding' },
+                    { label: 'Behavior Hits', value: formatNumber(Object.values(summaryBody.behaviors || {}).reduce((t, c) => t + Number(c || 0), 0), 0), icon: '??', tone: 'warning', sub: 'Structuring  Smurfing  Micro-funding' },
                     { label: 'Filtered Alerts', value: formatNumber(filteredAlerts.length, 0), icon: '??', tone: 'accent', sub: 'Matching current filters' },
                 ].map(({ label, value, icon, tone, sub }) => {
                     const c = { danger: { bg: 'rgba(239,68,68,0.10)', border: 'rgba(239,68,68,0.25)', text: '#F87171', num: '#F87171' }, warning: { bg: 'rgba(251,191,36,0.10)', border: 'rgba(251,191,36,0.25)', text: '#FBBF24', num: '#FBBF24' }, accent: { bg: 'rgba(96,165,250,0.10)', border: 'rgba(96,165,250,0.25)', text: '#60A5FA', num: '#60A5FA' } }[tone];
@@ -264,7 +264,7 @@ export default function Placement({ onNavigateToGraph }) {
             {/* Search + filter */}
             <div style={{ background: 'linear-gradient(145deg,#101D32,#0D1628)', border: '1px solid rgba(201,168,76,0.12)', borderRadius: '14px', padding: '14px 16px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
-                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>??</span>
+                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}></span>
                     <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search entity or address..." style={{ width: '100%', paddingLeft: '34px', paddingRight: '12px', paddingTop: '9px', paddingBottom: '9px', borderRadius: '10px', border: '1px solid rgba(201,168,76,0.12)', fontSize: '13px', background: 'rgba(201,168,76,0.04)', outline: 'none', boxSizing: 'border-box' }} />
                 </div>
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -283,7 +283,7 @@ export default function Placement({ onNavigateToGraph }) {
             {/* Date/time picker with available runs */}
             <div style={{ background: 'linear-gradient(145deg,#101D32,#0D1628)', border: '1px solid rgba(201,168,76,0.12)', borderRadius: '14px', padding: '14px 16px', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#6B7E94', textTransform: 'uppercase', letterSpacing: '0.1em' }}>?? Filter by Analysis Date</div>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#6B7E94', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Filter by Analysis Date</div>
                     <input type="datetime-local" value={dateTimeInput} max={new Date().toISOString().slice(0, 16)} onChange={(e) => { setDateTimeInput(e.target.value); setSelectedRunId(null); }} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid rgba(201,168,76,0.12)', background: 'rgba(201,168,76,0.04)', color: '#E2D9C8', fontSize: '13px', fontWeight: '600', cursor: 'pointer', outline: 'none' }} />
                     <div style={{ fontSize: '11px', color: '#4B5E72' }}>Shows the run closest to the selected date</div>
                 </div>
@@ -306,7 +306,7 @@ export default function Placement({ onNavigateToGraph }) {
                                 const inputVal = dt ? dt.toISOString().slice(0, 16) : '';
                                 return (
                                     <option key={run.id} value={inputVal}>
-                                        {i === 0 ? `? LATEST � ${label}` : label}
+                                        {i === 0 ? ` LATEST  ${label}` : label}
                                     </option>
                                 );
                             })}
@@ -323,7 +323,7 @@ export default function Placement({ onNavigateToGraph }) {
                     ))}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 20px', borderBottom: '1px solid rgba(201,168,76,0.06)', background: '#101D32' }}>
-                    <span style={{ fontSize: '12px', color: '#4B5E72' }}>{filteredAlerts.length} alerts � page {page} of {totalPages}</span>
+                    <span style={{ fontSize: '12px', color: '#4B5E72' }}>{filteredAlerts.length} alerts page {page} of {totalPages}</span>
                 </div>
                 {visibleAlerts.length === 0 ? (
                     <div style={{ padding: '48px 20px', textAlign: 'center', color: '#4B5E72', fontSize: '13px' }}>No alerts match the current filters.</div>
@@ -349,7 +349,7 @@ export default function Placement({ onNavigateToGraph }) {
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                         <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#6B7E94' }}>{truncate(alert.entity_id, 24)}</span>
                                         <button type="button" onClick={() => setClusterPopup({ entityId: alert.entity_id, addresses })} style={{ fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '999px', background: '#e6f6f8', color: '#0f6578', border: '1px solid #b3dde5', cursor: 'pointer' }}>
-                                            {addresses.length} addr ?
+                                            {addresses.length} addr
                                         </button>
                                     </div>
                                 ) : (
@@ -377,7 +377,7 @@ export default function Placement({ onNavigateToGraph }) {
                                                 : { bg: 'rgba(255,255,255,0.03)', color: '#4B5E72', border: 'rgba(255,255,255,0.06)', fontWeight: '500' };
                                         return (
                                             <span key={bType} title={isDominant ? 'Dominant' : isSecondary ? 'Secondary' : 'Additional'} style={{ fontSize: '10px', fontWeight: style.fontWeight, padding: '2px 7px', borderRadius: '999px', background: style.bg, color: style.color, border: `1px solid ${style.border}`, opacity: isDominant ? 1 : isSecondary ? 0.85 : 0.65 }}>
-                                                {isDominant && '? '}{formatBehaviorLabel(bType)}
+                                                {isDominant && ''}{formatBehaviorLabel(bType)}
                                             </span>
                                         );
                                     });
@@ -394,7 +394,7 @@ export default function Placement({ onNavigateToGraph }) {
                                         <>
                                             {truncated}
                                             {(first.length > 70 || reasons.length > 1) && (
-                                                <button type="button" onClick={() => setReasonPopup({ entityId: alert.entity_id, reasons, primaryBehavior: alert.primary_behavior })} style={{ marginLeft: '4px', fontSize: '10px', fontWeight: '700', color: '#0f6578', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+                                                <button type="button" onClick={() => setReasonPopup({ entityId: alert.entity_id, reasons, primaryBehavior: alert.primary_behavior })} style={{ marginLeft: '4px', fontSize: '10px', fontWeight: '700', color: '#C9A84C', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
                                                     see more
                                                 </button>
                                             )}
@@ -416,18 +416,18 @@ export default function Placement({ onNavigateToGraph }) {
 
                 {/* Pagination */}
                 {totalPages > 1 && (
-                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '14px 20px', borderTop: '1px solid rgba(201,168,76,0.08)', background: 'rgba(255,255,255,0.02)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '14px 20px', borderTop: '1px solid rgba(201,168,76,0.08)', background: '#101D32' }}>
                         {[
-                            { label: '�', action: () => setPage(1), disabled: page === 1 },
-                            { label: '� Back', action: () => setPage(p => p - 1), disabled: page === 1 },
+                            { label: '«', action: () => setPage(1), disabled: page === 1 },
+                            { label: '‹ Back', action: () => setPage(p => p - 1), disabled: page === 1 },
                             null,
-                            { label: 'Next �', action: () => setPage(p => p + 1), disabled: page === totalPages },
-                            { label: '�', action: () => setPage(totalPages), disabled: page === totalPages },
+                            { label: 'Next ›', action: () => setPage(p => p + 1), disabled: page === totalPages },
+                            { label: '»', action: () => setPage(totalPages), disabled: page === totalPages },
                         ].map((btn, i) =>
                             btn === null ? (
                                 <span key="counter" style={{ fontSize: '12px', color: '#6B7E94', minWidth: '70px', textAlign: 'center' }}>{page} / {totalPages}</span>
                             ) : (
-                                <button key={btn.label} type="button" onClick={btn.action} disabled={btn.disabled} style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid rgba(201,168,76,0.12)', background: btn.disabled ? '#f8fafc' : '#fff', color: btn.disabled ? '#cbd5e1' : '#0f6578', fontSize: '12px', fontWeight: '700', cursor: btn.disabled ? 'not-allowed' : 'pointer' }}>
+                                <button key={btn.label} type="button" onClick={btn.action} disabled={btn.disabled} style={{ padding: '6px 14px', borderRadius: '8px', border: `1px solid ${btn.disabled ? 'rgba(255,255,255,0.06)' : 'rgba(201,168,76,0.30)'}`, background: btn.disabled ? 'transparent' : 'rgba(201,168,76,0.10)', color: btn.disabled ? '#4B5E72' : '#C9A84C', fontSize: '12px', fontWeight: '700', cursor: btn.disabled ? 'not-allowed' : 'pointer' }}>
                                     {btn.label}
                                 </button>
                             )
@@ -441,7 +441,7 @@ export default function Placement({ onNavigateToGraph }) {
                 <>
                     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.25)', zIndex: 999 }} onClick={() => setClusterPopup(null)} />
                     <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: '380px', background: 'linear-gradient(145deg,#101D32,#0D1628)', zIndex: 1000, boxShadow: '-8px 0 32px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column' }}>
-                        <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(201,168,76,0.10)', background: 'linear-gradient(135deg, #f0f9ff 0%, #e6f6f8 100%)' }}>
+                        <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(201,168,76,0.10)', background: 'linear-gradient(135deg,#0D1628,#132240)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div>
                                     <div style={{ fontSize: '11px', fontWeight: '800', color: '#0f6578', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>?? Cluster Addresses</div>
@@ -470,22 +470,22 @@ export default function Placement({ onNavigateToGraph }) {
                 <>
                     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.25)', zIndex: 999 }} onClick={() => setReasonPopup(null)} />
                     <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: '420px', background: 'linear-gradient(145deg,#101D32,#0D1628)', zIndex: 1000, boxShadow: '-8px 0 32px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column' }}>
-                        <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(201,168,76,0.10)', background: 'linear-gradient(135deg, #fffbeb 0%, #fef9ec 100%)' }}>
+                        <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(201,168,76,0.10)', background: 'linear-gradient(135deg,#0D1628,#132240)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div>
-                                    <div style={{ fontSize: '11px', fontWeight: '800', color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>?? Placement Reasons</div>
+                                    <div style={{ fontSize: '11px', fontWeight: '800', color: '#C9A84C', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>🛡 Placement Reasons</div>
                                     <div style={{ fontSize: '12px', fontFamily: 'monospace', color: '#E2D9C8', wordBreak: 'break-all' }}>{reasonPopup.entityId}</div>
                                 </div>
                                 <button type="button" onClick={() => setReasonPopup(null)} style={{ border: '1px solid rgba(201,168,76,0.12)', background: 'linear-gradient(145deg,#101D32,#0D1628)', borderRadius: '8px', padding: '4px 10px', cursor: 'pointer', fontSize: '14px', color: '#6B7E94', flexShrink: 0, marginLeft: '12px' }}>?</button>
                             </div>
-                            <div style={{ marginTop: '10px', fontSize: '12px', color: '#92400e' }}>{reasonPopup.reasons.length} reason{reasonPopup.reasons.length !== 1 ? 's' : ''} detected</div>
+                            <div style={{ marginTop: '10px', fontSize: '12px', color: '#6B7E94' }}>{reasonPopup.reasons.length} reason{reasonPopup.reasons.length !== 1 ? 's' : ''} detected</div>
                         </div>
                         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             {reasonPopup.reasons.length === 0 ? (
                                 <div style={{ color: '#4B5E72', fontSize: '13px', textAlign: 'center', padding: '40px 0' }}>No reasons recorded</div>
                             ) : reasonPopup.reasons.map((r, i) => (
-                                <div key={i} style={{ padding: '12px 16px', borderRadius: '10px', background: '#fffbeb', border: '1px solid #fde68a' }}>
-                                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Reason {i + 1}</div>
+                                <div key={i} style={{ padding: '12px 16px', borderRadius: '10px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.15)' }}>
+                                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#C9A84C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Reason {i + 1}</div>
                                     <div style={{ fontSize: '13px', color: '#E2D9C8', lineHeight: 1.6, fontWeight: '500' }}>{humanizeReason([r], reasonPopup.primaryBehavior)}</div>
                                     {humanizeReason([r], reasonPopup.primaryBehavior) !== r && (
                                         <div style={{ fontSize: '11px', color: '#4B5E72', marginTop: '6px', fontStyle: 'italic' }}>Raw: {r}</div>

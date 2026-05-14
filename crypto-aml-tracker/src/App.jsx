@@ -9,7 +9,7 @@ import Integration from './pages/Integration'
 import Clusters from './pages/Clusters'
 import Analytics from './pages/Analytics'
 import RiskIntelligence from './pages/RiskIntelligence'
-import LandingPage from './pages/LandingPage'
+import AMLHome from './pages/AMLHome'
 import ComingSoon from './pages/ComingSoon'
 import { getLatestTransactions } from './services/transactionService'
 import { DEFAULT_PAGE, buildPathForPage, getGraphAddressFromSearch, getPageFromPathname } from './utils/navigation'
@@ -21,7 +21,7 @@ const getInitialPage = () => typeof window === 'undefined' ? DEFAULT_PAGE : getP
 const getInitialInvestigateAddress = () => typeof window === 'undefined' ? '' : getGraphAddressFromSearch(window.location.search)
 
 function App() {
-  const [workspace, setWorkspace] = useState(null)
+  const [workspace, setWorkspace] = useState('aml-home')
   const [activePage, setActivePage] = useState(getInitialPage)
   const [transactions, setTransactions] = useState([])
   const [txLoading, setTxLoading] = useState(true)
@@ -78,12 +78,12 @@ function App() {
   return (
     <div style={{ display: 'flex', width: '100vw', height: '100vh', overflow: 'hidden', background: '#0F1829' }}>
 
-      {/* Landing page */}
-      {workspace === null && (
+      {/* AML Home page — entry point */}
+      {workspace === 'aml-home' && (
         <div style={{ width: '100vw', height: '100vh', overflowY: 'auto' }}>
-          <LandingPage
-            onEnterAML={() => { setWorkspace('aml'); navigate('feed') }}
-            onEnterCluster={() => { setWorkspace('cluster') }}
+          <AMLHome
+            onEnterDashboard={() => { setWorkspace('aml'); navigate('feed') }}
+            onBack={() => setWorkspace(null)}
           />
         </div>
       )}
@@ -91,7 +91,7 @@ function App() {
       {/* AML Workspace */}
       {workspace === 'aml' && (
         <>
-          <Sidebar activePage={activePage} onNavigate={(page) => navigate(page)} onHome={() => setWorkspace(null)} />
+          <Sidebar activePage={activePage} onNavigate={(page) => navigate(page)} onHome={() => setWorkspace('aml-home')} />
           <main style={{ flex: 1, padding: '24px', overflowY: activePage === 'graph' ? 'hidden' : 'auto', overflowX: 'hidden', minWidth: 0, height: '100vh', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', background: '#0F1829' }}>
             {activePage === 'feed'
               ? <Dashboard transactions={transactions} loading={txLoading} loadingMore={txLoadingMore} error={txError} onInvestigate={handleInvestigate} onLoadMore={handleLoadMore} lastUpdated={lastUpdated} totalTransactions={txTotal} />

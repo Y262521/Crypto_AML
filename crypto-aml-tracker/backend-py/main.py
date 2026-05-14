@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from fastapi import FastAPI
@@ -20,7 +20,7 @@ from settings import get_env
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # ── startup ───────────────────────────────────────────────────────────────
+    # â”€â”€ startup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     await connect_mongo()
 
     try:
@@ -39,11 +39,11 @@ async def lifespan(app: FastAPI):
     # Start the ETL + clustering scheduler
     scheduler = create_scheduler()
     scheduler.start()
-    print(f"Scheduler started — next run: {get_next_run_time()}")
+    print(f"Scheduler started â€” next run: {get_next_run_time()}")
 
     yield
 
-    # ── shutdown ──────────────────────────────────────────────────────────────
+    # â”€â”€ shutdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     scheduler.shutdown(wait=False)
     await close_neo4j()
     await close_mysql()
@@ -70,7 +70,7 @@ app.include_router(custody_router, prefix="/api/chain-of-custody")
 
 @app.get("/api/status")
 async def get_status():
-    """Return pipeline scheduler status — useful for monitoring."""
+    """Return pipeline scheduler status â€” useful for monitoring."""
     return {
         "server_time":       datetime.now(timezone.utc).isoformat(),
         "scheduler": {
@@ -83,7 +83,6 @@ async def get_status():
             "schedule":         get_env("PIPELINE_SCHEDULE_HOURS", default="8,20") + ":00 UTC daily",
         }
     }
-
 
 if __name__ == "__main__":
     import uvicorn
