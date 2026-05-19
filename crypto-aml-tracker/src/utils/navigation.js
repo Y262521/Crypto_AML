@@ -3,6 +3,7 @@ export const PAGE_ROUTES = Object.freeze({
   placement: '/placement',
   layering: '/layering',
   integration: '/integration',
+  'market-value': '/market-value',
   clusters: '/clusters',
   graph: '/graph',
   analytics: '/analytics',

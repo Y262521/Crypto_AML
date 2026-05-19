@@ -18,7 +18,7 @@ from .utils import build_flat_transaction_documents, rpc_call_with_retry, to_jso
 
 logger = logging.getLogger(__name__)
 
-_MAX_FETCH_BLOCKS_PER_RUN = 30
+_MAX_FETCH_BLOCKS_PER_RUN = 5
 
 
 class EthereumExtractor(BaseExtractor):

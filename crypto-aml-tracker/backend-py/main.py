@@ -14,6 +14,9 @@ from routes.placement import ensure_placement_schema, router as placement_router
 from routes.risk import router as risk_router
 from routes.integration import ensure_integration_schema, router as integration_router
 from routes.chain_of_custody import router as custody_router
+from routes.mva import ensure_mva_schema, router as mva_router
+from routes.mvrv import router as mvrv_router
+from services.mvrv_calculator import _ensure_hist_price_schema, warm_hist_price_cache
 from scheduler import create_scheduler, get_next_run_time, pipeline_status
 from settings import get_env
 
@@ -30,9 +33,13 @@ async def lifespan(app: FastAPI):
 
     try:
         await connect_mysql()
-        await asyncio.to_thread(ensure_placement_schema)
-        await asyncio.to_thread(ensure_layering_schema)
-        await asyncio.to_thread(ensure_integration_schema)
+        await ensure_placement_schema()
+        await ensure_layering_schema()
+        await ensure_integration_schema()
+        await ensure_mva_schema()
+        await _ensure_hist_price_schema()
+        # Warm historical price cache once at startup — no CoinGecko calls during requests
+        await warm_hist_price_cache()
     except Exception as e:
         print(f"MariaDB schema bootstrap failed - processed transaction features may be unavailable: {e}")
 
@@ -66,6 +73,8 @@ app.include_router(layering_router,    prefix="/api/layering")
 app.include_router(risk_router,        prefix="/api/risk")
 app.include_router(integration_router, prefix="/api/integration")
 app.include_router(custody_router, prefix="/api/chain-of-custody")
+app.include_router(mva_router,         prefix="/api/mva")
+app.include_router(mvrv_router,        prefix="/api/mvrv")
 
 
 @app.get("/api/status")
@@ -87,4 +96,5 @@ async def get_status():
 if __name__ == "__main__":
     import uvicorn
     port = int(get_env("PORT", default="4000"))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+    host = get_env("HOST", default="0.0.0.0")
+    uvicorn.run("main:app", host=host, port=port, reload=True)
