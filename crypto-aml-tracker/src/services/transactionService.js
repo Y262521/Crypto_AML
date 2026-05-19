@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 const BACKEND_URL = `${API_BASE_URL}/transactions`;
 const CLUSTER_URL = `${API_BASE_URL}/clusters`;
 const PLACEMENT_URL = `${API_BASE_URL}/placement`;
@@ -214,6 +214,31 @@ export const postIntegrationFeedback = async (entityId, payload) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};
+
+// Market Value Analysis (MVA) API calls
+const MVA_URL = `${API_BASE_URL}/mva`;
+
+export const getClusterMVA = async (clusterId) => {
+  const res = await fetch(`${MVA_URL}/cluster/${encodeURIComponent(clusterId)}`);
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};
+
+export const getAddressMVA = async (address) => {
+  const res = await fetch(`${MVA_URL}/address/${encodeURIComponent(address)}`);
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};
+
+export const getMVAHistory = async (entityId, entityType = 'cluster', days = 30) => {
+  const params = new URLSearchParams({
+    entity_type: entityType,
+    days: String(days),
+  });
+  const res = await fetch(`${MVA_URL}/history/${encodeURIComponent(entityId)}?${params.toString()}`);
   if (!res.ok) throw new Error(`Backend error: ${res.status}`);
   return await res.json();
 };

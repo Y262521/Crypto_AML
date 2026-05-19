@@ -1,6 +1,7 @@
 ﻿// NBE Theme — Layering Stage Alerts
 import { useDeferredValue, useEffect, useRef, useState } from 'react';
 import Loader from '../components/common/Loader';
+import AnalyzeButton from '../components/common/AnalyzeButton';
 import { getLayeringAlerts, getLayeringRuns, getLayeringSummary } from '../services/transactionService';
 
 const formatNumber = (value, maximumFractionDigits = 2) => {
@@ -216,7 +217,7 @@ function ReasonPreview({ text, onExpand }) {
     );
 }
 
-export default function Layering({ onNavigateToGraph }) {
+export default function Layering({ onNavigateToGraph, onOpenWorkspace }) {
     const [runs, setRuns] = useState([]);
     const [selectedRunId, setSelectedRunId] = useState(null);
     const [dateTimeInput, setDateTimeInput] = useState('');
@@ -450,12 +451,13 @@ export default function Layering({ onNavigateToGraph }) {
                                 <th style={{ padding: '14px 16px', borderBottom: '1px solid rgba(201,168,76,0.10)', fontSize: '12px', color: '#8A9DB5' }}>Evidence</th>
                                 <th style={{ padding: '14px 16px', borderBottom: '1px solid rgba(201,168,76,0.10)', fontSize: '12px', color: '#8A9DB5' }}>Reason</th>
                                 <th style={{ padding: '14px 16px', borderBottom: '1px solid rgba(201,168,76,0.10)', fontSize: '12px', color: '#8A9DB5' }}>Action</th>
+                                <th style={{ padding: '14px 16px', borderBottom: '1px solid rgba(201,168,76,0.10)', fontSize: '12px', color: '#8A9DB5', width: '120px' }}>Analyze</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filteredAlerts.length === 0 ? (
                                 <tr>
-                                    <td colSpan="6" style={{ padding: '28px 16px', textAlign: 'center', color: '#6B7E94' }}>
+                                    <td colSpan="7" style={{ padding: '28px 16px', textAlign: 'center', color: '#6B7E94' }}>
                                         No layering alerts match the current filters.
                                     </td>
                                 </tr>
@@ -531,6 +533,17 @@ export default function Layering({ onNavigateToGraph }) {
                                         >
                                             Investigate
                                         </button>
+                                    </td>
+                                    <td style={{ padding: '16px', borderBottom: '1px solid rgba(201,168,76,0.10)' }}>
+                                        <AnalyzeButton
+                                            entityId={alert.entity_id}
+                                            entityType={alert.entity_type}
+                                            onSelectAnalysis={(id, type, analysisType) => {
+                                                if (onOpenWorkspace) {
+                                                    onOpenWorkspace(id, type, 'Layering', analysisType);
+                                                }
+                                            }}
+                                        />
                                     </td>
                                 </tr>
                             ))}

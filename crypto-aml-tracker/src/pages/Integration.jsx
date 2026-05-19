@@ -1,5 +1,6 @@
 ﻿import { useDeferredValue, useEffect, useState } from 'react';
 import Loader from '../components/common/Loader';
+import AnalyzeButton from '../components/common/AnalyzeButton';
 import ChainOfCustodyModal from '../components/ChainOfCustodyModal';
 import { getIntegrationAlerts, getIntegrationRuns, getIntegrationSummary } from '../services/transactionService';
 
@@ -232,7 +233,7 @@ const humanizeReason = (reasons = [], primarySignal = '') => {
     return reasons[0];
 };
 
-export default function Integration({ onNavigateToGraph }) {
+export default function Integration({ onNavigateToGraph, onOpenWorkspace }) {
     const [runs, setRuns] = useState([]);
     const [selectedRunId, setSelectedRunId] = useState(null);
     const [dateTimeInput, setDateTimeInput] = useState('');
@@ -412,8 +413,8 @@ export default function Integration({ onNavigateToGraph }) {
 
             {/* Alert table */}
             <div style={{ background: 'linear-gradient(145deg,#101D32,#0D1628)', border: '1px solid rgba(201,168,76,0.12)', borderRadius: '16px', overflow: 'hidden' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1.5fr 1fr', padding: '10px 20px', background: '#132240', borderBottom: '1px solid rgba(201,168,76,0.10)' }}>
-                    {['Entity', 'Signals Fired', 'Reason', 'Score'].map((h) => (
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1.5fr 1fr 120px', padding: '10px 20px', background: '#132240', borderBottom: '1px solid rgba(201,168,76,0.10)' }}>
+                    {['Entity', 'Signals Fired', 'Reason', 'Score', 'Analyze'].map((h) => (
                         <div key={h} style={{ fontSize: '11px', fontWeight: '800', color: '#6B7E94', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{h}</div>
                     ))}
                 </div>
@@ -436,7 +437,7 @@ export default function Integration({ onNavigateToGraph }) {
                     return (
                         <div
                             key={alert.entity_id}
-                            style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1.5fr 1fr', padding: '14px 20px', borderBottom: idx < visibleAlerts.length - 1 ? '1px solid rgba(201,168,76,0.06)' : 'none', background: idx % 2 === 0 ? '#0D1628' : '#101D32', borderLeft: '3px solid transparent', alignItems: 'center' }}
+                            style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1.5fr 1fr 120px', padding: '14px 20px', borderBottom: idx < visibleAlerts.length - 1 ? '1px solid rgba(201,168,76,0.06)' : 'none', background: idx % 2 === 0 ? '#0D1628' : '#101D32', borderLeft: '3px solid transparent', alignItems: 'center' }}
                             onMouseEnter={(e) => { e.currentTarget.style.background = '#132240'; e.currentTarget.style.borderLeft = '3px solid rgba(201,168,76,0.4)'; }}
                             onMouseLeave={(e) => { e.currentTarget.style.background = idx % 2 === 0 ? '#0D1628' : '#101D32'; e.currentTarget.style.borderLeft = '3px solid transparent'; }}
                         >
@@ -510,6 +511,17 @@ export default function Integration({ onNavigateToGraph }) {
                                     </button>
                                 </div>
                             </div>
+                            
+                            {/* Analyze Button */}
+                            <AnalyzeButton
+                                entityId={alert.entity_id}
+                                entityType={alert.entity_type}
+                                onSelectAnalysis={(id, type, analysisType) => {
+                                    if (onOpenWorkspace) {
+                                        onOpenWorkspace(id, type, 'Integration', analysisType);
+                                    }
+                                }}
+                            />
                         </div>
                     );
                 })}

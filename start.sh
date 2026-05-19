@@ -9,7 +9,9 @@
 set -e
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-BACKEND_PORT="${BACKEND_PORT:-4001}"
+BACKEND_PORT="${BACKEND_PORT:-4000}"
+FRONTEND_PORT="${FRONTEND_PORT:-5173}"
+APP_HOST="${APP_HOST:-172.20.72.198}"
 
 run_etl() {
   echo ""
@@ -39,7 +41,7 @@ start_backend() {
   else
     source venv/bin/activate
   fi
-  PORT="$BACKEND_PORT" python main.py &
+  PORT="$BACKEND_PORT" HOST="0.0.0.0" python main.py &
   BACKEND_PID=$!
   echo "Backend PID: $BACKEND_PID"
   deactivate
@@ -48,12 +50,14 @@ start_backend() {
 
 start_frontend() {
   echo ""
-  echo "=== Starting React Frontend (port 5173) ==="
+  echo "=== Starting React Frontend (port $FRONTEND_PORT) ==="
   cd "$ROOT/crypto-aml-tracker"
   if [ ! -d "node_modules" ]; then
     npm install -q
   fi
-  VITE_API_BASE_URL="http://localhost:$BACKEND_PORT/api" npm run dev &
+  VITE_BACKEND_TARGET="http://127.0.0.1:$BACKEND_PORT" \
+  VITE_WALLET_ANALYSIS_URL="http://$APP_HOST:3000" \
+  npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT" --strictPort &
   FRONTEND_PID=$!
   echo "Frontend PID: $FRONTEND_PID"
   cd "$ROOT"
@@ -71,8 +75,10 @@ start_frontend
 
 echo ""
 echo "─────────────────────────────────────────────────────────────────────────"
-echo "  Backend  → http://localhost:$BACKEND_PORT"
-echo "  Frontend → http://localhost:5173" 
+echo "  Backend (this PC)        → http://127.0.0.1:$BACKEND_PORT"
+echo "  Backend (LAN accessible) → http://$APP_HOST:$BACKEND_PORT"
+echo "  Frontend (this PC)       → http://127.0.0.1:$FRONTEND_PORT"
+echo "  Frontend (LAN accessible)→ http://$APP_HOST:$FRONTEND_PORT"
 echo "─────────────────────────────────────────────────────────────────────────"
 echo "Press Ctrl+C to stop all services."
 

@@ -1,5 +1,6 @@
 ﻿import { useDeferredValue, useEffect, useState } from 'react';
 import Loader from '../components/common/Loader';
+import AnalyzeButton from '../components/common/AnalyzeButton';
 import { getPlacements, getPlacementRuns, getPlacementSummary } from '../services/transactionService';
 
 const _BANNED = new Set(['funneling', 'funnel', 'immediate_utilization', 'immediate-utilization', 'immediate utilization']);
@@ -142,7 +143,7 @@ const humanizeReason = (reasons = [], primaryBehavior = '') => {
     return reasons[0]?.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || 'Flagged by placement detection algorithm.';
 };
 
-export default function Placement({ onNavigateToGraph }) {
+export default function Placement({ onNavigateToGraph, onShowAnalysisMenu, onOpenWorkspace }) {
     const [runs, setRuns] = useState([]);
     const [selectedRunId, setSelectedRunId] = useState(null);
     const [selectedDate, setSelectedDate] = useState(''); // YYYY-MM-DD
@@ -264,7 +265,7 @@ export default function Placement({ onNavigateToGraph }) {
             {/* Search + filter */}
             <div style={{ background: 'linear-gradient(145deg,#101D32,#0D1628)', border: '1px solid rgba(201,168,76,0.12)', borderRadius: '14px', padding: '14px 16px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
-                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>??</span>
+                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}></span>
                     <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search entity or address..." style={{ width: '100%', paddingLeft: '34px', paddingRight: '12px', paddingTop: '9px', paddingBottom: '9px', borderRadius: '10px', border: '1px solid rgba(201,168,76,0.12)', fontSize: '13px', background: 'rgba(201,168,76,0.04)', outline: 'none', boxSizing: 'border-box' }} />
                 </div>
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -317,8 +318,8 @@ export default function Placement({ onNavigateToGraph }) {
 
             {/* Alert table */}
             <div style={{ background: '#0D1628', border: '1px solid rgba(201,168,76,0.12)', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', padding: '10px 20px', background: '#132240', borderBottom: '1px solid rgba(201,168,76,0.10)' }}>
-                    {['Entity', 'Behaviors', 'Reason', 'Confidence'].map((h) => (
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 120px', padding: '10px 20px', background: '#132240', borderBottom: '1px solid rgba(201,168,76,0.10)' }}>
+                    {['Entity', 'Behaviors', 'Reason', 'Confidence', 'Analyze'].map((h) => (
                         <div key={h} style={{ fontSize: '11px', fontWeight: '800', color: '#6B7E94', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{h}</div>
                     ))}
                 </div>
@@ -334,8 +335,9 @@ export default function Placement({ onNavigateToGraph }) {
                         : profile.highlighted;
                     const isCluster = alert.entity_type === 'cluster';
                     const addresses = alert.addresses || [];
+                    
                     return (
-                        <div key={alert.entity_id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', padding: '14px 20px', borderBottom: idx < visibleAlerts.length - 1 ? '1px solid rgba(201,168,76,0.06)' : 'none', background: idx % 2 === 0 ? '#0D1628' : '#101D32', borderLeft: '3px solid transparent', alignItems: 'center' }}
+                        <div key={alert.entity_id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 120px', padding: '14px 20px', borderBottom: idx < visibleAlerts.length - 1 ? '1px solid rgba(201,168,76,0.06)' : 'none', background: idx % 2 === 0 ? '#0D1628' : '#101D32', borderLeft: '3px solid transparent', alignItems: 'center' }}
                             onMouseEnter={(e) => { e.currentTarget.style.background = '#132240'; e.currentTarget.style.borderLeft = '3px solid rgba(201,168,76,0.4)'; }}
                             onMouseLeave={(e) => { e.currentTarget.style.background = idx % 2 === 0 ? '#0D1628' : '#101D32'; e.currentTarget.style.borderLeft = '3px solid transparent'; }}
                         >
@@ -410,6 +412,18 @@ export default function Placement({ onNavigateToGraph }) {
                                 </div>
                                 <span style={{ fontSize: '11px', fontWeight: '700', color: '#8A9DB5', minWidth: '32px' }}>{formatNumber((alert.confidence || 0) * 100, 0)}%</span>
                             </div>
+                            
+                            {/* Analyze Button */}
+                            <AnalyzeButton
+                                entityId={alert.entity_id}
+                                entityType={alert.entity_type}
+                                onSelectAnalysis={(id, type, analysisType) => {
+                                    // Directly open workspace
+                                    if (onOpenWorkspace) {
+                                        onOpenWorkspace(id, type, 'Placement', analysisType);
+                                    }
+                                }}
+                            />
                         </div>
                     );
                 })}
