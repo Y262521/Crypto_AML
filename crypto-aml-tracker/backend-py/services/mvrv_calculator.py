@@ -107,7 +107,16 @@ async def _fetch_hist_prices_coingecko(symbol: str, days: int = 730) -> Dict[str
     params = {"vs_currency": "usd", "days": str(days), "interval": "daily"}
     headers = {"x-cg-pro-api-key": api_key} if api_key else {}
     try:
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as s:
+        import ssl
+        ssl_ctx = ssl.create_default_context()
+        try:
+            import certifi
+            ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        except ImportError:
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = ssl.CERT_NONE
+        connector = aiohttp.TCPConnector(ssl=ssl_ctx)
+        async with aiohttp.ClientSession(connector=connector, timeout=aiohttp.ClientTimeout(total=30)) as s:
             async with s.get(url, params=params, headers=headers) as resp:
                 if resp.status != 200:
                     print(f"  CoinGecko hist {symbol}: HTTP {resp.status}")
@@ -139,27 +148,74 @@ async def _save_hist_prices_to_db(symbol: str, prices: Dict[str, Decimal]):
     try:
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
-                rows_data = [
-                    (symbol, date_str, float(price), float(price))
-                    for date_str, price in prices.items()
-                ]
-                await cur.executemany(
-                    """INSERT INTO token_price_history (token_symbol, price_date, price_usd)
-                       VALUES (%s, %s, %s)
-                       ON DUPLICATE KEY UPDATE price_usd = %s""",
-                    rows_data,
-                )
+                for date_str, price in prices.items():
+                    await cur.execute(
+                        "INSERT INTO token_price_history (token_symbol, price_date, price_usd) "
+                        "VALUES (%s, %s, %s) "
+                        "ON DUPLICATE KEY UPDATE price_usd = %s",
+                        (symbol, date_str, float(price), float(price)),
+                    )
             await conn.commit()
     except Exception as exc:
         print(f"  save hist prices error: {exc}")
 
 
+async def _fetch_current_price_fallback(symbol: str) -> Optional[Decimal]:
+    """Fetch today's price from CoinGecko simple/price endpoint as a fallback."""
+    cg_id = _CG_IDS.get(symbol.upper())
+    if not cg_id:
+        return None
+    api_key = os.getenv("COINGECKO_API_KEY", "")
+    url = "https://api.coingecko.com/api/v3/simple/price"
+    params = {"ids": cg_id, "vs_currencies": "usd"}
+    headers = {"x-cg-pro-api-key": api_key} if api_key else {}
+    try:
+        import ssl
+        ssl_ctx = ssl.create_default_context()
+        try:
+            import certifi
+            ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        except ImportError:
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = ssl.CERT_NONE
+        connector = aiohttp.TCPConnector(ssl=ssl_ctx)
+        async with aiohttp.ClientSession(connector=connector, timeout=aiohttp.ClientTimeout(total=15)) as s:
+            async with s.get(url, params=params, headers=headers) as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.json()
+                price = data.get(cg_id, {}).get("usd")
+                return Decimal(str(price)) if price else None
+    except Exception as exc:
+        print(f"  fallback price {symbol} error: {exc}")
+        return None
+
+
+async def _seed_prices_for_all_tx_dates(symbol: str, current_price: Decimal):
+    """
+    Seed token_price_history with current_price for every date that appears
+    in the transactions table. This makes MVRV work without historical data.
+    """
+    rows = await fetch_all(
+        "SELECT DISTINCT DATE(timestamp) AS d FROM transactions WHERE timestamp IS NOT NULL"
+    ) or []
+    if not rows:
+        return None
+    prices = {str(r["d"]): current_price for r in rows}
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    prices[today] = current_price
+    await _save_hist_prices_to_db(symbol, prices)
+    print(f"  ✓ {symbol}: seeded {len(prices)} dates with price ${current_price:.2f}")
+    return prices
+
+
 async def warm_hist_price_cache():
     """
     Called ONCE at server startup.
-    1. Load all existing prices from DB into memory.
-    2. For any symbol with no DB data, fetch from CoinGecko and persist.
-    After this runs, get_hist_price() never calls CoinGecko again.
+    1. Load existing prices from DB into memory.
+    2. Try CoinGecko historical endpoint (needs free API key for /market_chart).
+    3. If that fails, seed all transaction dates with today's current price.
+       This gives approximate MVRV (assumes constant price) but is never zero.
     """
     print("🌡  Warming historical price cache…")
     for sym in _PRICE_SYMBOLS:
@@ -168,16 +224,23 @@ async def warm_hist_price_cache():
             _HIST_PRICE_CACHE.setdefault(sym, {}).update(db_prices)
             print(f"  ✓ {sym}: {len(db_prices)} days loaded from DB")
         else:
-            # DB empty — fetch from CoinGecko once
             print(f"  ↓ {sym}: no DB data, fetching from CoinGecko…")
             fresh = await _fetch_hist_prices_coingecko(sym)
             if fresh:
                 _HIST_PRICE_CACHE.setdefault(sym, {}).update(fresh)
                 await _save_hist_prices_to_db(sym, fresh)
             else:
-                print(f"  ✗ {sym}: CoinGecko fetch failed, will use current price as fallback")
+                print(f"  ↓ {sym}: CoinGecko hist unavailable, seeding from current price…")
+                current = await _fetch_current_price_fallback(sym)
+                if current and current > 0:
+                    seeded = await _seed_prices_for_all_tx_dates(sym, current)
+                    if seeded:
+                        _HIST_PRICE_CACHE.setdefault(sym, {}).update(seeded)
+                else:
+                    print(f"  ✗ {sym}: all price sources failed")
         _HIST_CACHE_WARMED.add(sym)
-    print(f"✓ Historical price cache warm ({sum(len(v) for v in _HIST_PRICE_CACHE.values())} total entries)")
+    total = sum(len(v) for v in _HIST_PRICE_CACHE.values())
+    print(f"✓ Historical price cache warm ({total} total entries)")
 
 
 async def get_hist_price(symbol: str, dt: datetime) -> Decimal:

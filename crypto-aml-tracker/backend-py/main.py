@@ -23,7 +23,7 @@ from settings import get_env
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # ── startup ───────────────────────────────────────────────────────────────
+    # -- startup --
     await connect_mongo()
 
     try:
@@ -33,12 +33,15 @@ async def lifespan(app: FastAPI):
 
     try:
         await connect_mysql()
-        await ensure_placement_schema()
-        await ensure_layering_schema()
-        await ensure_integration_schema()
+        # ensure_placement_schema / ensure_layering_schema / ensure_integration_schema
+        # are synchronous functions — run them in a thread to avoid blocking the event loop
+        await asyncio.to_thread(ensure_placement_schema)
+        await asyncio.to_thread(ensure_layering_schema)
+        await asyncio.to_thread(ensure_integration_schema)
+        # ensure_mva_schema is async — await it directly
         await ensure_mva_schema()
         await _ensure_hist_price_schema()
-        # Warm historical price cache once at startup — no CoinGecko calls during requests
+        # Warm historical price cache once at startup
         await warm_hist_price_cache()
     except Exception as e:
         print(f"MariaDB schema bootstrap failed - processed transaction features may be unavailable: {e}")
@@ -46,11 +49,11 @@ async def lifespan(app: FastAPI):
     # Start the ETL + clustering scheduler
     scheduler = create_scheduler()
     scheduler.start()
-    print(f"Scheduler started — next run: {get_next_run_time()}")
+    print(f"Scheduler started - next run: {get_next_run_time()}")
 
     yield
 
-    # ── shutdown ──────────────────────────────────────────────────────────────
+    # -- shutdown --
     scheduler.shutdown(wait=False)
     await close_neo4j()
     await close_mysql()
@@ -72,16 +75,16 @@ app.include_router(placement_router,   prefix="/api/placement")
 app.include_router(layering_router,    prefix="/api/layering")
 app.include_router(risk_router,        prefix="/api/risk")
 app.include_router(integration_router, prefix="/api/integration")
-app.include_router(custody_router, prefix="/api/chain-of-custody")
+app.include_router(custody_router,     prefix="/api/chain-of-custody")
 app.include_router(mva_router,         prefix="/api/mva")
 app.include_router(mvrv_router,        prefix="/api/mvrv")
 
 
 @app.get("/api/status")
 async def get_status():
-    """Return pipeline scheduler status — useful for monitoring."""
+    """Return pipeline scheduler status - useful for monitoring."""
     return {
-        "server_time":       datetime.now(timezone.utc).isoformat(),
+        "server_time": datetime.now(timezone.utc).isoformat(),
         "scheduler": {
             "next_run_at":      get_next_run_time(),
             "last_run_at":      pipeline_status["last_run_at"],
@@ -90,7 +93,7 @@ async def get_status():
             "runs_today":       pipeline_status["runs_today"],
             "total_runs":       pipeline_status["total_runs"],
             "schedule":         get_env("PIPELINE_SCHEDULE_HOURS", default="8,20") + ":00 UTC daily",
-        }
+        },
     }
 
 
