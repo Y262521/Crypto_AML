@@ -131,6 +131,25 @@ async def _resolve_cluster_id(cluster_id_or_address: str) -> str:
         return cluster_id_or_address
 
     candidate = str(cluster_id_or_address).strip()
+
+    # Already a cluster ID (e.g. C-DFEAFB85990B) — verify it exists, return as-is
+    if candidate.upper().startswith('C-'):
+        row = await fetch_one(
+            "SELECT id FROM wallet_clusters WHERE id = %s LIMIT 1",
+            (candidate.upper(),),
+        )
+        if row:
+            return row['id']
+        # Try case-insensitive fallback
+        row = await fetch_one(
+            "SELECT id FROM wallet_clusters WHERE UPPER(id) = %s LIMIT 1",
+            (candidate.upper(),),
+        )
+        if row:
+            return row['id']
+        return candidate.upper()
+
+    # It's a 0x address — look up its cluster
     if len(candidate) == 42 and candidate.lower().startswith('0x'):
         row = await fetch_one(
             "SELECT cluster_id FROM addresses WHERE address = %s LIMIT 1",
@@ -155,7 +174,7 @@ async def get_address_mvrv(
     addr = address.lower()
     acct = _validate_method(method)
 
-    # Refresh on-chain balances if stale (>1 h)
+    # Always refresh on-chain balances (stale check: >1 h)
     latest_row = await fetch_one(
         "SELECT MAX(updated_at) AS u FROM wallet_balances WHERE address = %s", (addr,)
     )
@@ -169,6 +188,15 @@ async def get_address_mvrv(
 
     current_balances = await _get_address_balances(addr)
     current_prices   = await _get_current_prices()
+
+    # If wallet_balances are all zero (RPC may have failed), fetch live ETH balance directly
+    if not any(v > 0 for v in current_balances.values()):
+        try:
+            eth_bal = await get_aggregator().fetch_eth_balance(addr)
+            if eth_bal > 0:
+                current_balances["ETH"] = eth_bal
+        except Exception:
+            pass
 
     mvrv = await compute_mvrv_for_address(addr, current_prices, current_balances, acct)
     await save_mvrv_snapshot(addr, "address", mvrv)
@@ -261,6 +289,23 @@ async def get_cluster_mvrv(
     addr_rows = await fetch_all(
         "SELECT address FROM addresses WHERE cluster_id = %s", (cluster_id,)
     ) or []
+    # Also try uppercase in case of case mismatch
+    if not addr_rows:
+        addr_rows = await fetch_all(
+            "SELECT address FROM addresses WHERE UPPER(cluster_id) = %s", (cluster_id.upper(),)
+        ) or []
+    # Fallback: check placement_entity_addresses (placement clusters)
+    if not addr_rows:
+        addr_rows = await fetch_all(
+            "SELECT address FROM placement_entity_addresses WHERE entity_id = %s",
+            (cluster_id,)
+        ) or []
+    # Fallback: check layering_entity_addresses
+    if not addr_rows:
+        addr_rows = await fetch_all(
+            "SELECT address FROM layering_entity_addresses WHERE entity_id = %s",
+            (cluster_id,)
+        ) or []
     addresses = [r["address"].lower() for r in addr_rows]
 
     if not addresses:
@@ -406,19 +451,22 @@ async def get_mvrv_directory(
     where_sql  = " WHERE z.address LIKE %s " if search else ""
     where_args = (f"%{search}%",) if search else ()
 
-    # Union of all address sources
+    # Union of all address sources — only include addresses that have
+    # actual transaction data or wallet balance data (skip empty/burn addresses)
     union_core = """
-        SELECT address AS address FROM addresses
-            WHERE CHAR_LENGTH(address) = 42 AND address LIKE '0x%'
+        SELECT LOWER(address) AS address FROM addresses
+            WHERE CHAR_LENGTH(address) = 42 AND address LIKE '0x%%'
+            AND (total_in > 0 OR total_out > 0 OR tx_count > 0)
         UNION
-        SELECT address FROM wallet_balances
-            WHERE CHAR_LENGTH(address) = 42 AND address LIKE '0x%'
+        SELECT LOWER(address) FROM wallet_balances
+            WHERE CHAR_LENGTH(address) = 42 AND address LIKE '0x%%'
+            AND balance_usd > 0
         UNION
-        SELECT address FROM placement_entity_addresses
-            WHERE CHAR_LENGTH(address) = 42 AND address LIKE '0x%'
+        SELECT LOWER(address) FROM placement_entity_addresses
+            WHERE CHAR_LENGTH(address) = 42 AND address LIKE '0x%%'
         UNION
-        SELECT address FROM layering_entity_addresses
-            WHERE CHAR_LENGTH(address) = 42 AND address LIKE '0x%'
+        SELECT LOWER(address) FROM layering_entity_addresses
+            WHERE CHAR_LENGTH(address) = 42 AND address LIKE '0x%%'
     """
 
     if search:
@@ -507,8 +555,17 @@ async def get_mvrv_directory(
     for row in rows:
         mv    = float(row["market_value_usd"] or 0)
         rv    = float(row["realized_value_usd"] or 0)
-        ratio = float(row["mvrv_ratio"] or 0)
-        upnl  = float(row["unrealized_pnl_usd"] or 0)
+        snap  = row.get("mvrv_snapshot_at")
+
+        # Recompute ratio from actual MV/RV — never trust stored ratio if MV changed
+        if mv > 0 and rv > 0:
+            ratio = round(mv / rv, 6)
+        elif snap:
+            ratio = float(row["mvrv_ratio"] or 0)
+        else:
+            ratio = 0.0
+
+        upnl     = mv - rv if (mv > 0 and rv > 0) else float(row["unrealized_pnl_usd"] or 0)
         upnl_pct = round(upnl / rv * 100, 2) if rv > 0 else 0.0
 
         owner = (row.get("owner_name") or "").strip()
@@ -558,3 +615,103 @@ async def refresh_address_mvrv(
     """Force-refresh on-chain balances and recompute MVRV."""
     await get_aggregator().update_address(address.lower())
     return await get_address_mvrv(address.lower(), method=method)
+
+
+# ---------------------------------------------------------------------------
+# Bulk populate — compute MV from transaction history for all addresses
+# No on-chain RPC calls needed — uses local DB transactions + current price
+# ---------------------------------------------------------------------------
+
+@router.post("/bulk-populate")
+async def bulk_populate_mvrv(
+    limit: int = Query(500, ge=1, le=5000),
+    skip_existing: bool = Query(True),
+):
+    """
+    Pre-compute MVRV snapshots for all addresses using local transaction data.
+    Uses current ETH price × net ETH balance from transactions as Market Value.
+    No on-chain RPC calls — fast and works offline.
+    """
+    current_prices = await _get_current_prices()
+    eth_price = current_prices.get("ETH", Decimal("0"))
+    if eth_price <= 0:
+        return {"error": "ETH price unavailable", "populated": 0}
+
+    # Get addresses that already have snapshots (skip if skip_existing=True)
+    existing = set()
+    if skip_existing:
+        rows = await fetch_all(
+            "SELECT DISTINCT entity_id FROM mvrv_snapshots WHERE entity_type='address'"
+        ) or []
+        existing = {r["entity_id"] for r in rows}
+
+    # Get top addresses by net ETH volume from transactions
+    addr_rows = await fetch_all(
+        """
+        SELECT address, total_in, total_out, tx_count
+        FROM addresses
+        WHERE address LIKE '0x%%'
+          AND LENGTH(address) = 42
+          AND (total_in > 0 OR total_out > 0)
+        ORDER BY (total_in + total_out) DESC
+        LIMIT %s
+        """,
+        (limit,),
+    ) or []
+
+    populated = 0
+    skipped = 0
+
+    for row in addr_rows:
+        addr = row["address"].lower()
+        if addr in existing:
+            skipped += 1
+            continue
+
+        total_in  = float(row["total_in"]  or 0)
+        total_out = float(row["total_out"] or 0)
+        # Net balance = what came in minus what went out
+        net_eth = max(total_in - total_out, 0.0)
+
+        mv = net_eth * float(eth_price)
+        # Without historical prices, RV ≈ MV (break-even assumption)
+        # This gives ratio=1.0 for addresses without snapshot history
+        # but at least populates MV so the directory shows real values
+        rv = mv
+        ratio = 1.0
+
+        # If address has wallet_balances, use that as MV instead
+        bal_row = await fetch_one(
+            "SELECT SUM(balance_usd) AS total FROM wallet_balances WHERE address = %s",
+            (addr,),
+        )
+        wb_mv = float((bal_row or {}).get("total") or 0)
+        if wb_mv > 0:
+            mv = wb_mv
+            rv = wb_mv
+            ratio = 1.0
+
+        if mv <= 0:
+            continue
+
+        # Save snapshot
+        from services.mvrv_calculator import save_mvrv_snapshot
+        await save_mvrv_snapshot(addr, "address", {
+            "market_value_usd":   mv,
+            "realized_value_usd": rv,
+            "mvrv_ratio":         ratio,
+            "unrealized_pnl_usd": 0.0,
+            "realized_pnl_usd":   0.0,
+            "accounting_method":  "FIFO",
+        })
+        populated += 1
+
+    # Invalidate directory count cache
+    _directory_count_cache['updated_at'] = None
+
+    return {
+        "populated": populated,
+        "skipped_existing": skipped,
+        "eth_price_used": float(eth_price),
+        "total_processed": len(addr_rows),
+    }

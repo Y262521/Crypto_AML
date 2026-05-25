@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 ENV_PATH = Path(__file__).resolve().with_name(".env")
 load_dotenv(ENV_PATH)
 
-
 def get_env(*names: str, default: str | None = None) -> str | None:
     for name in names:
         value = os.getenv(name)

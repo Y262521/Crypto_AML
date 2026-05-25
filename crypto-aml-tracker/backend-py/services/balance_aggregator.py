@@ -92,9 +92,18 @@ class BalanceAggregator:
 
     async def _jsonrpc(self, payload: dict) -> Tuple[Optional[dict], Optional[str]]:
         """POST JSON-RPC to first endpoint that returns valid JSON with optional result or error object."""
+        import ssl as _ssl
+        ssl_ctx = _ssl.create_default_context()
+        try:
+            import certifi
+            ssl_ctx = _ssl.create_default_context(cafile=certifi.where())
+        except ImportError:
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = _ssl.CERT_NONE
         timeout = aiohttp.ClientTimeout(total=25)
         last_err: Optional[str] = None
-        async with aiohttp.ClientSession(timeout=timeout) as session:
+        connector = aiohttp.TCPConnector(ssl=ssl_ctx)
+        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
             for url in self.rpc_urls:
                 try:
                     async with session.post(
@@ -195,7 +204,16 @@ class BalanceAggregator:
                 headers["x-cg-pro-api-key"] = self.coingecko_api_key
             
             print(f"💰 Fetching token prices from CoinGecko...")
-            async with aiohttp.ClientSession() as session:
+            import ssl
+            ssl_ctx = ssl.create_default_context()
+            try:
+                import certifi
+                ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+            except ImportError:
+                ssl_ctx.check_hostname = False
+                ssl_ctx.verify_mode = ssl.CERT_NONE
+            connector = aiohttp.TCPConnector(ssl=ssl_ctx)
+            async with aiohttp.ClientSession(connector=connector) as session:
                 async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                     if resp.status == 200:
                         data = await resp.json()

@@ -5,7 +5,13 @@ Uses aiomysql for async access.
 """
 
 import os
+from pathlib import Path
+
 import aiomysql
+from dotenv import load_dotenv
+
+# Load the local .env so credentials are available when this module is imported
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 pool = None
 
@@ -15,8 +21,8 @@ async def connect_mysql():
     pool = await aiomysql.create_pool(
         host=os.getenv("MYSQL_HOST", "localhost"),
         port=int(os.getenv("MYSQL_PORT", 3306)),
-        user=os.getenv("MYSQL_USER", "hakim"),
-        password=os.getenv("MYSQL_PASSWORD", "hakim22"),
+      user=os.getenv("MYSQL_USER"),
+password=os.getenv("MYSQL_PASSWORD"),
         db=os.getenv("MYSQL_DB", "aml_db"),
         charset="utf8mb4",
         use_unicode=True,
