@@ -30,11 +30,14 @@ const C = {
 const fmt$ = (v) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
 const fmtNum   = (v, d = 4) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: d }).format(v || 0);
-const fmtRatio = (v) => v == null ? '—' : Number(v).toFixed(3);
+// ratio=0 means no real cost basis computed — show as no-data
+const fmtRatio = (v) => (v == null || v === 0) ? '—' : Number(v).toFixed(3);
 const pnlColor = (v) => (v > 0 ? C.green : v < 0 ? C.red : C.textSec);
-const mvrvColor = (r) => { if (r == null) return C.gold; if (r > 1) return C.green; if (r < 1) return C.red; return C.gold; };
-const mvrvLabel = (r) => { if (r == null) return 'No Data'; if (r > 1) return 'Profit Zone'; if (r < 1) return 'Loss Zone'; return 'Break-Even'; };
+const mvrvColor = (r) => { if (!r || r === 0) return C.gold; if (r > 1) return C.green; if (r < 1) return C.red; return C.gold; };
+const mvrvLabel = (r) => { if (!r || r === 0) return 'Awaiting Data'; if (r > 1) return 'Profit Zone'; if (r < 1) return 'Loss Zone'; return 'Break-Even'; };
 const gaugePercent = (r) => Math.min(Math.max((r || 0) / 3, 0), 1) * 100;
+// Safe number — converts null/undefined/NaN to 0
+const safeNum = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 
 const SummaryCard = ({ label, value, icon, color, sub }) => (
   <div style={{ background: C.cardBg, borderRadius: '14px', border: C.cardBorder, padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
@@ -246,18 +249,30 @@ const MvrvAnalysis = ({ entityId, entityType }) => {
             <span style={{ padding: '3px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', background: 'rgba(139,92,246,0.12)', color: '#A78BFA' }}>{method}</span>
           </div>
         </div>
-        <MvrvGauge ratio={ratio} />
+        {safeNum(ratio) === 0 ? (
+          <div style={{ textAlign: 'center', padding: '24px 0' }}>
+            <div style={{ fontSize: '36px', fontWeight: '800', color: C.textMuted, marginBottom: '8px' }}>—</div>
+            <div style={{ fontSize: '12px', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+              Cost basis not yet computed
+            </div>
+            <div style={{ fontSize: '11px', color: C.textMuted, marginTop: '8px', maxWidth: '320px', margin: '8px auto 0' }}>
+              Click ⟳ Refresh to fetch on-chain balance and compute FIFO cost basis
+            </div>
+          </div>
+        ) : (
+          <MvrvGauge ratio={ratio} />
+        )}
       </div>
 
       {/* Summary cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
-        <SummaryCard label={valMode===MODES.ETH ? 'Market Value (Ξ)' : 'Market Value'}   value={fv(summary.market_value_usd)}   icon="📈" color={C.gold} />
-        <SummaryCard label={valMode===MODES.ETH ? 'Realized Value (Ξ)' : 'Realized Value'} value={fv(summary.realized_value_usd)} icon="🏦" color={C.blue} />
-        <SummaryCard label={valMode===MODES.ETH ? 'Unrealized PnL (Ξ)' : 'Unrealized PnL'} value={fp(summary.unrealized_pnl_usd)} icon={summary.unrealized_pnl_usd>=0?'🟢':'🔴'} color={pnlColor(summary.unrealized_pnl_usd)} />
-        <SummaryCard label={valMode===MODES.ETH ? 'Realized PnL (Ξ)' : 'Realized PnL'}   value={fp(summary.realized_pnl_usd)}   icon={summary.realized_pnl_usd>=0?'✅':'❌'} color={pnlColor(summary.realized_pnl_usd)} />
-        <SummaryCard label={valMode===MODES.ETH ? 'Net PnL (Ξ)' : 'Net PnL'}             value={fp(summary.net_pnl_usd)}         icon="💹" color={pnlColor(summary.net_pnl_usd)} />
-        <SummaryCard label="Tx Count"  value={fmtNum(summary.tx_count_total, 0)} icon="🔁" color={C.textSec} />
-        <SummaryCard label="MVRV Ratio" value={fmtRatio(ratio)} icon="⚖️" color={mvrvColor(ratio)} />
+        <SummaryCard label={valMode===MODES.ETH ? 'Market Value (Ξ)' : 'Market Value'}   value={fv(safeNum(summary.market_value_usd))}   icon="📈" color={C.gold} />
+        <SummaryCard label={valMode===MODES.ETH ? 'Realized Value (Ξ)' : 'Realized Value'} value={safeNum(summary.realized_value_usd) > 0 ? fv(safeNum(summary.realized_value_usd)) : '—'} icon="🏦" color={C.blue} />
+        <SummaryCard label={valMode===MODES.ETH ? 'Unrealized PnL (Ξ)' : 'Unrealized PnL'} value={safeNum(summary.realized_value_usd) > 0 ? fp(safeNum(summary.unrealized_pnl_usd)) : '—'} icon={safeNum(summary.unrealized_pnl_usd) >= 0 ? '🟢' : '🔴'} color={pnlColor(safeNum(summary.unrealized_pnl_usd))} />
+        <SummaryCard label={valMode===MODES.ETH ? 'Realized PnL (Ξ)' : 'Realized PnL'}   value={safeNum(summary.realized_pnl_usd) !== 0 ? fp(safeNum(summary.realized_pnl_usd)) : '—'}   icon={safeNum(summary.realized_pnl_usd) >= 0 ? '✅' : '❌'} color={pnlColor(safeNum(summary.realized_pnl_usd))} />
+        <SummaryCard label={valMode===MODES.ETH ? 'Net PnL (Ξ)' : 'Net PnL'}             value={safeNum(summary.realized_value_usd) > 0 ? fp(safeNum(summary.net_pnl_usd)) : '—'}         icon="💹" color={pnlColor(safeNum(summary.net_pnl_usd))} />
+        <SummaryCard label="Tx Count"  value={fmtNum(safeNum(summary.tx_count_total), 0)} icon="🔁" color={C.textSec} />
+        <SummaryCard label="MVRV Ratio" value={fmtRatio(safeNum(summary.mvrv_ratio) || null)} icon="⚖️" color={mvrvColor(safeNum(summary.mvrv_ratio))} />
       </div>
 
       {/* Chart + Flags */}
@@ -369,10 +384,10 @@ const MvrvAnalysis = ({ entityId, entityType }) => {
                         <span style={{ display:'inline-block', padding:'2px 8px', borderRadius:'6px', background: asset.token_symbol==='ETH'?'rgba(98,126,234,0.15)':'rgba(139,92,246,0.12)', color: asset.token_symbol==='ETH'?C.blue:C.purple, fontSize:'12px', fontWeight:'700' }}>{asset.token_symbol||'?'}</span>
                       </td>
                       <td style={{ padding:'14px 20px', color:C.textSec, fontSize:'13px', textAlign:'right' }}>{fmtNum(asset.balance)}</td>
-                      <td style={{ padding:'14px 20px', color:C.gold, fontSize:'13px', fontWeight:'600', textAlign:'right' }}>{fv(asset.market_value_usd)}</td>
-                      <td style={{ padding:'14px 20px', color:C.blue, fontSize:'13px', textAlign:'right' }}>{fv(asset.cost_basis_usd)}</td>
-                      <td style={{ padding:'14px 20px', color:pnlColor(upnl), fontSize:'13px', fontWeight:'600', textAlign:'right' }}>{fp(upnl)}</td>
-                      <td style={{ padding:'14px 20px', color:C.textSec, fontSize:'13px', textAlign:'right' }}>{Number(asset.portfolio_percent||0).toFixed(2)}%</td>
+                      <td style={{ padding:'14px 20px', color:C.gold, fontSize:'13px', fontWeight:'600', textAlign:'right' }}>{fv(safeNum(asset.market_value_usd))}</td>
+                      <td style={{ padding:'14px 20px', color:C.blue, fontSize:'13px', textAlign:'right' }}>{safeNum(asset.cost_basis_usd) > 0 ? fv(safeNum(asset.cost_basis_usd)) : '—'}</td>
+                      <td style={{ padding:'14px 20px', color:pnlColor(upnl), fontSize:'13px', fontWeight:'600', textAlign:'right' }}>{safeNum(asset.cost_basis_usd) > 0 ? fp(upnl) : '—'}</td>
+                      <td style={{ padding:'14px 20px', color:C.textSec, fontSize:'13px', textAlign:'right' }}>{safeNum(asset.portfolio_percent) > 0 ? Number(asset.portfolio_percent).toFixed(2) + '%' : '—'}</td>
                     </tr>
                   );
                 })}

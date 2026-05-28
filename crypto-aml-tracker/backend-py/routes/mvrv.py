@@ -624,94 +624,101 @@ async def refresh_address_mvrv(
 
 @router.post("/bulk-populate")
 async def bulk_populate_mvrv(
-    limit: int = Query(500, ge=1, le=5000),
+    limit: int = Query(5000, ge=1, le=20000),
     skip_existing: bool = Query(True),
 ):
     """
-    Pre-compute MVRV snapshots for all addresses using local transaction data.
-    Uses current ETH price × net ETH balance from transactions as Market Value.
-    No on-chain RPC calls — fast and works offline.
+    Compute MVRV snapshots for all addresses with incoming transactions.
+    Uses FIFO cost basis from local transaction history + Chainlink oracle prices.
+    No RPC calls — fully offline from local DB.
+
+    Addresses with ONLY outgoing transactions are skipped (no cost basis possible).
+    Results include cost_basis_available flag for forensic traceability.
     """
     current_prices = await _get_current_prices()
     eth_price = current_prices.get("ETH", Decimal("0"))
     if eth_price <= 0:
-        return {"error": "ETH price unavailable", "populated": 0}
+        return {"error": "ETH price unavailable — ensure ALCHEMY_RPC is configured", "populated": 0}
 
-    # Get addresses that already have snapshots (skip if skip_existing=True)
+    # Get addresses that already have real snapshots (skip if requested)
     existing = set()
     if skip_existing:
         rows = await fetch_all(
-            "SELECT DISTINCT entity_id FROM mvrv_snapshots WHERE entity_type='address'"
+            "SELECT DISTINCT entity_id FROM mvrv_snapshots WHERE entity_type='address' AND market_value_usd > 0"
         ) or []
         existing = {r["entity_id"] for r in rows}
 
-    # Get top addresses by net ETH volume from transactions
+    # Get ALL addresses with incoming transactions (these can have real cost basis)
     addr_rows = await fetch_all(
         """
         SELECT address, total_in, total_out, tx_count
         FROM addresses
         WHERE address LIKE '0x%%'
           AND LENGTH(address) = 42
-          AND (total_in > 0 OR total_out > 0)
+          AND total_in > 0
         ORDER BY (total_in + total_out) DESC
         LIMIT %s
         """,
         (limit,),
     ) or []
 
-    populated = 0
-    skipped = 0
+    populated       = 0
+    skipped_exists  = 0
+    skipped_no_mv   = 0
+    insufficient    = 0
+
+    from services.mvrv_calculator import compute_mvrv_for_address, save_mvrv_snapshot as _save
 
     for row in addr_rows:
         addr = row["address"].lower()
         if addr in existing:
-            skipped += 1
+            skipped_exists += 1
             continue
 
-        total_in  = float(row["total_in"]  or 0)
-        total_out = float(row["total_out"] or 0)
-        # Net balance = what came in minus what went out
-        net_eth = max(total_in - total_out, 0.0)
-
-        mv = net_eth * float(eth_price)
-        # Without historical prices, RV ≈ MV (break-even assumption)
-        # This gives ratio=1.0 for addresses without snapshot history
-        # but at least populates MV so the directory shows real values
-        rv = mv
-        ratio = 1.0
-
-        # If address has wallet_balances, use that as MV instead
-        bal_row = await fetch_one(
-            "SELECT SUM(balance_usd) AS total FROM wallet_balances WHERE address = %s",
+        # Build current_balances from wallet_balances if available,
+        # otherwise derive from net tx history (total_in - total_out)
+        bal_rows = await fetch_all(
+            "SELECT token_symbol, SUM(balance) AS balance FROM wallet_balances WHERE address = %s GROUP BY token_symbol",
             (addr,),
-        )
-        wb_mv = float((bal_row or {}).get("total") or 0)
-        if wb_mv > 0:
-            mv = wb_mv
-            rv = wb_mv
-            ratio = 1.0
+        ) or []
+        current_balances = {r["token_symbol"]: Decimal(str(r["balance"] or 0)) for r in bal_rows if float(r["balance"] or 0) > 0}
 
-        if mv <= 0:
+        if not current_balances:
+            net_eth = max(float(row["total_in"] or 0) - float(row["total_out"] or 0), 0.0)
+            if net_eth > 0:
+                current_balances["ETH"] = Decimal(str(net_eth))
+
+        if not current_balances:
+            skipped_no_mv += 1
             continue
 
-        # Save snapshot
-        from services.mvrv_calculator import save_mvrv_snapshot
-        await save_mvrv_snapshot(addr, "address", {
-            "market_value_usd":   mv,
-            "realized_value_usd": rv,
-            "mvrv_ratio":         ratio,
-            "unrealized_pnl_usd": 0.0,
-            "realized_pnl_usd":   0.0,
-            "accounting_method":  "FIFO",
-        })
-        populated += 1
+        try:
+            mvrv = await compute_mvrv_for_address(addr, current_prices, current_balances, "FIFO")
 
-    # Invalidate directory count cache
+            if mvrv["market_value_usd"] <= 0:
+                skipped_no_mv += 1
+                continue
+
+            if not mvrv.get("cost_basis_available"):
+                insufficient += 1
+                # Still save the snapshot — MV is real, just RV is unavailable
+                # mvrv_ratio=0 signals "no cost basis" to the frontend
+
+            await _save(addr, "address", mvrv)
+            populated += 1
+
+        except Exception:
+            skipped_no_mv += 1
+            continue
+
     _directory_count_cache['updated_at'] = None
 
     return {
-        "populated": populated,
-        "skipped_existing": skipped,
-        "eth_price_used": float(eth_price),
-        "total_processed": len(addr_rows),
+        "populated":            populated,
+        "skipped_already_done": skipped_exists,
+        "skipped_no_balance":   skipped_no_mv,
+        "insufficient_history": insufficient,
+        "eth_price_used":       float(eth_price),
+        "total_candidates":     len(addr_rows),
+        "note":                 "FIFO cost basis from local tx history + Chainlink oracle prices. cost_basis_available=false means address has no incoming txs.",
     }

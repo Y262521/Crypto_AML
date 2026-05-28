@@ -2,6 +2,7 @@
 
 import logging
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
@@ -14,6 +15,82 @@ from ..extract.connections import get_flat_transaction_collection, prepare_flat_
 from ..extract.utils import build_flat_transaction_documents, normalize_hex_data, normalize_hex_id
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Sync price lookup — reads from token_price_history via SQLAlchemy
+# The transformer is synchronous so we query MySQL directly instead of using
+# the async get_hist_price() from mvrv_calculator.
+# ---------------------------------------------------------------------------
+
+_PRICE_CACHE: Dict[str, Dict[str, Optional[Decimal]]] = {}
+_PRICE_CACHE_LOADED = False
+
+
+def _load_price_cache_sync(cfg: Config) -> None:
+    """Load token_price_history into memory once per transform run."""
+    global _PRICE_CACHE, _PRICE_CACHE_LOADED
+    if _PRICE_CACHE_LOADED:
+        return
+    try:
+        from ...utils.connections import get_maria_engine
+        engine = get_maria_engine(cfg)
+        with engine.connect() as conn:
+            from sqlalchemy import text
+            rows = conn.execute(
+                text("SELECT token_symbol, price_date, price_usd FROM token_price_history")
+            ).fetchall()
+        for row in rows:
+            sym = str(row[0]).upper()
+            date_str = str(row[1])  # already "YYYY-MM-DD" from DATE column
+            price = Decimal(str(row[2]))
+            _PRICE_CACHE.setdefault(sym, {})[date_str] = price
+        engine.dispose()
+        total = sum(len(v) for v in _PRICE_CACHE.values())
+        logger.info("Loaded %d price entries into transformer price cache", total)
+        _PRICE_CACHE_LOADED = True
+    except Exception as exc:
+        logger.warning("Could not load price cache for transformer: %s", exc)
+        _PRICE_CACHE_LOADED = True  # don't retry on every row
+
+
+def _get_eth_price_sync(ts: Optional[datetime]) -> Optional[Decimal]:
+    """
+    Return the ETH/USD price for the date of `ts` from the in-memory cache.
+    Returns None if no price is available (usd_at_execution will be NULL).
+    """
+    if ts is None:
+        return None
+    date_str = ts.strftime("%Y-%m-%d")
+    eth_prices = _PRICE_CACHE.get("ETH", {})
+    price = eth_prices.get(date_str)
+    if price is not None:
+        return price
+    # Try WETH as fallback
+    weth_prices = _PRICE_CACHE.get("WETH", {})
+    return weth_prices.get(date_str)
+
+
+def _compute_usd_at_execution(
+    value_eth: float,
+    is_contract_call: bool,
+    ts: Optional[datetime],
+) -> tuple:
+    """
+    Compute the USD value of a transaction at the time of execution.
+    Returns (usd_at_execution, pricing_source, valuation_version).
+
+    Rules:
+    - Native ETH transfers (value_eth > 0): value_eth × Chainlink historical price
+    - Contract calls with no ETH value: (None, None, 0) — no economic transfer
+    - If no Chainlink price available for the date: (None, None, 0) — never fabricate
+    """
+    if value_eth <= 0:
+        return None, None, 0
+    price = _get_eth_price_sync(ts)
+    if price is None or price <= 0:
+        return None, None, 0
+    usd_val = round(float(Decimal(str(value_eth)) * price), 2)
+    return usd_val, "chainlink_oracle", 1
 
 
 def _get_raw_collection(cfg: Config):
@@ -181,6 +258,7 @@ def clean_single_tx(
         gas_used = _to_int(receipt.get("gasUsed"))
         status = receipt.get("status")
 
+    usd_val, pricing_src, val_ver = _compute_usd_at_execution(value_eth, is_contract_call, block_timestamp)
     return {
         "block_number": block_number,
         "timestamp": block_timestamp,
@@ -188,6 +266,9 @@ def clean_single_tx(
         "from_address": from_address,
         "to_address": to_address,
         "value_eth": value_eth,
+        "usd_at_execution": usd_val,
+        "pricing_source": pricing_src,
+        "valuation_version": val_ver,
         "gas_used": gas_used,
         "status": status,
         "is_contract_call": is_contract_call,
@@ -210,13 +291,18 @@ def clean_flat_tx(tx_doc: dict, cfg: Config) -> dict:
     is_contract_call = bool(forensics.get("is_contract")) or to_address is None
     value_eth = _decimal_to_float(value.get("eth"))
 
+    ts = _to_datetime(block.get("timestamp"))
+    usd_val, pricing_src, val_ver = _compute_usd_at_execution(value_eth, is_contract_call, ts)
     return {
         "block_number": _to_int(block.get("number")),
-        "timestamp": _to_datetime(block.get("timestamp")),
+        "timestamp": ts,
         "tx_hash": tx_hash,
         "from_address": from_address,
         "to_address": to_address,
         "value_eth": value_eth,
+        "usd_at_execution": usd_val,
+        "pricing_source": pricing_src,
+        "valuation_version": val_ver,
         "gas_used": _to_int(gas.get("gas_used")) if gas.get("gas_used") is not None else None,
         "status": _to_int(forensics.get("receipt_status")) if forensics.get("receipt_status") is not None else None,
         "is_contract_call": is_contract_call,
@@ -346,6 +432,9 @@ def transform_raw_to_aml(
     flat_collection = _get_flat_transaction_collection(cfg)
     prepare_flat_transaction_collection(cfg)
     batch_size = batch_size or cfg.batch_size_transform
+
+    # Load historical ETH/USD prices into memory once before processing rows
+    _load_price_cache_sync(cfg)
 
     summary = {
         "batches": 0,

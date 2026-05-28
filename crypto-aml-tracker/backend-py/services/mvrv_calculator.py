@@ -12,12 +12,12 @@ Definitions (EVM account-based model):
   Net PnL              = Realized PnL + Unrealized PnL
 
 Accounting methods supported: FIFO, LIFO, HIFO
-Historical prices: CoinGecko /market_chart, cached in token_price_history table.
+Historical prices: Chainlink oracle via Alchemy, cached in token_price_history table.
+Single source of truth: no CoinGecko, no fallback market APIs.
 """
 
 import asyncio
 import os
-from collections import deque
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Dict, List, Literal, Optional
@@ -81,56 +81,182 @@ async def _ensure_hist_price_schema():
 # ---------------------------------------------------------------------------
 
 _HIST_PRICE_CACHE: Dict[str, Dict[str, Decimal]] = {}
-# Set of symbols whose data has been fully loaded into memory (from DB or CoinGecko).
-# Once a symbol is in this set, we NEVER call CoinGecko again during this process run.
 _HIST_CACHE_WARMED: set = set()
-
-_CG_IDS = {
-    "ETH":  "ethereum",
-    "WETH": "weth",
-    "USDT": "tether",
-    "USDC": "usd-coin",
-    "DAI":  "dai",
-    "BUSD": "binance-usd",
-}
 
 # Symbols we track for historical prices (stablecoins excluded — always $1)
 _PRICE_SYMBOLS = ["ETH", "WETH"]
 
+# ---------------------------------------------------------------------------
+# Chainlink oracle — single source of truth for ETH/USD pricing
+# Contract: 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419 (Mainnet ETH/USD feed)
+# ABI selector: latestRoundData() → (roundId, answer, startedAt, updatedAt, answeredInRound)
+# answer is int256 with 8 decimal places (divide by 1e8 to get USD)
+# ---------------------------------------------------------------------------
 
-async def _fetch_hist_prices_coingecko(symbol: str, days: int = 730) -> Dict[str, Decimal]:
-    cg_id = _CG_IDS.get(symbol.upper())
-    if not cg_id:
-        return {}
-    api_key = os.getenv("COINGECKO_API_KEY", "")
-    url = f"https://api.coingecko.com/api/v3/coins/{cg_id}/market_chart"
-    params = {"vs_currency": "usd", "days": str(days), "interval": "daily"}
-    headers = {"x-cg-pro-api-key": api_key} if api_key else {}
+_CHAINLINK_ETH_USD = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
+_LATEST_ROUND_DATA_SELECTOR = "0xfeaf968c"   # keccak256("latestRoundData()")[:4]
+_BLOCKS_PER_DAY = 7150                        # post-Merge: 12s slots → 7200/day; 7150 is conservative
+
+
+def _get_alchemy_url() -> str:
+    """Return the configured Alchemy RPC URL. Raises if not set."""
+    url = (os.getenv("ALCHEMY_RPC") or "").strip()
+    if not url or "/v2/demo" in url.lower():
+        raise RuntimeError(
+            "ALCHEMY_RPC is not configured. "
+            "Set ALCHEMY_RPC=https://eth-mainnet.g.alchemy.com/v2/<your-key> in .env"
+        )
+    return url
+
+
+async def _eth_call_at_block(
+    session: "aiohttp.ClientSession",
+    url: str,
+    contract: str,
+    data: str,
+    block_hex: str,
+) -> Optional[str]:
+    """Send a single eth_call at a specific block height. Returns raw hex result or None."""
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "eth_call",
+        "params": [{"to": contract, "data": data}, block_hex],
+        "id": 1,
+    }
     try:
-        import ssl
-        ssl_ctx = ssl.create_default_context()
-        try:
-            import certifi
-            ssl_ctx = ssl.create_default_context(cafile=certifi.where())
-        except ImportError:
-            ssl_ctx.check_hostname = False
-            ssl_ctx.verify_mode = ssl.CERT_NONE
-        connector = aiohttp.TCPConnector(ssl=ssl_ctx)
-        async with aiohttp.ClientSession(connector=connector, timeout=aiohttp.ClientTimeout(total=30)) as s:
-            async with s.get(url, params=params, headers=headers) as resp:
-                if resp.status != 200:
-                    print(f"  CoinGecko hist {symbol}: HTTP {resp.status}")
-                    return {}
-                data = await resp.json()
-                out: Dict[str, Decimal] = {}
-                for ts_ms, price in data.get("prices", []):
-                    dt = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc)
-                    out[dt.strftime("%Y-%m-%d")] = Decimal(str(price))
-                print(f"  ✓ CoinGecko hist {symbol}: {len(out)} days")
-                return out
-    except Exception as exc:
-        print(f"  CoinGecko hist {symbol} error: {exc}")
+        async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+            if resp.status != 200:
+                return None
+            body = await resp.json()
+            result = body.get("result")
+            if not result or result == "0x":
+                return None
+            return result
+    except Exception:
+        return None
+
+
+def _decode_chainlink_answer(hex_result: str) -> Optional[Decimal]:
+    """
+    Decode the latestRoundData() return value.
+    Returns: (roundId, answer, startedAt, updatedAt, answeredInRound) — each 32 bytes.
+    answer is at slot index 1 (bytes 32-63 of the ABI-encoded payload).
+
+    IMPORTANT: The Chainlink contract may return a hex string shorter than 320 chars
+    because leading zero bytes are omitted. We left-pad with zfill(320) before slicing
+    to ensure correct slot alignment.
+
+    answer is int256 with 8 decimal places → divide by 1e8 to get USD.
+    Sanity check: valid ETH/USD price must be between $1 and $1,000,000.
+    """
+    try:
+        raw = hex_result.lstrip("0x")
+        if not raw:
+            return None
+        # Left-pad to exactly 320 hex chars (5 slots × 64 chars each)
+        padded = raw.zfill(320)
+        if len(padded) < 128:
+            return None
+        # answer is the second 32-byte slot (chars 64–127 of the padded string)
+        answer_hex = padded[64:128]
+        answer_int = int(answer_hex, 16)
+        # Handle int256 sign (two's complement)
+        if answer_int >= (1 << 255):
+            answer_int -= (1 << 256)
+        if answer_int <= 0:
+            return None
+        price = Decimal(answer_int) / Decimal(10 ** 8)
+        # Sanity guard: reject obviously invalid prices
+        if price <= 0 or price > Decimal("1000000"):
+            return None
+        return price
+    except Exception:
+        return None
+
+
+async def _fetch_hist_prices_chainlink(days: int = 730) -> Dict[str, Decimal]:
+    """
+    Fetch historical daily ETH/USD prices from the Chainlink oracle via Alchemy archive node.
+
+    Method:
+      1. Get current head block via eth_blockNumber.
+      2. For each of the past `days` days, subtract (day_index × 7150) blocks.
+      3. Call latestRoundData() on the Chainlink ETH/USD feed at that block.
+      4. Decode the answer (int256, 8 decimals) → USD price.
+      5. Return Dict["YYYY-MM-DD" → Decimal].
+
+    This is the ONLY pricing source. No fallbacks.
+    """
+    import ssl as _ssl
+    try:
+        url = _get_alchemy_url()
+    except RuntimeError as exc:
+        print(f"  ✗ Chainlink fetch skipped: {exc}")
         return {}
+
+    ssl_ctx = _ssl.create_default_context()
+    try:
+        import certifi
+        ssl_ctx = _ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = _ssl.CERT_NONE
+
+    connector = aiohttp.TCPConnector(ssl=ssl_ctx)
+    out: Dict[str, Decimal] = {}
+
+    async with aiohttp.ClientSession(connector=connector) as session:
+        # Step 1: get current head block
+        try:
+            async with session.post(
+                url,
+                json={"jsonrpc": "2.0", "method": "eth_blockNumber", "params": [], "id": 1},
+                timeout=aiohttp.ClientTimeout(total=15),
+            ) as resp:
+                body = await resp.json()
+                head_block = int(body["result"], 16)
+        except Exception as exc:
+            print(f"  ✗ Chainlink: could not fetch head block: {exc}")
+            return {}
+
+        print(f"  Chainlink: head block {head_block}, fetching {days} daily prices…")
+
+        # Step 2: build (date_str, block_hex) pairs
+        today = datetime.now(timezone.utc)
+        targets = []
+        for day_index in range(days):
+            target_block = max(head_block - day_index * _BLOCKS_PER_DAY, 1)
+            date = today.replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            from datetime import timedelta
+            date = date - timedelta(days=day_index)
+            targets.append((date.strftime("%Y-%m-%d"), hex(target_block)))
+
+        # Step 3: batch eth_call requests concurrently (50 at a time to avoid rate limits)
+        BATCH = 50
+        for i in range(0, len(targets), BATCH):
+            batch = targets[i:i + BATCH]
+            tasks = [
+                _eth_call_at_block(
+                    session, url, _CHAINLINK_ETH_USD,
+                    _LATEST_ROUND_DATA_SELECTOR, block_hex
+                )
+                for _, block_hex in batch
+            ]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for (date_str, _), result in zip(batch, results):
+                if isinstance(result, Exception) or result is None:
+                    continue
+                price = _decode_chainlink_answer(result)
+                if price and price > 0:
+                    out[date_str] = price
+
+            # Small pause between batches to respect Alchemy rate limits
+            await asyncio.sleep(0.1)
+
+    print(f"  ✓ Chainlink ETH/USD: {len(out)}/{days} days resolved")
+    return out
 
 
 async def _load_hist_prices_from_db(symbol: str) -> Dict[str, Decimal]:
@@ -160,87 +286,72 @@ async def _save_hist_prices_to_db(symbol: str, prices: Dict[str, Decimal]):
         print(f"  save hist prices error: {exc}")
 
 
-async def _fetch_current_price_fallback(symbol: str) -> Optional[Decimal]:
-    """Fetch today's price from CoinGecko simple/price endpoint as a fallback."""
-    cg_id = _CG_IDS.get(symbol.upper())
-    if not cg_id:
-        return None
-    api_key = os.getenv("COINGECKO_API_KEY", "")
-    url = "https://api.coingecko.com/api/v3/simple/price"
-    params = {"ids": cg_id, "vs_currencies": "usd"}
-    headers = {"x-cg-pro-api-key": api_key} if api_key else {}
+async def _fetch_current_price_chainlink() -> Optional[Decimal]:
+    """
+    Fetch today's ETH/USD spot price from the Chainlink oracle at the latest block.
+    Used only to seed today's date when the full historical fetch is not yet complete.
+    No CoinGecko. No fallbacks.
+    """
+    import ssl as _ssl
     try:
-        import ssl
-        ssl_ctx = ssl.create_default_context()
-        try:
-            import certifi
-            ssl_ctx = ssl.create_default_context(cafile=certifi.where())
-        except ImportError:
-            ssl_ctx.check_hostname = False
-            ssl_ctx.verify_mode = ssl.CERT_NONE
-        connector = aiohttp.TCPConnector(ssl=ssl_ctx)
-        async with aiohttp.ClientSession(connector=connector, timeout=aiohttp.ClientTimeout(total=15)) as s:
-            async with s.get(url, params=params, headers=headers) as resp:
-                if resp.status != 200:
-                    return None
-                data = await resp.json()
-                price = data.get(cg_id, {}).get("usd")
-                return Decimal(str(price)) if price else None
-    except Exception as exc:
-        print(f"  fallback price {symbol} error: {exc}")
+        url = _get_alchemy_url()
+    except RuntimeError:
         return None
 
+    ssl_ctx = _ssl.create_default_context()
+    try:
+        import certifi
+        ssl_ctx = _ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = _ssl.CERT_NONE
 
-async def _seed_prices_for_all_tx_dates(symbol: str, current_price: Decimal):
-    """
-    Seed token_price_history with current_price for every date that appears
-    in the transactions table. This makes MVRV work without historical data.
-    """
-    rows = await fetch_all(
-        "SELECT DISTINCT DATE(timestamp) AS d FROM transactions WHERE timestamp IS NOT NULL"
-    ) or []
-    if not rows:
+    connector = aiohttp.TCPConnector(ssl=ssl_ctx)
+    async with aiohttp.ClientSession(connector=connector) as session:
+        result = await _eth_call_at_block(
+            session, url, _CHAINLINK_ETH_USD,
+            _LATEST_ROUND_DATA_SELECTOR, "latest"
+        )
+    if result is None:
         return None
-    prices = {str(r["d"]): current_price for r in rows}
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    prices[today] = current_price
-    await _save_hist_prices_to_db(symbol, prices)
-    print(f"  ✓ {symbol}: seeded {len(prices)} dates with price ${current_price:.2f}")
-    return prices
+    return _decode_chainlink_answer(result)
 
 
 async def warm_hist_price_cache():
     """
     Called ONCE at server startup.
-    1. Load existing prices from DB into memory.
-    2. Try CoinGecko historical endpoint (needs free API key for /market_chart).
-    3. If that fails, seed all transaction dates with today's current price.
-       This gives approximate MVRV (assumes constant price) but is never zero.
+    Single source of truth: Chainlink ETH/USD oracle via Alchemy archive node.
+    No CoinGecko. No fallbacks. No external market APIs.
+
+    Flow:
+      1. Load existing prices from token_price_history DB table into memory.
+      2. If DB is empty, fetch 730 days from Chainlink oracle and persist.
+      3. If Chainlink fetch fails (Alchemy not configured), log a clear error.
+         usd_at_execution will remain NULL until ALCHEMY_RPC is configured.
     """
-    print("🌡  Warming historical price cache…")
+    print("🌡  Warming historical price cache (Chainlink/Alchemy oracle)…")
     for sym in _PRICE_SYMBOLS:
         db_prices = await _load_hist_prices_from_db(sym)
         if db_prices:
             _HIST_PRICE_CACHE.setdefault(sym, {}).update(db_prices)
-            print(f"  ✓ {sym}: {len(db_prices)} days loaded from DB")
+            print(f"  ✓ {sym}: {len(db_prices)} days loaded from DB (Chainlink oracle data)")
         else:
-            print(f"  ↓ {sym}: no DB data, fetching from CoinGecko…")
-            fresh = await _fetch_hist_prices_coingecko(sym)
+            print(f"  ↓ {sym}: no DB data, querying Chainlink oracle via Alchemy…")
+            # ETH and WETH share the same Chainlink ETH/USD feed
+            fresh = await _fetch_hist_prices_chainlink(days=730)
             if fresh:
                 _HIST_PRICE_CACHE.setdefault(sym, {}).update(fresh)
                 await _save_hist_prices_to_db(sym, fresh)
+                print(f"  ✓ {sym}: {len(fresh)} days fetched from Chainlink and persisted")
             else:
-                print(f"  ↓ {sym}: CoinGecko hist unavailable, seeding from current price…")
-                current = await _fetch_current_price_fallback(sym)
-                if current and current > 0:
-                    seeded = await _seed_prices_for_all_tx_dates(sym, current)
-                    if seeded:
-                        _HIST_PRICE_CACHE.setdefault(sym, {}).update(seeded)
-                else:
-                    print(f"  ✗ {sym}: all price sources failed")
+                print(
+                    f"  ✗ {sym}: Chainlink oracle fetch failed. "
+                    "Ensure ALCHEMY_RPC is set in .env. "
+                    "usd_at_execution will be NULL until prices are loaded."
+                )
         _HIST_CACHE_WARMED.add(sym)
     total = sum(len(v) for v in _HIST_PRICE_CACHE.values())
-    print(f"✓ Historical price cache warm ({total} total entries)")
+    print(f"✓ Historical price cache warm ({total} total entries, source: Chainlink/Alchemy)")
 
 
 async def get_hist_price(symbol: str, dt: datetime) -> Decimal:
@@ -362,7 +473,7 @@ TRACKED_TOKENS = {
 async def _get_address_tx_history(address: str) -> List[dict]:
     """
     Pull all ETH transactions for `address` from the local DB.
-    Uses block_number + tx_hash for ordering (avoids dependency on auto-inc id).
+    Includes usd_at_execution (Chainlink oracle price at time of tx) for cost basis.
     """
     addr = address.lower()
     rows = await fetch_all(
@@ -374,6 +485,7 @@ async def _get_address_tx_history(address: str) -> List[dict]:
             value_eth           AS amount,
             timestamp,
             block_number,
+            usd_at_execution,
             'ETH'               AS token_symbol
         FROM transactions
         WHERE (LOWER(from_address) = %s OR LOWER(to_address) = %s)
@@ -416,20 +528,28 @@ async def compute_mvrv_for_address(
         if amount <= 0:
             continue
 
-        ts = row.get("timestamp")
-        if ts is None:
-            hist_price = current_prices.get(sym, Decimal("0"))
+        # Price resolution priority:
+        # 1. usd_at_execution — already Chainlink oracle price stored at transform time
+        # 2. get_hist_price() — Chainlink oracle lookup by date
+        # 3. current price — last resort for dates outside oracle window
+        usd_exec = row.get("usd_at_execution")
+        if usd_exec is not None and float(usd_exec) > 0:
+            hist_price = Decimal(str(usd_exec)) / amount  # usd_at_execution = amount × price
         else:
-            if isinstance(ts, str):
-                try:
-                    ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                except ValueError:
-                    ts = datetime.now(timezone.utc)
-            if getattr(ts, "tzinfo", None) is None:
-                ts = ts.replace(tzinfo=timezone.utc)
-            hist_price = await get_hist_price(sym, ts)
-            if hist_price == 0:
+            ts = row.get("timestamp")
+            if ts is None:
                 hist_price = current_prices.get(sym, Decimal("0"))
+            else:
+                if isinstance(ts, str):
+                    try:
+                        ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                    except ValueError:
+                        ts = datetime.now(timezone.utc)
+                if getattr(ts, "tzinfo", None) is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                hist_price = await get_hist_price(sym, ts)
+                if hist_price == 0:
+                    hist_price = current_prices.get(sym, Decimal("0"))
 
         from_addr = (row.get("from_address") or "").lower()
         to_addr   = (row.get("to_address")   or "").lower()
@@ -475,25 +595,33 @@ async def compute_mvrv_for_address(
 
     unrealized_pnl_usd = market_value_usd - realized_value_usd
     if realized_value_usd > 0:
-        mvrv_ratio       = float(market_value_usd / realized_value_usd)
+        mvrv_ratio         = float(market_value_usd / realized_value_usd)
         unrealized_pnl_pct = float(unrealized_pnl_usd / realized_value_usd * 100)
     else:
-        mvrv_ratio         = 1.0 if market_value_usd == 0 else 0.0
+        mvrv_ratio         = 0.0   # 0 = no cost basis, NOT break-even
         unrealized_pnl_pct = 0.0
 
+    # Determine cost basis completeness
+    has_incoming = tx_in > 0
+    cost_basis_available = has_incoming and realized_value_usd > 0
+
     return {
-        "market_value_usd":    float(market_value_usd),
-        "realized_value_usd":  float(realized_value_usd),
-        "mvrv_ratio":          round(mvrv_ratio, 6),
-        "unrealized_pnl_usd":  float(unrealized_pnl_usd),
-        "unrealized_pnl_pct":  round(unrealized_pnl_pct, 4),
-        "realized_pnl_usd":    float(realized_pnl_usd),
-        "net_pnl_usd":         float(unrealized_pnl_usd + realized_pnl_usd),
-        "cost_basis_per_token": cost_basis_per_token,
-        "tx_count_in":         tx_in,
-        "tx_count_out":        tx_out,
-        "tx_count_total":      tx_in + tx_out,
-        "accounting_method":   method,
+        "market_value_usd":      float(market_value_usd),
+        "realized_value_usd":    float(realized_value_usd) if cost_basis_available else 0.0,
+        "mvrv_ratio":            round(mvrv_ratio, 6),
+        "unrealized_pnl_usd":    float(unrealized_pnl_usd) if cost_basis_available else 0.0,
+        "unrealized_pnl_pct":    round(unrealized_pnl_pct, 4) if cost_basis_available else 0.0,
+        "realized_pnl_usd":      float(realized_pnl_usd),
+        "net_pnl_usd":           float(unrealized_pnl_usd + realized_pnl_usd) if cost_basis_available else float(realized_pnl_usd),
+        "cost_basis_per_token":  cost_basis_per_token,
+        "tx_count_in":           tx_in,
+        "tx_count_out":          tx_out,
+        "tx_count_total":        tx_in + tx_out,
+        "accounting_method":     method,
+        "cost_basis_available":  cost_basis_available,
+        "history_complete":      cost_basis_available,
+        "pricing_source":        "chainlink_oracle",
+        "cost_basis_method":     method,
     }
 
 
@@ -550,8 +678,16 @@ async def compute_mvrv_for_cluster(
 # ---------------------------------------------------------------------------
 
 async def save_mvrv_snapshot(entity_id: str, entity_type: str, mvrv: dict):
+    """
+    Upsert the latest MVRV snapshot for an entity.
+    Uses INSERT ... ON DUPLICATE KEY UPDATE so only one row per entity exists.
+    Requires a UNIQUE KEY on (entity_id, entity_type) — added via migration below.
+    """
     pool = get_pool()
     if not pool:
+        return
+    # Only save if we have a real market value
+    if not mvrv.get("market_value_usd", 0):
         return
     try:
         async with pool.acquire() as conn:
@@ -563,20 +699,121 @@ async def save_mvrv_snapshot(entity_id: str, entity_type: str, mvrv: dict):
                          market_value_usd, realized_value_usd, mvrv_ratio,
                          unrealized_pnl_usd, realized_pnl_usd, snapshot_at)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                    ON DUPLICATE KEY UPDATE
+                        accounting_method  = VALUES(accounting_method),
+                        market_value_usd   = VALUES(market_value_usd),
+                        realized_value_usd = VALUES(realized_value_usd),
+                        mvrv_ratio         = VALUES(mvrv_ratio),
+                        unrealized_pnl_usd = VALUES(unrealized_pnl_usd),
+                        realized_pnl_usd   = VALUES(realized_pnl_usd),
+                        snapshot_at        = NOW()
                     """,
                     (
                         entity_id, entity_type,
                         mvrv.get("accounting_method", "FIFO"),
                         mvrv["market_value_usd"],
-                        mvrv["realized_value_usd"],
-                        mvrv["mvrv_ratio"],
-                        mvrv["unrealized_pnl_usd"],
-                        mvrv["realized_pnl_usd"],
+                        mvrv.get("realized_value_usd", 0),
+                        mvrv.get("mvrv_ratio", 0),
+                        mvrv.get("unrealized_pnl_usd", 0),
+                        mvrv.get("realized_pnl_usd", 0),
                     ),
                 )
             await conn.commit()
     except Exception as exc:
         print(f"  save_mvrv_snapshot error: {exc}")
+
+
+async def reconstruct_wallet_balances_from_txs(
+    addresses: List[str],
+    current_prices: Dict[str, Decimal],
+) -> int:
+    """
+    Reconstruct wallet_balances for a list of addresses using local transaction data.
+    No RPC calls — derives ETH balance as (total_in - total_out) from the transactions table.
+    Writes to wallet_balances with balance_reconstructed=true marker via updated_at.
+
+    Returns the number of addresses successfully reconstructed.
+    """
+    pool = get_pool()
+    if not pool or not addresses:
+        return 0
+
+    eth_price = current_prices.get("ETH", Decimal("0"))
+    if eth_price <= 0:
+        return 0
+
+    reconstructed = 0
+    for addr in addresses:
+        addr = addr.lower()
+        try:
+            # Compute net ETH from transaction history
+            row = await fetch_one(
+                """
+                SELECT
+                    COALESCE(SUM(CASE WHEN LOWER(to_address)   = %s THEN value_eth ELSE 0 END), 0) AS total_in,
+                    COALESCE(SUM(CASE WHEN LOWER(from_address) = %s THEN value_eth ELSE 0 END), 0) AS total_out
+                FROM transactions
+                WHERE (LOWER(from_address) = %s OR LOWER(to_address) = %s)
+                  AND value_eth > 0
+                """,
+                (addr, addr, addr, addr),
+            )
+            if not row:
+                continue
+
+            total_in  = Decimal(str(row["total_in"]  or 0))
+            total_out = Decimal(str(row["total_out"] or 0))
+            net_eth   = max(total_in - total_out, Decimal("0"))
+
+            if net_eth <= 0:
+                continue
+
+            balance_usd = net_eth * eth_price
+
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        """
+                        INSERT INTO wallet_balances
+                            (address, token_symbol, token_contract, balance, balance_usd, updated_at)
+                        VALUES (%s, 'ETH', '', %s, %s, NOW())
+                        ON DUPLICATE KEY UPDATE
+                            balance     = %s,
+                            balance_usd = %s,
+                            updated_at  = NOW()
+                        """,
+                        (addr, float(net_eth), float(balance_usd),
+                         float(net_eth), float(balance_usd)),
+                    )
+                await conn.commit()
+            reconstructed += 1
+
+        except Exception:
+            continue
+
+    return reconstructed
+
+
+def _snapshot_status(mvrv: dict) -> str:
+    """
+    Derive a snapshot status string for forensic traceability.
+    COMPLETE  — MV > 0, real cost basis available
+    PARTIAL   — MV > 0, but no cost basis (only outgoing txs)
+    EMPTY     — MV = 0 (no holdings)
+    """
+    mv = mvrv.get("market_value_usd", 0)
+    if mv <= 0:
+        return "EMPTY"
+    if mvrv.get("cost_basis_available"):
+        return "COMPLETE"
+    return "PARTIAL"
+    if not ts:
+        return None
+    if isinstance(ts, str):
+        return ts
+    if getattr(ts, "tzinfo", None) is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    return ts.astimezone(timezone.utc).isoformat()
 
 
 def _fmt_ts(ts) -> Optional[str]:

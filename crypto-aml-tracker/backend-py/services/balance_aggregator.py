@@ -50,44 +50,38 @@ SUPPORTED_TOKENS = {
 
 STABLECOINS = {"USDT", "USDC", "DAI", "BUSD"}
 
-_DEFAULT_ETH_RPCS = (
-    "https://eth.llamarpc.com",
-    "https://ethereum.publicnode.com",
-)
+# Stablecoin prices are always $1 — no oracle call needed
+_STABLECOIN_PRICES = {sym: Decimal("1") for sym in STABLECOINS}
+
+# Chainlink ETH/USD feed (Mainnet)
+_CHAINLINK_ETH_USD = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
+_LATEST_ROUND_DATA_SELECTOR = "0xfeaf968c"
 
 
 def _collect_rpc_urls() -> List[str]:
     """
-    Build an ordered list of JSON-RPC endpoints.
-    Skips Alchemy's public /v2/demo URL (HTTP 429). Prefer RPC_URL, then paid/free providers, then public nodes.
+    Return the single Alchemy RPC URL from environment.
+    Alchemy is the ONLY permitted blockchain data provider.
+    No fallback URLs. No alternative providers.
     """
-    seen: set[str] = set()
-    out: List[str] = []
-    for key in ("RPC_URL", "INFURA_RPC", "ALCHEMY_RPC"):
-        u = (os.getenv(key) or "").strip()
-        if not u or u in seen:
-            continue
-        low = u.lower()
-        if "/v2/demo" in low or low.rstrip("/").endswith("/demo"):
-            continue
-        seen.add(u)
-        out.append(u)
-    for u in _DEFAULT_ETH_RPCS:
-        if u not in seen:
-            seen.add(u)
-            out.append(u)
-    return out
+    url = (os.getenv("ALCHEMY_RPC") or "").strip()
+    if not url or "/v2/demo" in url.lower():
+        raise RuntimeError(
+            "ALCHEMY_RPC is not configured or uses the demo key. "
+            "Set ALCHEMY_RPC=https://eth-mainnet.g.alchemy.com/v2/<your-key> in .env"
+        )
+    return [url]
 
 
 class BalanceAggregator:
     """Aggregates on-chain balances for addresses and clusters."""
-    
+
     def __init__(self):
         self.rpc_urls = _collect_rpc_urls()
         preview = self.rpc_urls[0][:56] + "…" if len(self.rpc_urls[0]) > 56 else self.rpc_urls[0]
-        print(f"🔗 JSON-RPC chain ({len(self.rpc_urls)} endpoints), first: {preview}")
-        self.coingecko_api_key = os.getenv("COINGECKO_API_KEY")
-        self.price_cache = {}
+        print(f"🔗 Alchemy RPC: {preview}")
+        # No CoinGecko key — pricing is oracle-only
+        self.price_cache: Dict[str, Decimal] = {}
         self.price_cache_time = None
 
     async def _jsonrpc(self, payload: dict) -> Tuple[Optional[dict], Optional[str]]:
@@ -185,64 +179,88 @@ class BalanceAggregator:
     
     async def fetch_token_prices(self) -> Dict[str, Decimal]:
         """
-        Fetch token prices from CoinGecko API.
-        Caches prices for 5 minutes to avoid excessive API calls.
+        Fetch current ETH/USD price from the Chainlink oracle via Alchemy.
+        Stablecoins are always $1 — no oracle call needed.
+        Caches for 5 minutes. No CoinGecko. No external market APIs.
         """
         now = datetime.now(timezone.utc)
-        
-        # Return cached prices if less than 5 minutes old
-        if self.price_cache_time and (now - self.price_cache_time).seconds < 300:
+        if self.price_cache_time and (now - self.price_cache_time).total_seconds() < 300:
             return self.price_cache
-        
+
+        print("💰 Fetching ETH/USD price from Chainlink oracle via Alchemy…")
+        prices: Dict[str, Decimal] = {}
+
+        # Stablecoins: always $1
+        for sym in STABLECOINS:
+            prices[sym] = Decimal("1")
+
+        # ETH/WETH: query Chainlink oracle at latest block
         try:
-            # Build CoinGecko IDs list
-            ids = ",".join([token["coingecko_id"] for token in SUPPORTED_TOKENS.values()])
-            
-            url = f"https://api.coingecko.com/api/v3/simple/price?ids={ids}&vs_currencies=usd"
-            headers = {}
-            if self.coingecko_api_key:
-                headers["x-cg-pro-api-key"] = self.coingecko_api_key
-            
-            print(f"💰 Fetching token prices from CoinGecko...")
-            import ssl
-            ssl_ctx = ssl.create_default_context()
+            url = self.rpc_urls[0]
+            import ssl as _ssl
+            ssl_ctx = _ssl.create_default_context()
             try:
                 import certifi
-                ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+                ssl_ctx = _ssl.create_default_context(cafile=certifi.where())
             except ImportError:
                 ssl_ctx.check_hostname = False
-                ssl_ctx.verify_mode = ssl.CERT_NONE
+                ssl_ctx.verify_mode = _ssl.CERT_NONE
+
             connector = aiohttp.TCPConnector(ssl=ssl_ctx)
             async with aiohttp.ClientSession(connector=connector) as session:
-                async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        
-                        # Map prices to token symbols
-                        prices = {}
-                        for symbol, token_info in SUPPORTED_TOKENS.items():
-                            coingecko_id = token_info["coingecko_id"]
-                            if coingecko_id in data and "usd" in data[coingecko_id]:
-                                prices[symbol] = Decimal(str(data[coingecko_id]["usd"]))
-                                print(f"  ✓ {symbol}: ${prices[symbol]}")
-                            else:
-                                prices[symbol] = Decimal(0)
-                                print(f"  ✗ {symbol}: No price data")
-                        
-                        self.price_cache = prices
-                        self.price_cache_time = now
-                        
-                        # Save to database
-                        await self.save_prices_to_db(prices)
-                        
-                        return prices
+                payload = {
+                    "jsonrpc": "2.0",
+                    "method": "eth_call",
+                    "params": [
+                        {"to": _CHAINLINK_ETH_USD, "data": _LATEST_ROUND_DATA_SELECTOR},
+                        "latest",
+                    ],
+                    "id": 1,
+                }
+                async with session.post(
+                    url, json=payload, timeout=aiohttp.ClientTimeout(total=15)
+                ) as resp:
+                    body = await resp.json()
+                    result = body.get("result")
+
+            if result and result != "0x":
+                raw = result.lstrip("0x")
+                # Left-pad to 320 hex chars — Chainlink omits leading zeros on roundId
+                padded = raw.zfill(320)
+                if len(padded) >= 128:
+                    answer_int = int(padded[64:128], 16)
+                    if answer_int >= (1 << 255):
+                        answer_int -= (1 << 256)
+                    if answer_int > 0:
+                        eth_price = Decimal(answer_int) / Decimal(10 ** 8)
+                        # Sanity guard: reject obviously invalid prices
+                        if Decimal("1") < eth_price < Decimal("1000000"):
+                            prices["ETH"]  = eth_price
+                            prices["WETH"] = eth_price
+                            print(f"  ✓ ETH/WETH: ${eth_price:.2f} (Chainlink oracle)")
+                        else:
+                            print(f"  ✗ Chainlink price out of range: {eth_price}")
                     else:
-                        print(f"  ✗ CoinGecko API error: {resp.status}")
-                        return await self.load_prices_from_db()
-        
-        except Exception as e:
-            print(f"  ✗ Error fetching token prices: {e}")
-            return await self.load_prices_from_db()
+                        print("  ✗ Chainlink returned non-positive answer")
+                else:
+                    print("  ✗ Chainlink response too short to decode")
+            else:
+                print("  ✗ Chainlink oracle returned empty result")
+
+        except Exception as exc:
+            print(f"  ✗ Chainlink price fetch error: {exc}")
+            # Try loading from DB cache as last resort (still oracle data, just stale)
+            cached = await self.load_prices_from_db()
+            if cached.get("ETH", Decimal(0)) > 0:
+                prices.update(cached)
+                print("  ↩ Using stale oracle price from DB cache")
+
+        if prices.get("ETH", Decimal(0)) > 0:
+            self.price_cache = prices
+            self.price_cache_time = now
+            await self.save_prices_to_db(prices)
+
+        return prices
     
     async def save_prices_to_db(self, prices: Dict[str, Decimal]):
         """Save token prices to database cache."""

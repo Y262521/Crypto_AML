@@ -22,6 +22,9 @@ TRANSACTION_COLUMNS = [
     "from_address",
     "to_address",
     "value_eth",
+    "usd_at_execution",
+    "pricing_source",
+    "valuation_version",
     "gas_used",
     "status",
     "is_contract_call",
@@ -445,6 +448,7 @@ def create_tables_if_not_exist(cfg: Config | None = None) -> None:
         _migrate_legacy_owner_schema(engine, cfg)
         _drop_legacy_placement_poi_table(engine, cfg)
         _ensure_utf8mb4_tables(engine, cfg)
+        _ensure_usd_at_execution_column(engine, cfg)
     finally:
         engine.dispose()
 
@@ -517,6 +521,35 @@ def _upsert_rows(table_name: str, engine: Engine, rows: Iterable[dict]) -> int:
     with engine.begin() as conn:
         conn.execute(sql, records)
     return len(records)
+
+
+def _ensure_usd_at_execution_column(engine: Engine, cfg: Config) -> None:
+    """Add usd_at_execution, pricing_source, and valuation_version columns if missing."""
+    with engine.begin() as conn:
+        rows = conn.execute(
+            text(
+                """
+                SELECT COLUMN_NAME
+                FROM information_schema.columns
+                WHERE table_schema = :db
+                  AND table_name = 'transactions'
+                """
+            ),
+            {"db": cfg.mysql_db},
+        ).all()
+        existing = {row[0] for row in rows}
+
+        migrations = {
+            "usd_at_execution":  "DECIMAL(24,2) NULL",
+            "pricing_source":    "VARCHAR(64) NULL COMMENT 'chainlink_oracle | backfill_chainlink'",
+            "valuation_version": "TINYINT UNSIGNED NOT NULL DEFAULT 0",
+        }
+        for col, ddl in migrations.items():
+            if col not in existing:
+                conn.exec_driver_sql(
+                    f"ALTER TABLE `transactions` ADD COLUMN `{col}` {ddl}"
+                )
+                logger.info("Added column transactions.%s", col)
 
 
 def _ensure_address_columns(engine: Engine, cfg: Config) -> None:

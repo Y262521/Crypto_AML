@@ -58,6 +58,9 @@ CREATE TABLE IF NOT EXISTS transactions (
     from_address VARCHAR(64) NULL,
     to_address VARCHAR(64) NULL,
     value_eth DECIMAL(38,18) NOT NULL DEFAULT 0,
+    usd_at_execution DECIMAL(24,2) NULL,
+    pricing_source VARCHAR(64) NULL COMMENT 'chainlink_oracle | backfill_chainlink | NULL if no price',
+    valuation_version TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'increments on each backfill run',
     timestamp DATETIME NULL,
     block_number BIGINT NOT NULL,
     is_contract_call TINYINT(1) NOT NULL DEFAULT 0,
@@ -426,4 +429,24 @@ CREATE TABLE IF NOT EXISTS integration_alerts (
     CONSTRAINT fk_integration_alerts_run
         FOREIGN KEY (run_id) REFERENCES integration_runs(id)
         ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── Valuation audit log ──────────────────────────────────────────────────────
+-- Immutable record of every backfill run. Never updated, only appended.
+
+CREATE TABLE IF NOT EXISTS valuation_audit_log (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    run_id VARCHAR(64) NOT NULL COMMENT 'UUID generated per backfill execution',
+    pricing_source VARCHAR(64) NOT NULL COMMENT 'chainlink_oracle | backfill_chainlink',
+    price_date DATE NOT NULL COMMENT 'The date the oracle price applies to',
+    eth_usd_price DECIMAL(24,8) NOT NULL COMMENT 'ETH/USD price used for this date',
+    tx_hash VARCHAR(66) NOT NULL COMMENT 'Transaction that was valued',
+    value_eth DECIMAL(38,18) NOT NULL COMMENT 'ETH amount at time of execution',
+    usd_at_execution DECIMAL(24,2) NOT NULL COMMENT 'Computed USD value',
+    valuation_version TINYINT UNSIGNED NOT NULL COMMENT 'Version written to transactions table',
+    computed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'When this valuation was computed',
+    KEY idx_val_audit_run_id (run_id),
+    KEY idx_val_audit_tx_hash (tx_hash),
+    KEY idx_val_audit_price_date (price_date),
+    KEY idx_val_audit_computed_at (computed_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
