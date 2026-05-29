@@ -221,15 +221,18 @@ async def get_address_mvrv(
         sym    = r["token_symbol"]
         cb     = mvrv["cost_basis_per_token"].get(sym, {})
         mv_usd = float(r["balance_usd"] or 0)
+        cb_available = cb.get("cost_basis_available", False)
         assets.append({
             "token_symbol":       sym,
             "token_contract":     r.get("token_contract") or None,
             "balance":            float(r["balance"] or 0),
             "current_price_usd":  float(current_prices.get(sym, Decimal("0"))),
             "market_value_usd":   mv_usd,
-            "cost_basis_usd":     float(cb.get("avg_cost_basis_usd", 0)),
-            "unrealized_pnl_usd": float(cb.get("unrealized_pnl_usd", 0)),
-            "realized_pnl_usd":   float(cb.get("realized_pnl_usd", 0)),
+            # None when no acquisition history — never fabricate zero
+            "cost_basis_usd":     float(cb["avg_cost_basis_usd"]) if cb_available and cb.get("avg_cost_basis_usd") is not None else None,
+            "unrealized_pnl_usd": float(cb["unrealized_pnl_usd"]) if cb_available and cb.get("unrealized_pnl_usd") is not None else None,
+            "realized_pnl_usd":   float(cb["realized_pnl_usd"])   if cb_available and cb.get("realized_pnl_usd")   is not None else None,
+            "cost_basis_available": cb_available,
             "portfolio_percent":  round(mv_usd / total_mv * 100, 2) if total_mv > 0 else 0,
         })
 
@@ -253,12 +256,12 @@ async def get_address_mvrv(
         "mvrv":         mvrv,
         "summary": {
             "market_value_usd":   mvrv["market_value_usd"],
-            "realized_value_usd": mvrv["realized_value_usd"],
-            "mvrv_ratio":         mvrv["mvrv_ratio"],
-            "unrealized_pnl_usd": mvrv["unrealized_pnl_usd"],
-            "unrealized_pnl_pct": mvrv["unrealized_pnl_pct"],
-            "realized_pnl_usd":   mvrv["realized_pnl_usd"],
-            "net_pnl_usd":        mvrv["net_pnl_usd"],
+            "realized_value_usd": mvrv.get("realized_value_usd"),   # None if no history
+            "mvrv_ratio":         mvrv.get("mvrv_ratio"),            # None if no history
+            "unrealized_pnl_usd": mvrv.get("unrealized_pnl_usd"),   # None if no history
+            "unrealized_pnl_pct": mvrv.get("unrealized_pnl_pct"),   # None if no history
+            "realized_pnl_usd":   mvrv.get("realized_pnl_usd"),     # None if no history
+            "net_pnl_usd":        mvrv.get("net_pnl_usd"),          # None if no history
             "tx_count_in":        mvrv["tx_count_in"],
             "tx_count_out":       mvrv["tx_count_out"],
             "tx_count_total":     mvrv["tx_count_total"],
@@ -266,6 +269,9 @@ async def get_address_mvrv(
             "wallet_count":       1,
             "accounting_method":  acct,
             "updated_at":         _fmt_ts(latest_u),
+            "cost_basis_available": mvrv.get("cost_basis_available", False),
+            "history_complete":     mvrv.get("history_complete", False),
+            "pricing_source":       mvrv.get("pricing_source", "chainlink_oracle"),
         },
         "assets":     assets,
         "allocation": allocation,
@@ -274,7 +280,9 @@ async def get_address_mvrv(
 
 
 # ---------------------------------------------------------------------------
-# Cluster endpoint
+# Cluster endpoint — pure aggregation from precomputed address snapshots
+# No FIFO recomputation. No RPC calls. No wallet_balances reconstruction.
+# Cluster MV/RV = SUM of address-level mvrv_snapshots only.
 # ---------------------------------------------------------------------------
 
 @router.get("/cluster/{cluster_id}")
@@ -282,55 +290,109 @@ async def get_cluster_mvrv(
     cluster_id: str,
     method: str = Query("FIFO", pattern="^(FIFO|LIFO|HIFO)$"),
 ):
-    """Aggregated MVRV for a wallet cluster."""
+    """
+    Aggregate MVRV for a wallet cluster by summing precomputed address-level snapshots.
+
+    Architecture:
+      1. Resolve cluster → member addresses (no RPC)
+      2. Fetch latest mvrv_snapshots for each member address (no FIFO recomputation)
+      3. Aggregate: cluster_MV = SUM(addr.MV), cluster_RV = SUM(addr.RV), etc.
+      4. Addresses with no snapshot are skipped (not zeroed)
+      5. cluster_ratio = cluster_MV / cluster_RV (safe division)
+    """
     acct = _validate_method(method)
     cluster_id = await _resolve_cluster_id(cluster_id)
 
+    # Step 1 — resolve member addresses
     addr_rows = await fetch_all(
         "SELECT address FROM addresses WHERE cluster_id = %s", (cluster_id,)
     ) or []
-    # Also try uppercase in case of case mismatch
     if not addr_rows:
         addr_rows = await fetch_all(
             "SELECT address FROM addresses WHERE UPPER(cluster_id) = %s", (cluster_id.upper(),)
         ) or []
-    # Fallback: check placement_entity_addresses (placement clusters)
     if not addr_rows:
         addr_rows = await fetch_all(
-            "SELECT address FROM placement_entity_addresses WHERE entity_id = %s",
-            (cluster_id,)
+            "SELECT address FROM placement_entity_addresses WHERE entity_id = %s", (cluster_id,)
         ) or []
-    # Fallback: check layering_entity_addresses
     if not addr_rows:
         addr_rows = await fetch_all(
-            "SELECT address FROM layering_entity_addresses WHERE entity_id = %s",
-            (cluster_id,)
+            "SELECT address FROM layering_entity_addresses WHERE entity_id = %s", (cluster_id,)
         ) or []
-    addresses = [r["address"].lower() for r in addr_rows]
 
+    addresses = [r["address"].lower() for r in addr_rows]
     if not addresses:
         return _empty_cluster_response(cluster_id, acct)
 
-    agg = get_aggregator()
-    stale = []
-    for addr in addresses:
-        row = await fetch_one(
-            "SELECT MAX(updated_at) AS u FROM wallet_balances WHERE address = %s", (addr,)
-        )
-        if _stale((row or {}).get("u")):
-            stale.append(addr)
-    if stale:
-        await asyncio.gather(*[agg.update_address(a) for a in stale], return_exceptions=True)
-
-    current_prices   = await _get_current_prices()
-    balances_by_addr = {addr: await _get_address_balances(addr) for addr in addresses}
-
-    mvrv = await compute_mvrv_for_cluster(
-        cluster_id, addresses, current_prices, balances_by_addr, acct
-    )
-    await save_mvrv_snapshot(cluster_id, "cluster", mvrv)
-
+    # Step 2 — fetch latest precomputed snapshots for all member addresses
+    # One query for all members — no per-address loops, no FIFO, no RPC
     placeholders = ",".join(["%s"] * len(addresses))
+    snapshot_rows = await fetch_all(
+        f"""
+        SELECT ms.entity_id,
+               ms.market_value_usd,
+               ms.realized_value_usd,
+               ms.mvrv_ratio,
+               ms.unrealized_pnl_usd,
+               ms.realized_pnl_usd,
+               ms.accounting_method,
+               ms.snapshot_at
+        FROM mvrv_snapshots ms
+        INNER JOIN (
+            SELECT entity_id, MAX(snapshot_at) AS latest
+            FROM mvrv_snapshots
+            WHERE entity_type = 'address'
+              AND entity_id IN ({placeholders})
+            GROUP BY entity_id
+        ) latest_snap
+          ON ms.entity_id = latest_snap.entity_id
+         AND ms.snapshot_at = latest_snap.latest
+        WHERE ms.entity_type = 'address'
+        """,
+        tuple(addresses),
+    ) or []
+
+    # Step 3 — pure aggregation (skip addresses with no snapshot)
+    total_mv   = Decimal("0")
+    total_rv   = Decimal("0")
+    total_upnl = Decimal("0")
+    total_rpnl = Decimal("0")
+    addresses_with_snapshot = 0
+    addresses_with_cost_basis = 0
+
+    for snap in snapshot_rows:
+        mv   = Decimal(str(snap["market_value_usd"]   or 0))
+        rv   = Decimal(str(snap["realized_value_usd"] or 0))
+        upnl = Decimal(str(snap["unrealized_pnl_usd"] or 0))
+        rpnl = Decimal(str(snap["realized_pnl_usd"]   or 0))
+
+        if mv <= 0:
+            continue  # skip addresses with no holdings
+
+        total_mv   += mv
+        total_upnl += upnl
+        total_rpnl += rpnl
+        addresses_with_snapshot += 1
+
+        if rv > 0:
+            total_rv += rv
+            addresses_with_cost_basis += 1
+
+    # Step 4 — compute cluster-level ratio (safe division)
+    if total_mv > 0 and total_rv > 0:
+        cluster_ratio     = round(float(total_mv / total_rv), 6)
+        upnl_pct          = round(float(total_upnl / total_rv * 100), 4)
+        cost_basis_available = True
+    elif total_mv > 0:
+        cluster_ratio     = 0.0   # holdings exist but no cost basis
+        upnl_pct          = 0.0
+        cost_basis_available = False
+    else:
+        cluster_ratio     = 0.0
+        upnl_pct          = 0.0
+        cost_basis_available = False
+
+    # Step 5 — build asset breakdown from wallet_balances (read-only, no recomputation)
     asset_rows = await fetch_all(
         f"""
         SELECT token_symbol,
@@ -345,50 +407,80 @@ async def get_cluster_mvrv(
         tuple(addresses),
     ) or []
 
-    total_mv = mvrv["market_value_usd"]
+    total_mv_f = float(total_mv)
     assets = [
         {
             "token_symbol":       r["token_symbol"],
             "token_contract":     r.get("token_contract") or None,
             "balance":            float(r["balance"] or 0),
-            "current_price_usd":  float(current_prices.get(r["token_symbol"], Decimal("0"))),
+            "current_price_usd":  None,   # not recomputed — read from wallet_balances
             "market_value_usd":   float(r["balance_usd"] or 0),
-            "cost_basis_usd":     0.0,
-            "unrealized_pnl_usd": 0.0,
-            "realized_pnl_usd":   0.0,
-            "portfolio_percent":  round(float(r["balance_usd"] or 0) / total_mv * 100, 2) if total_mv > 0 else 0,
+            "cost_basis_usd":     None,   # cluster-level cost basis not per-token
+            "unrealized_pnl_usd": None,
+            "realized_pnl_usd":   None,
+            "portfolio_percent":  round(float(r["balance_usd"] or 0) / total_mv_f * 100, 2)
+                                  if total_mv_f > 0 else 0,
         }
         for r in asset_rows
+        if float(r["balance_usd"] or 0) > 0
     ]
 
-    flags = generate_mvrv_flags(mvrv, assets)
     eth_v = sum(a["market_value_usd"] for a in assets if a["token_symbol"] in ("ETH", "WETH"))
     st_v  = sum(a["market_value_usd"] for a in assets if a["token_symbol"] in STABLECOINS)
     allocation = {
-        "eth_percent":        round(eth_v / total_mv * 100, 2) if total_mv > 0 else 0,
-        "stablecoin_percent": round(st_v  / total_mv * 100, 2) if total_mv > 0 else 0,
+        "eth_percent":        round(eth_v / total_mv_f * 100, 2) if total_mv_f > 0 else 0,
+        "stablecoin_percent": round(st_v  / total_mv_f * 100, 2) if total_mv_f > 0 else 0,
         "defi_percent":       0,
     }
     allocation["other_erc20_percent"] = round(
         100 - allocation["eth_percent"] - allocation["stablecoin_percent"], 2
     )
 
+    mvrv_out = {
+        "market_value_usd":    total_mv_f,
+        "realized_value_usd":  float(total_rv),
+        "mvrv_ratio":          cluster_ratio,
+        "unrealized_pnl_usd":  float(total_upnl),
+        "unrealized_pnl_pct":  upnl_pct,
+        "realized_pnl_usd":    float(total_rpnl),
+        "net_pnl_usd":         float(total_upnl + total_rpnl),
+        "cost_basis_per_token": {},
+        "tx_count_total":      0,
+        "wallet_count":        len(addresses),
+        "accounting_method":   acct,
+        "cost_basis_available": cost_basis_available,
+        "history_complete":    cost_basis_available,
+        "pricing_source":      "chainlink_oracle",
+        "cost_basis_method":   acct,
+    }
+
+    # Save cluster snapshot
+    if total_mv_f > 0:
+        await save_mvrv_snapshot(cluster_id, "cluster", mvrv_out)
+
+    flags = generate_mvrv_flags(mvrv_out, assets)
+
     return {
-        "cluster_id": cluster_id,
-        "mvrv":       mvrv,
+        "cluster_id":          cluster_id,
+        "mvrv":                mvrv_out,
         "summary": {
-            "market_value_usd":   mvrv["market_value_usd"],
-            "realized_value_usd": mvrv["realized_value_usd"],
-            "mvrv_ratio":         mvrv["mvrv_ratio"],
-            "unrealized_pnl_usd": mvrv["unrealized_pnl_usd"],
-            "unrealized_pnl_pct": mvrv["unrealized_pnl_pct"],
-            "realized_pnl_usd":   mvrv["realized_pnl_usd"],
-            "net_pnl_usd":        mvrv["net_pnl_usd"],
-            "tx_count_total":     mvrv["tx_count_total"],
-            "token_count":        len(assets),
-            "wallet_count":       len(addresses),
-            "accounting_method":  acct,
-            "updated_at":         None,
+            "market_value_usd":          total_mv_f,
+            "realized_value_usd":        float(total_rv),
+            "mvrv_ratio":                cluster_ratio,
+            "unrealized_pnl_usd":        float(total_upnl),
+            "unrealized_pnl_pct":        upnl_pct,
+            "realized_pnl_usd":          float(total_rpnl),
+            "net_pnl_usd":               float(total_upnl + total_rpnl),
+            "tx_count_total":            0,
+            "token_count":               len(assets),
+            "wallet_count":              len(addresses),
+            "accounting_method":         acct,
+            "updated_at":                None,
+            "cost_basis_available":      cost_basis_available,
+            "addresses_with_snapshot":   addresses_with_snapshot,
+            "addresses_with_cost_basis": addresses_with_cost_basis,
+            "snapshot_status":           "COMPLETE" if cost_basis_available else
+                                         ("PARTIAL" if total_mv_f > 0 else "EMPTY"),
         },
         "assets":     assets,
         "allocation": allocation,

@@ -249,14 +249,16 @@ const MvrvAnalysis = ({ entityId, entityType }) => {
             <span style={{ padding: '3px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', background: 'rgba(139,92,246,0.12)', color: '#A78BFA' }}>{method}</span>
           </div>
         </div>
-        {safeNum(ratio) === 0 ? (
+        {ratio == null || ratio === 0 ? (
           <div style={{ textAlign: 'center', padding: '24px 0' }}>
             <div style={{ fontSize: '36px', fontWeight: '800', color: C.textMuted, marginBottom: '8px' }}>—</div>
             <div style={{ fontSize: '12px', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-              Cost basis not yet computed
+              {data?.mvrv?.cost_basis_available === false ? 'No Acquisition History in Dataset' : 'Cost basis not yet computed'}
             </div>
             <div style={{ fontSize: '11px', color: C.textMuted, marginTop: '8px', maxWidth: '320px', margin: '8px auto 0' }}>
-              Click ⟳ Refresh to fetch on-chain balance and compute FIFO cost basis
+              {data?.mvrv?.cost_basis_available === false
+                ? 'This address holds assets but its acquisition transactions are outside the extracted block range.'
+                : 'Click ⟳ Refresh to fetch on-chain balance and compute FIFO cost basis'}
             </div>
           </div>
         ) : (
@@ -267,12 +269,12 @@ const MvrvAnalysis = ({ entityId, entityType }) => {
       {/* Summary cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
         <SummaryCard label={valMode===MODES.ETH ? 'Market Value (Ξ)' : 'Market Value'}   value={fv(safeNum(summary.market_value_usd))}   icon="📈" color={C.gold} />
-        <SummaryCard label={valMode===MODES.ETH ? 'Realized Value (Ξ)' : 'Realized Value'} value={safeNum(summary.realized_value_usd) > 0 ? fv(safeNum(summary.realized_value_usd)) : '—'} icon="🏦" color={C.blue} />
-        <SummaryCard label={valMode===MODES.ETH ? 'Unrealized PnL (Ξ)' : 'Unrealized PnL'} value={safeNum(summary.realized_value_usd) > 0 ? fp(safeNum(summary.unrealized_pnl_usd)) : '—'} icon={safeNum(summary.unrealized_pnl_usd) >= 0 ? '🟢' : '🔴'} color={pnlColor(safeNum(summary.unrealized_pnl_usd))} />
-        <SummaryCard label={valMode===MODES.ETH ? 'Realized PnL (Ξ)' : 'Realized PnL'}   value={safeNum(summary.realized_pnl_usd) !== 0 ? fp(safeNum(summary.realized_pnl_usd)) : '—'}   icon={safeNum(summary.realized_pnl_usd) >= 0 ? '✅' : '❌'} color={pnlColor(safeNum(summary.realized_pnl_usd))} />
-        <SummaryCard label={valMode===MODES.ETH ? 'Net PnL (Ξ)' : 'Net PnL'}             value={safeNum(summary.realized_value_usd) > 0 ? fp(safeNum(summary.net_pnl_usd)) : '—'}         icon="💹" color={pnlColor(safeNum(summary.net_pnl_usd))} />
+        <SummaryCard label={valMode===MODES.ETH ? 'Realized Value (Ξ)' : 'Realized Value'} value={data?.mvrv?.cost_basis_available ? fv(safeNum(summary.realized_value_usd)) : 'No History'} icon="🏦" color={data?.mvrv?.cost_basis_available ? C.blue : C.textMuted} />
+        <SummaryCard label={valMode===MODES.ETH ? 'Unrealized PnL (Ξ)' : 'Unrealized PnL'} value={data?.mvrv?.cost_basis_available ? fp(safeNum(summary.unrealized_pnl_usd)) : 'No History'} icon={safeNum(summary.unrealized_pnl_usd) >= 0 ? '🟢' : '🔴'} color={data?.mvrv?.cost_basis_available ? pnlColor(safeNum(summary.unrealized_pnl_usd)) : C.textMuted} />
+        <SummaryCard label={valMode===MODES.ETH ? 'Realized PnL (Ξ)' : 'Realized PnL'}   value={data?.mvrv?.cost_basis_available ? fp(safeNum(summary.realized_pnl_usd)) : 'No History'}   icon={safeNum(summary.realized_pnl_usd) >= 0 ? '✅' : '❌'} color={data?.mvrv?.cost_basis_available ? pnlColor(safeNum(summary.realized_pnl_usd)) : C.textMuted} />
+        <SummaryCard label={valMode===MODES.ETH ? 'Net PnL (Ξ)' : 'Net PnL'}             value={data?.mvrv?.cost_basis_available ? fp(safeNum(summary.net_pnl_usd)) : 'No History'}         icon="💹" color={data?.mvrv?.cost_basis_available ? pnlColor(safeNum(summary.net_pnl_usd)) : C.textMuted} />
         <SummaryCard label="Tx Count"  value={fmtNum(safeNum(summary.tx_count_total), 0)} icon="🔁" color={C.textSec} />
-        <SummaryCard label="MVRV Ratio" value={fmtRatio(safeNum(summary.mvrv_ratio) || null)} icon="⚖️" color={mvrvColor(safeNum(summary.mvrv_ratio))} />
+        <SummaryCard label="MVRV Ratio" value={data?.mvrv?.cost_basis_available && ratio ? fmtRatio(ratio) : 'No History'} icon="⚖️" color={data?.mvrv?.cost_basis_available ? mvrvColor(ratio) : C.textMuted} />
       </div>
 
       {/* Chart + Flags */}
@@ -385,9 +387,9 @@ const MvrvAnalysis = ({ entityId, entityType }) => {
                       </td>
                       <td style={{ padding:'14px 20px', color:C.textSec, fontSize:'13px', textAlign:'right' }}>{fmtNum(asset.balance)}</td>
                       <td style={{ padding:'14px 20px', color:C.gold, fontSize:'13px', fontWeight:'600', textAlign:'right' }}>{fv(safeNum(asset.market_value_usd))}</td>
-                      <td style={{ padding:'14px 20px', color:C.blue, fontSize:'13px', textAlign:'right' }}>{safeNum(asset.cost_basis_usd) > 0 ? fv(safeNum(asset.cost_basis_usd)) : '—'}</td>
-                      <td style={{ padding:'14px 20px', color:pnlColor(upnl), fontSize:'13px', fontWeight:'600', textAlign:'right' }}>{safeNum(asset.cost_basis_usd) > 0 ? fp(upnl) : '—'}</td>
-                      <td style={{ padding:'14px 20px', color:C.textSec, fontSize:'13px', textAlign:'right' }}>{safeNum(asset.portfolio_percent) > 0 ? Number(asset.portfolio_percent).toFixed(2) + '%' : '—'}</td>
+                      <td style={{ padding:'14px 20px', color:C.blue, fontSize:'13px', textAlign:'right' }}>{asset.cost_basis_usd != null ? fv(safeNum(asset.cost_basis_usd)) : '—'}</td>
+                      <td style={{ padding:'14px 20px', color:pnlColor(upnl), fontSize:'13px', fontWeight:'600', textAlign:'right' }}>{asset.cost_basis_usd != null ? fp(upnl) : '—'}</td>
+                      <td style={{ padding:'14px 20px', color:C.textSec, fontSize:'13px', textAlign:'right' }}>{asset.portfolio_percent != null ? Number(asset.portfolio_percent).toFixed(2) + '%' : '—'}</td>
                     </tr>
                   );
                 })}

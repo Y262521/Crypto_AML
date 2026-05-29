@@ -572,26 +572,47 @@ async def compute_mvrv_for_address(
         cur_bal   = current_balances.get(sym, tracker.current_balance)
 
         mv = cur_bal * cur_price
-        # If we have cost basis data use it; otherwise MV == RV (break-even)
+        market_value_usd += mv
+
         avg_cb = tracker.average_cost_basis
-        rv = cur_bal * avg_cb if avg_cb > 0 else mv
+        has_lots = avg_cb > 0 or tracker.total_received > 0
 
-        market_value_usd   += mv
-        realized_value_usd += rv
-        realized_pnl_usd   += tracker.realized_pnl
+        if has_lots:
+            # Real cost basis exists — use FIFO-computed average
+            rv = cur_bal * avg_cb if avg_cb > 0 else Decimal("0")
+            realized_value_usd += rv
+            realized_pnl_usd   += tracker.realized_pnl
 
-        if cur_bal > 0 or tracker.realized_pnl != 0:
-            cost_basis_per_token[sym] = {
-                "balance":            float(cur_bal),
-                "current_price_usd":  float(cur_price),
-                "avg_cost_basis_usd": float(avg_cb),
-                "market_value_usd":   float(mv),
-                "realized_value_usd": float(rv),
-                "unrealized_pnl_usd": float(mv - rv),
-                "realized_pnl_usd":   float(tracker.realized_pnl),
-                "tx_in":              float(tracker.total_received),
-                "tx_out":             float(tracker.total_sent),
-            }
+            if cur_bal > 0 or tracker.realized_pnl != 0:
+                cost_basis_per_token[sym] = {
+                    "balance":            float(cur_bal),
+                    "current_price_usd":  float(cur_price),
+                    "avg_cost_basis_usd": float(avg_cb),
+                    "market_value_usd":   float(mv),
+                    "realized_value_usd": float(rv),
+                    "unrealized_pnl_usd": float(mv - rv),
+                    "realized_pnl_usd":   float(tracker.realized_pnl),
+                    "tx_in":              float(tracker.total_received),
+                    "tx_out":             float(tracker.total_sent),
+                    "cost_basis_available": True,
+                }
+        else:
+            # No acquisition history — do NOT fabricate RV
+            # Only include in cost_basis_per_token if balance exists, with explicit null markers
+            if cur_bal > 0:
+                cost_basis_per_token[sym] = {
+                    "balance":            float(cur_bal),
+                    "current_price_usd":  float(cur_price),
+                    "avg_cost_basis_usd": None,   # unknown — not zero
+                    "market_value_usd":   float(mv),
+                    "realized_value_usd": None,   # unknown — not zero
+                    "unrealized_pnl_usd": None,   # unknown — not zero
+                    "realized_pnl_usd":   None,   # unknown — not zero
+                    "tx_in":              float(tracker.total_received),
+                    "tx_out":             float(tracker.total_sent),
+                    "cost_basis_available": False,
+                }
+            # Do NOT add to realized_value_usd — unknown ≠ zero
 
     unrealized_pnl_usd = market_value_usd - realized_value_usd
     if realized_value_usd > 0:
@@ -607,12 +628,14 @@ async def compute_mvrv_for_address(
 
     return {
         "market_value_usd":      float(market_value_usd),
-        "realized_value_usd":    float(realized_value_usd) if cost_basis_available else 0.0,
-        "mvrv_ratio":            round(mvrv_ratio, 6),
-        "unrealized_pnl_usd":    float(unrealized_pnl_usd) if cost_basis_available else 0.0,
-        "unrealized_pnl_pct":    round(unrealized_pnl_pct, 4) if cost_basis_available else 0.0,
-        "realized_pnl_usd":      float(realized_pnl_usd),
-        "net_pnl_usd":           float(unrealized_pnl_usd + realized_pnl_usd) if cost_basis_available else float(realized_pnl_usd),
+        # RV/ratio/PnL are NULL when no acquisition history exists — not zero
+        # Returning 0 would be semantically incorrect (unknown ≠ zero)
+        "realized_value_usd":    float(realized_value_usd) if cost_basis_available else None,
+        "mvrv_ratio":            round(mvrv_ratio, 6)      if cost_basis_available else None,
+        "unrealized_pnl_usd":    float(unrealized_pnl_usd) if cost_basis_available else None,
+        "unrealized_pnl_pct":    round(unrealized_pnl_pct, 4) if cost_basis_available else None,
+        "realized_pnl_usd":      float(realized_pnl_usd)  if cost_basis_available else None,
+        "net_pnl_usd":           float(unrealized_pnl_usd + realized_pnl_usd) if cost_basis_available else None,
         "cost_basis_per_token":  cost_basis_per_token,
         "tx_count_in":           tx_in,
         "tx_count_out":          tx_out,
@@ -712,10 +735,10 @@ async def save_mvrv_snapshot(entity_id: str, entity_type: str, mvrv: dict):
                         entity_id, entity_type,
                         mvrv.get("accounting_method", "FIFO"),
                         mvrv["market_value_usd"],
-                        mvrv.get("realized_value_usd", 0),
-                        mvrv.get("mvrv_ratio", 0),
-                        mvrv.get("unrealized_pnl_usd", 0),
-                        mvrv.get("realized_pnl_usd", 0),
+                        mvrv.get("realized_value_usd"),   # None → NULL in DB
+                        mvrv.get("mvrv_ratio"),            # None → NULL in DB
+                        mvrv.get("unrealized_pnl_usd"),   # None → NULL in DB
+                        mvrv.get("realized_pnl_usd"),     # None → NULL in DB
                     ),
                 )
             await conn.commit()
@@ -858,13 +881,14 @@ async def get_mvrv_history(entity_id: str, entity_type: str, days: int = 30) -> 
 
 def generate_mvrv_flags(mvrv: dict, assets: list) -> list:
     flags = []
-    ratio    = mvrv.get("mvrv_ratio", 1.0)
-    mv       = mvrv.get("market_value_usd", 0)
-    rv       = mvrv.get("realized_value_usd", 0)
-    upnl_pct = mvrv.get("unrealized_pnl_pct", 0)
-    rpnl     = mvrv.get("realized_pnl_usd", 0)
+    ratio    = mvrv.get("mvrv_ratio")       # may be None
+    mv       = mvrv.get("market_value_usd", 0) or 0
+    rv       = mvrv.get("realized_value_usd")  # may be None
+    upnl_pct = mvrv.get("unrealized_pnl_pct") or 0
+    rpnl     = mvrv.get("realized_pnl_usd") or 0
 
-    if rv > 100:
+    # Only compute ratio-based flags when cost basis is available
+    if rv is not None and rv > 100 and ratio is not None:
         if ratio > 3.0:
             flags.append({
                 "type": "mvrv_extreme_profit", "severity": "warning",

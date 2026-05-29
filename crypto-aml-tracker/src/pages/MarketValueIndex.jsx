@@ -410,8 +410,8 @@ export default function MarketValueIndex({ onOpenWorkspace, onNavigateToGraph })
                     </td>
 
                     {/* MVRV Ratio — dimensionless, same in both modes */}
-                    <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, fontFamily: 'monospace', color: hasSnap && ratio > 0 ? ratioColor(ratio) : '#4B5E72', whiteSpace: 'nowrap' }}>
-                      {hasSnap && ratio > 0 ? ratio.toFixed(3) : '—'}
+                    <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, fontFamily: 'monospace', color: hasSnap && ratio != null ? ratioColor(ratio) : '#4B5E72', whiteSpace: 'nowrap' }}>
+                      {hasSnap && ratio != null ? ratio.toFixed(3) : '—'}
                     </td>
 
                     {/* Unrealized PnL % */}
