@@ -9,6 +9,8 @@ import {
 } from '../services/transactionService';
 import { filterEdgesData, applyRadialLayout } from '../utils/graphUtils';
 import Loader from '../components/common/Loader';
+import ChainBadge from '../components/chain/ChainBadge';
+import ChainFilter from '../components/chain/ChainFilter';
 
 const EMPTY_OWNER_FORM = {
     full_name: '',
@@ -117,6 +119,15 @@ const formatEth = (value) => {
     return num.toLocaleString(undefined, { maximumFractionDigits: 6 });
 };
 
+// Map chain_name → native asset symbol for display
+const CHAIN_NATIVE_ASSET = {
+    ethereum: 'ETH', base: 'ETH', arbitrum: 'ETH',
+    bnb: 'BNB', polygon: 'POL', solana: 'SOL',
+    bitcoin: 'BTC', litecoin: 'LTC', dogecoin: 'DOGE', bitcoin_cash: 'BCH',
+};
+const getNativeAsset = (cluster) =>
+    CHAIN_NATIVE_ASSET[cluster?.chain_name] || cluster?.blockchain_type === 'UTXO' ? '' : 'ETH';
+
 const formatOwner = (owner, labelStatus) => {
     if (owner?.full_name) return owner.full_name;
     if (labelStatus === 'conflict') return 'Owner match conflict';
@@ -202,7 +213,7 @@ const buildPreviewGraph = (edgesData, centerId) => {
             target: receiver,
             type: 'default',
             animated: false,
-            label: `${Number(tx.amount || 0).toFixed(4)} ETH`,
+            label: `${Number(tx.amount || 0).toFixed(4)}`,
             style: { stroke: '#2563eb', strokeWidth: 2 },
             markerEnd: { type: 'arrowclosed', color: '#2563eb', width: 16, height: 16 },
             labelStyle: { fontSize: '9px', fill: '#bfdbfe', fontWeight: '600' },
@@ -229,9 +240,9 @@ const getActivityHighlights = (activity, riskLevel) => {
     }
 
     if (totalFlow > 50) {
-        highlights.push('Large internal ETH movement');
+        highlights.push('Large internal value movement within cluster');
     } else if (totalFlow > 5) {
-        highlights.push('Moderate ETH activity inside the cluster');
+        highlights.push('Moderate value activity inside the cluster');
     }
 
     if (riskLevel && riskLevel !== 'normal') {
@@ -620,7 +631,7 @@ function OwnerListModal({
     );
 }
 
-export default function Clusters({ onAddressClick }) {
+export default function Clusters({ onAddressClick, onShowAnalysisMenu }) {
     const [clusters, setClusters] = useState([]);
     const [summary, setSummary] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -637,6 +648,8 @@ export default function Clusters({ onAddressClick }) {
     const [ownerFormError, setOwnerFormError] = useState(null);
     const [ownerSuccess, setOwnerSuccess] = useState(null);
     const [conflictData, setConflictData] = useState(null);
+    const [chainFilter, setChainFilter] = useState('all');
+    const [search, setSearch] = useState('');
 
     const loadData = () => {
         setLoading(true);
@@ -904,13 +917,22 @@ export default function Clusters({ onAddressClick }) {
                     <StatCard label="Matched Labels" value={summary.matched} color="#166534" />
                     <StatCard label="Unknown / Unlabeled" value={summary.unlabeled} color="#475569" />
                     <StatCard label="Top Internal Flow" value={summary.top_by_balance?.[0]?.cluster_id || '—'}
-                        sub={summary.top_by_balance?.[0] ? `${formatEth(summary.top_by_balance[0].total_balance)} ETH` : ''} />
+                        sub={summary.top_by_balance?.[0] ? `Balance: ${formatEth(summary.top_by_balance[0].total_balance)}` : ''} />
                     <StatCard label="Top Size" value={summary.top_by_size?.[0]?.cluster_id || '—'}
                         sub={summary.top_by_size?.[0] ? `${summary.top_by_size[0].cluster_size} addresses` : ''} />
                 </div>
             )}
 
             <div style={{ background: 'linear-gradient(180deg,#101D32,#0D1628)', borderRadius: '12px', border: '1px solid rgba(201,168,76,0.12)', overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.35)' }}>
+                {/* Chain filter inside cluster table */}
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(201,168,76,0.08)' }}>
+                    <ChainFilter
+                        selectedChain={chainFilter}
+                        onChainChange={setChainFilter}
+                        compact
+                        showTypeFilter={false}
+                    />
+                </div>
                 {clusters.length === 0 ? (
                     <div style={{ padding: '40px', textAlign: 'center', color: '#4B5E72' }}>
                         No clusters available yet. Run clustering to generate ownership groups.
@@ -919,64 +941,74 @@ export default function Clusters({ onAddressClick }) {
                     <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                         <thead>
                             <tr>
-                                <th style={{ ...th, width: '18%' }}>Cluster ID</th>
-                                <th style={{ ...th, width: '22%' }}>Owner</th>
-                                <th style={{ ...th, width: '26%' }}>Location</th>
-                                <th style={{ ...th, width: '12%' }}>Members</th>
-                                <th style={{ ...th, width: '22%' }}>Total Balance</th>
+                                <th style={{ ...th, width: '16%' }}>Cluster ID</th>
+                                <th style={{ ...th, width: '8%' }}>Chain</th>
+                                <th style={{ ...th, width: '20%' }}>Owner</th>
+                                <th style={{ ...th, width: '22%' }}>Location</th>
+                                <th style={{ ...th, width: '10%' }}>Members</th>
+                                <th style={{ ...th, width: '20%' }}>Total Balance</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {clusters.map((cluster, idx) => {
-                                const memberCount = cluster.addresses?.length ?? cluster.cluster_size ?? 0;
-                                return (
-                                    <tr
-                                        key={cluster.cluster_id}
-                                        onClick={() => openClusterDrawer(cluster)}
-                                        style={{ cursor: 'pointer', background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}
-                                        onMouseEnter={(event) => { event.currentTarget.style.background = 'rgba(201,168,76,0.04)'; }}
-                                        onMouseLeave={(event) => { event.currentTarget.style.background = idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)'; }}
-                                    >
-                                        <td style={{ ...td, fontFamily: 'monospace', fontSize: '11px', color: '#C9A84C' }} title={cluster.cluster_id}>
-                                            {`${cluster.cluster_id.slice(0, 10)}...${cluster.cluster_id.slice(-6)}`}
-                                        </td>
-                                        <td style={td}>
-                                            <button
-                                                onClick={(event) => { event.stopPropagation(); openClusterDrawer(cluster); }}
-                                                style={{
-                                                    background: 'transparent', border: 'none', padding: 0, margin: 0,
-                                                    color: cluster.label_status === 'matched' ? '#C9A84C' : '#8A9DB5',
-                                                    fontWeight: '700', cursor: 'pointer',
-                                                    textAlign: 'left', fontSize: '12px',
-                                                }}
-                                                title={formatLocation(cluster.owner, cluster.label_status)}
-                                            >
-                                                {formatOwner(cluster.owner, cluster.label_status)}
-                                            </button>
-                                            <div style={{ marginTop: '8px' }}>
-                                                <StatusPill status={cluster.label_status} />
-                                            </div>
-                                        </td>
-                                        <td style={{ ...td, fontSize: '11px', color: '#6B7E94' }} title={formatLocation(cluster.owner, cluster.label_status)}>
-                                            {truncate(formatLocation(cluster.owner, cluster.label_status), 52)}
-                                        </td>
-                                        <td style={{ ...td, color: '#E2D9C8' }}>{memberCount}</td>
-                                        <td style={{ ...td, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <span style={{ fontWeight: '700', color: '#4ADE80' }}>{formatEth(cluster.total_balance)} ETH</span>
-                                            <button
-                                                onClick={(event) => { event.stopPropagation(); openClusterDrawer(cluster); }}
-                                                style={{
-                                                    border: '1px solid rgba(201,168,76,0.20)', borderRadius: '8px', padding: '6px 10px',
-                                                    background: 'rgba(201,168,76,0.06)', color: '#C9A84C', fontSize: '11px', fontWeight: '600',
-                                                    cursor: 'pointer',
-                                                }}
-                                            >
-                                                View
-                                            </button>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
+                            {clusters
+                                .filter(cluster => {
+                                    const clusterChain = cluster.chain_name || null;
+                                    const matchChain = chainFilter === 'all' || (clusterChain !== null && clusterChain === chainFilter);
+                                    return matchChain;
+                                })
+                                .map((cluster, idx) => {
+                                    const memberCount = cluster.addresses?.length ?? cluster.cluster_size ?? 0;
+                                    return (
+                                        <tr
+                                            key={cluster.cluster_id}
+                                            onClick={() => openClusterDrawer(cluster)}
+                                            style={{ cursor: 'pointer', background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}
+                                            onMouseEnter={(event) => { event.currentTarget.style.background = 'rgba(201,168,76,0.04)'; }}
+                                            onMouseLeave={(event) => { event.currentTarget.style.background = idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)'; }}
+                                        >
+                                            <td style={{ ...td, fontFamily: 'monospace', fontSize: '11px', color: '#C9A84C' }} title={cluster.cluster_id}>
+                                                {`${cluster.cluster_id.slice(0, 10)}...${cluster.cluster_id.slice(-6)}`}
+                                            </td>
+                                            <td style={td}>
+                                                <ChainBadge chain={cluster.chain_name || 'ethereum'} size="xs" showType={false} />
+                                            </td>
+                                            <td style={td}>
+                                                <button
+                                                    onClick={(event) => { event.stopPropagation(); openClusterDrawer(cluster); }}
+                                                    style={{
+                                                        background: 'transparent', border: 'none', padding: 0, margin: 0,
+                                                        color: cluster.label_status === 'matched' ? '#C9A84C' : '#8A9DB5',
+                                                        fontWeight: '700', cursor: 'pointer',
+                                                        textAlign: 'left', fontSize: '12px',
+                                                    }}
+                                                    title={formatLocation(cluster.owner, cluster.label_status)}
+                                                >
+                                                    {formatOwner(cluster.owner, cluster.label_status)}
+                                                </button>
+                                                <div style={{ marginTop: '8px' }}>
+                                                    <StatusPill status={cluster.label_status} />
+                                                </div>
+                                            </td>
+                                            <td style={{ ...td, fontSize: '11px', color: '#6B7E94' }} title={formatLocation(cluster.owner, cluster.label_status)}>
+                                                {truncate(formatLocation(cluster.owner, cluster.label_status), 52)}
+                                            </td>
+                                            <td style={{ ...td, color: '#E2D9C8' }}>{memberCount}</td>
+                                            <td style={{ ...td, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span style={{ fontWeight: '700', color: '#4ADE80' }}>{formatEth(cluster.total_balance)} {CHAIN_NATIVE_ASSET[cluster.chain_name] || 'ETH'}</span>
+                                                <button
+                                                    onClick={(event) => { event.stopPropagation(); openClusterDrawer(cluster); }}
+                                                    style={{
+                                                        border: '1px solid rgba(201,168,76,0.20)', borderRadius: '8px', padding: '6px 10px',
+                                                        background: 'rgba(201,168,76,0.06)', color: '#C9A84C', fontSize: '11px', fontWeight: '600',
+                                                        cursor: 'pointer',
+                                                    }}
+                                                >
+                                                    View
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                         </tbody>
                     </table>
                 )}
@@ -1013,7 +1045,7 @@ export default function Clusters({ onAddressClick }) {
                                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
                                     {[
                                         { label: 'Members', value: selectedCluster.addresses?.length ?? selectedCluster.cluster_size },
-                                        { label: 'Total Balance', value: `${formatEth(selectedCluster.total_balance)} ETH` },
+                                        { label: 'Total Balance', value: `${formatEth(selectedCluster.total_balance)} ${CHAIN_NATIVE_ASSET[selectedCluster.chain_name] || 'ETH'}` },
                                         { label: 'Internal Flow', value: `${formatEth(selectedCluster.activity.total_in)} in / ${formatEth(selectedCluster.activity.total_out)} out` },
                                     ].map(({ label, value }) => (
                                         <div key={label} style={{ padding: '12px 14px', borderRadius: '14px', background: 'rgba(201,168,76,0.05)', border: '1px solid rgba(201,168,76,0.12)', minWidth: '140px' }}>

@@ -92,6 +92,37 @@ async def _latest_run() -> dict | None:
     )
 
 
+async def _latest_batch_run_ids() -> list[str]:
+    """
+    Return the latest placement run ID for each chain.
+    Selects the most recent completed run per chain_name from
+    placement_detections, giving one result per chain.
+    This works correctly whether chains ran together or hours apart.
+    """
+    rows = await fetch_all(
+        """
+        SELECT d.run_id
+        FROM placement_detections d
+        INNER JOIN (
+            SELECT chain_name, MAX(r2.completed_at) AS max_ts
+            FROM placement_detections d2
+            JOIN placement_runs r2 ON r2.id = d2.run_id
+            WHERE r2.status = 'completed'
+            GROUP BY d2.chain_name
+        ) latest_per_chain
+          ON d.chain_name = latest_per_chain.chain_name
+        JOIN placement_runs r ON r.id = d.run_id
+          AND r.completed_at = latest_per_chain.max_ts
+          AND r.status = 'completed'
+        GROUP BY d.run_id
+        """
+    )
+    if rows:
+        return list({r["run_id"] for r in rows})
+    latest = await _latest_run()
+    return [latest["id"]] if latest else []
+
+
 async def _get_run(run_id: str | None, before_date: str | None = None) -> dict | None:
     """Return a specific run by ID, by date, or the latest."""
     if run_id:
@@ -100,7 +131,6 @@ async def _get_run(run_id: str | None, before_date: str | None = None) -> dict |
             (run_id,),
         )
     if before_date:
-        # Find the most recent completed run on or before the given date
         return await fetch_one(
             """
             SELECT id, source, status, started_at, completed_at, summary_json
@@ -204,6 +234,7 @@ def _placement_payload(row: dict, addresses: list[str], names_map: dict | None =
         "entity_id": row.get("entity_id"),
         "entity_name": entity_name,  # None = unlabeled → frontend shows "Unknown"
         "entity_type": row.get("entity_type"),
+        "chain_name": row.get("chain_name") or "ethereum",
         "addresses": addresses,
         "address_count": len(addresses),
         "confidence": float(row.get("confidence_score") or 0.0),
@@ -347,23 +378,39 @@ async def get_placement_runs():
 
 @router.get("/")
 async def get_placements(
-    limit: int = Query(50, ge=1, le=500),
+    limit: int = Query(5000, ge=1, le=10000),
     min_confidence: float = Query(0.0, ge=0.0, le=1.0),
     run_id: str | None = Query(None),
     before_date: str | None = Query(None),
+    chain: str | None = Query(None),
 ):
     _require_mysql()
-    run = await _latest_run_safe(run_id, before_date)
-    if not run:
-        return {
-            "run_id": None,
-            "generated_at": None,
-            "summary": {},
-            "items": [],
-        }
+
+    # When a specific run is requested, use single-run path
+    if run_id or before_date:
+        run = await _latest_run_safe(run_id, before_date)
+        if not run:
+            return {"run_id": None, "generated_at": None, "summary": {}, "items": []}
+        run_ids = [run["id"]]
+        run_meta = run
+    else:
+        # No specific run — query ALL runs from the latest pipeline batch.
+        # run_all_chains.py creates one run per chain; we want all of them.
+        run_ids = await _latest_batch_run_ids()
+        if not run_ids:
+            return {"run_id": None, "generated_at": None, "summary": {}, "items": []}
+        run_meta = await _latest_run()
+
+    run_id_placeholders = ", ".join(["%s"] * len(run_ids))
+
+    chain_filter_sql = ""
+    chain_params: list = []
+    if chain and chain != "all":
+        chain_filter_sql = " AND (d.chain_name = %s OR (d.chain_name IS NULL AND %s = 'ethereum'))"
+        chain_params = [chain, chain]
 
     rows = await fetch_all(
-        """
+        f"""
         SELECT d.entity_id,
                d.entity_type,
                d.confidence_score,
@@ -378,6 +425,8 @@ async def get_placements(
                d.metrics_json,
                d.first_seen_at,
                d.last_seen_at,
+               d.chain_name,
+               d.run_id,
                e.validation_status,
                e.validation_confidence,
                e.source_kind
@@ -385,22 +434,29 @@ async def get_placements(
         JOIN placement_entities e
           ON e.run_id = d.run_id
          AND e.entity_id = d.entity_id
-        WHERE d.run_id = %s
+        WHERE d.run_id IN ({run_id_placeholders})
           AND d.confidence_score >= %s
+          {chain_filter_sql}
         ORDER BY d.placement_score DESC, d.confidence_score DESC, d.entity_id ASC
         LIMIT %s
         """,
-        (run["id"], min_confidence, limit),
+        tuple(run_ids + [min_confidence] + chain_params + [limit]),
     )
     entity_ids = [row["entity_id"] for row in rows]
-    address_map = await _fetch_addresses_map(run["id"], entity_ids)
+    # Fetch addresses across all run_ids in this batch
+    address_map: dict[str, list[str]] = {}
+    for rid in run_ids:
+        partial = await _fetch_addresses_map(rid, entity_ids)
+        for eid, addrs in partial.items():
+            if eid not in address_map:
+                address_map[eid] = addrs
     all_addresses = [addr for addrs in address_map.values() for addr in addrs] + entity_ids
     names_map = await _fetch_names_map(all_addresses)
 
     return {
-        "run_id": run["id"],
-        "generated_at": _format_ts(run.get("completed_at")),
-        "summary": _decode_json(run.get("summary_json"), {}),
+        "run_id": run_meta["id"] if run_meta else run_ids[0],
+        "generated_at": _format_ts(run_meta.get("completed_at")) if run_meta else None,
+        "summary": _decode_json(run_meta.get("summary_json"), {}) if run_meta else {},
         "items": [
             _placement_payload(row, address_map.get(row["entity_id"], []), names_map)
             for row in rows
@@ -411,32 +467,45 @@ async def get_placements(
 @router.get("/summary")
 async def get_placement_summary():
     _require_mysql()
-    run = await _latest_run_safe()
-    if not run:
-        return {
-            "run_id": None,
-            "generated_at": None,
-            "summary": {},
-            "top_alerts": [],
-        }
+    run_ids = await _latest_batch_run_ids()
+    if not run_ids:
+        return {"run_id": None, "generated_at": None, "summary": {}, "top_alerts": []}
+
+    run_meta = await _latest_run()
+    run_id_placeholders = ", ".join(["%s"] * len(run_ids))
 
     top_rows = await fetch_all(
-        """
-        SELECT entity_id, placement_score
+        f"""
+        SELECT entity_id, placement_score, run_id
         FROM placement_detections
-        WHERE run_id = %s
+        WHERE run_id IN ({run_id_placeholders})
         ORDER BY placement_score DESC, confidence_score DESC
         LIMIT 5
         """,
-        (run["id"],),
+        tuple(run_ids),
     )
     entity_ids = [row["entity_id"] for row in top_rows]
-    address_map = await _fetch_addresses_map(run["id"], entity_ids)
+    address_map: dict[str, list[str]] = {}
+    for rid in run_ids:
+        partial = await _fetch_addresses_map(rid, entity_ids)
+        for eid, addrs in partial.items():
+            if eid not in address_map:
+                address_map[eid] = addrs
+
+    # Aggregate total placements count across all runs in the batch
+    try:
+        count_row = await fetch_all(
+            f"SELECT SUM(JSON_EXTRACT(summary_json,'$.placements')) AS total FROM placement_runs WHERE id IN ({run_id_placeholders})",
+            tuple(run_ids),
+        )
+        total_placements = int((count_row[0].get("total") or 0) if count_row else 0)
+    except Exception:
+        total_placements = 0
 
     return {
-        "run_id": run["id"],
-        "generated_at": _format_ts(run.get("completed_at")),
-        "summary": _decode_json(run.get("summary_json"), {}),
+        "run_id": run_meta["id"] if run_meta else run_ids[0],
+        "generated_at": _format_ts(run_meta.get("completed_at")) if run_meta else None,
+        "summary": {"placements": total_placements},
         "top_alerts": [
             {
                 "entity_id": row.get("entity_id"),

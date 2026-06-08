@@ -80,9 +80,10 @@ class IntegrationAnalysisEngine:
     placement and layering scores for confidence aggregation.
     """
 
-    def __init__(self, cfg: Config | None = None):
+    def __init__(self, cfg: Config | None = None, chain_name: str | None = None):
         self.cfg = cfg or load_config()
-        self._layering_engine = LayeringAnalysisEngine(cfg=self.cfg)
+        self.chain_name = chain_name or "ethereum"
+        self._layering_engine = LayeringAnalysisEngine(cfg=self.cfg, chain_name=self.chain_name)
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -689,6 +690,7 @@ class IntegrationAnalysisEngine:
                             "layering_score": a.layering_score,
                             "placement_score": a.placement_score,
                             "metrics_json": json_dumps(a.metrics),
+                            "chain_name": self.chain_name,
                             "first_seen_at": dt_from_ts(
                                 datetime.fromisoformat(a.first_seen_at.replace("Z", "+00:00")).timestamp()
                                 if a.first_seen_at else None
@@ -709,14 +711,16 @@ class IntegrationAnalysisEngine:
                                     signals_fired_json, signal_scores_json,
                                     reasons_json, supporting_tx_hashes_json,
                                     layering_score, placement_score,
-                                    metrics_json, first_seen_at, last_seen_at
+                                    metrics_json, chain_name,
+                                    first_seen_at, last_seen_at
                                 ) VALUES (
                                     :run_id, :entity_id, :entity_type,
                                     :integration_score, :confidence_score,
                                     :signals_fired_json, :signal_scores_json,
                                     :reasons_json, :supporting_tx_hashes_json,
                                     :layering_score, :placement_score,
-                                    :metrics_json, :first_seen_at, :last_seen_at
+                                    :metrics_json, :chain_name,
+                                    :first_seen_at, :last_seen_at
                                 )
                                 ON DUPLICATE KEY UPDATE
                                     integration_score = VALUES(integration_score),
@@ -724,7 +728,8 @@ class IntegrationAnalysisEngine:
                                     signals_fired_json = VALUES(signals_fired_json),
                                     signal_scores_json = VALUES(signal_scores_json),
                                     reasons_json = VALUES(reasons_json),
-                                    metrics_json = VALUES(metrics_json)
+                                    metrics_json = VALUES(metrics_json),
+                                    chain_name = VALUES(chain_name)
                             """),
                             rows,
                         )

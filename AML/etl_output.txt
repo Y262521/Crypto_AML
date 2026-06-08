@@ -1,0 +1,59 @@
+============================================================
+  PRE-FLIGHT CHECK
+============================================================
+  ✓ ethereum     → block #25,237,300
+  ✓ bnb          → block #102,084,395
+  ✓ polygon      → block #87,860,130
+  ✓ arbitrum     → block #469,638,973
+  ✓ base         → block #46,852,801
+  ✓ solana       → slot #402,123,143
+
+  Reachable EVM chains: ['ethereum', 'bnb', 'polygon', 'arbitrum', 'base']
+  Solana: YES
+
+============================================================
+  EXTRACTING 3 BLOCKS PER CHAIN
+============================================================
+
+  [ethereum] Starting extraction...
+  [ethereum] ✗ No module named 'hexbytes'
+
+  [bnb] Starting extraction...
+  [bnb] ✗ No module named 'hexbytes'
+
+  [polygon] Starting extraction...
+  [polygon] ✗ No module named 'hexbytes'
+
+  [arbitrum] Starting extraction...
+  [arbitrum] ✗ No module named 'hexbytes'
+
+  [base] Starting extraction...
+  [base] ✗ No module named 'hexbytes'
+
+  [solana] Starting extraction...
+  [solana] ✗ No module named 'hexbytes'
+
+============================================================
+  LOADING TO MARIADB
+============================================================
+
+============================================================
+  MULTI-CHAIN ETL SUMMARY
+============================================================
+
+  Total transactions in MySQL: 18,667
+  By chain:
+    ethereum       : 17,702
+    bnb            : 588
+    polygon        : 368
+    arbitrum       : 9
+
+  Extraction results:
+    ✗ ethereum       : No module named 'hexbytes'
+    ✗ bnb            : No module named 'hexbytes'
+    ✗ polygon        : No module named 'hexbytes'
+    ✗ arbitrum       : No module named 'hexbytes'
+    ✗ base           : No module named 'hexbytes'
+    ✗ solana         : No module named 'hexbytes'
+
+============================================================

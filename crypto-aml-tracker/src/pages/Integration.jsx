@@ -1,201 +1,10 @@
 ﻿import { useDeferredValue, useEffect, useState } from 'react';
 import Loader from '../components/common/Loader';
 import AnalyzeButton from '../components/common/AnalyzeButton';
+import ChainBadge from '../components/chain/ChainBadge';
+import ChainFilter from '../components/chain/ChainFilter';
 import ChainOfCustodyModal from '../components/ChainOfCustodyModal';
 import { getIntegrationAlerts, getIntegrationRuns, getIntegrationSummary } from '../services/transactionService';
-
-const MOCK_DORMANCY_ALERTS = [
-    {
-        entity_id: '0xa1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0',
-        entity_name: null,
-        entity_type: 'address',
-        addresses: ['0xa1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0'],
-        integration_score: 0.82,
-        confidence_score: 0.82,
-        signals_fired: ['dormancy'],
-        signal_scores: { dormancy: 0.82 },
-        primary_signal: 'dormancy',
-        reasons: ['Dormancy-to-activation: 47.3 days silent, then 8.4500 ETH sent'],
-        reason: 'Dormancy-to-activation: 47.3 days silent, then 8.4500 ETH sent',
-        layering_score: 0.71,
-        placement_score: 0.65,
-        metrics: { dormancy_days: 47.3, activation_value_eth: 8.45 },
-        first_seen_at: '2024-10-01T08:00:00',
-        last_seen_at: '2024-11-17T14:32:00',
-        _isMock: true,
-    },
-    {
-        entity_id: '0xb2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1',
-        entity_name: null,
-        entity_type: 'address',
-        addresses: ['0xb2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1'],
-        integration_score: 0.76,
-        confidence_score: 0.76,
-        signals_fired: ['dormancy'],
-        signal_scores: { dormancy: 0.76 },
-        primary_signal: 'dormancy',
-        reasons: ['Dormancy-to-activation: 62.1 days silent, then 3.2000 ETH sent'],
-        reason: 'Dormancy-to-activation: 62.1 days silent, then 3.2000 ETH sent',
-        layering_score: 0.58,
-        placement_score: 0.0,
-        metrics: { dormancy_days: 62.1, activation_value_eth: 3.2 },
-        first_seen_at: '2024-09-15T10:00:00',
-        last_seen_at: '2024-11-16T09:14:00',
-        _isMock: true,
-    },
-    {
-        entity_id: '0xc3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2',
-        entity_name: 'Suspicious Wallet A',
-        entity_type: 'address',
-        addresses: ['0xc3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2'],
-        integration_score: 0.91,
-        confidence_score: 0.91,
-        signals_fired: ['dormancy', 'terminal_node'],
-        signal_scores: { dormancy: 0.91, terminal_node: 0.78 },
-        primary_signal: 'dormancy',
-        reasons: ['Dormancy-to-activation: 93.5 days silent, then 22.1000 ETH sent', 'Terminal node: 22.1000 ETH received, never forwarded'],
-        reason: 'Dormancy-to-activation: 93.5 days silent, then 22.1000 ETH sent',
-        layering_score: 0.84,
-        placement_score: 0.79,
-        metrics: { dormancy_days: 93.5, activation_value_eth: 22.1 },
-        first_seen_at: '2024-08-01T00:00:00',
-        last_seen_at: '2024-11-02T18:45:00',
-        _isMock: true,
-    },
-    {
-        entity_id: '0xd4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3',
-        entity_name: null,
-        entity_type: 'address',
-        addresses: ['0xd4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3'],
-        integration_score: 0.68,
-        confidence_score: 0.68,
-        signals_fired: ['dormancy'],
-        signal_scores: { dormancy: 0.68 },
-        primary_signal: 'dormancy',
-        reasons: ['Dormancy-to-activation: 35.8 days silent, then 1.9500 ETH sent'],
-        reason: 'Dormancy-to-activation: 35.8 days silent, then 1.9500 ETH sent',
-        layering_score: 0.0,
-        placement_score: 0.52,
-        metrics: { dormancy_days: 35.8, activation_value_eth: 1.95 },
-        first_seen_at: '2024-10-10T12:00:00',
-        last_seen_at: '2024-11-15T07:22:00',
-        _isMock: true,
-    },
-    {
-        entity_id: '0xe5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4',
-        entity_name: null,
-        entity_type: 'address',
-        addresses: ['0xe5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4'],
-        integration_score: 0.79,
-        confidence_score: 0.79,
-        signals_fired: ['dormancy', 'convergence'],
-        signal_scores: { dormancy: 0.79, convergence: 0.61 },
-        primary_signal: 'dormancy',
-        reasons: ['Dormancy-to-activation: 55.0 days silent, then 5.7000 ETH sent', 'Fan-in convergence: 7 senders → 5.7000 ETH received'],
-        reason: 'Dormancy-to-activation: 55.0 days silent, then 5.7000 ETH sent',
-        layering_score: 0.63,
-        placement_score: 0.0,
-        metrics: { dormancy_days: 55.0, activation_value_eth: 5.7 },
-        first_seen_at: '2024-09-20T06:00:00',
-        last_seen_at: '2024-11-14T20:10:00',
-        _isMock: true,
-    },
-    {
-        entity_id: '0xf6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5',
-        entity_name: null,
-        entity_type: 'address',
-        addresses: ['0xf6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5'],
-        integration_score: 0.72,
-        confidence_score: 0.72,
-        signals_fired: ['dormancy'],
-        signal_scores: { dormancy: 0.72 },
-        primary_signal: 'dormancy',
-        reasons: ['Dormancy-to-activation: 41.2 days silent, then 2.8000 ETH sent'],
-        reason: 'Dormancy-to-activation: 41.2 days silent, then 2.8000 ETH sent',
-        layering_score: 0.0,
-        placement_score: 0.44,
-        metrics: { dormancy_days: 41.2, activation_value_eth: 2.8 },
-        first_seen_at: '2024-10-05T14:00:00',
-        last_seen_at: '2024-11-15T11:30:00',
-        _isMock: true,
-    },
-    {
-        entity_id: '0xa7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6',
-        entity_name: 'Cold Storage Exit',
-        entity_type: 'address',
-        addresses: ['0xa7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6'],
-        integration_score: 0.88,
-        confidence_score: 0.88,
-        signals_fired: ['dormancy', 'reaggregation'],
-        signal_scores: { dormancy: 0.88, reaggregation: 0.74 },
-        primary_signal: 'dormancy',
-        reasons: ['Dormancy-to-activation: 120.0 days silent, then 15.3000 ETH sent', 'Value reaggregation: 9 inputs → 15.3000 ETH output (ratio 0.94)'],
-        reason: 'Dormancy-to-activation: 120.0 days silent, then 15.3000 ETH sent',
-        layering_score: 0.77,
-        placement_score: 0.71,
-        metrics: { dormancy_days: 120.0, activation_value_eth: 15.3 },
-        first_seen_at: '2024-07-15T00:00:00',
-        last_seen_at: '2024-11-12T16:00:00',
-        _isMock: true,
-    },
-    {
-        entity_id: '0xb8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7',
-        entity_name: null,
-        entity_type: 'address',
-        addresses: ['0xb8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7'],
-        integration_score: 0.65,
-        confidence_score: 0.65,
-        signals_fired: ['dormancy'],
-        signal_scores: { dormancy: 0.65 },
-        primary_signal: 'dormancy',
-        reasons: ['Dormancy-to-activation: 31.5 days silent, then 1.2000 ETH sent'],
-        reason: 'Dormancy-to-activation: 31.5 days silent, then 1.2000 ETH sent',
-        layering_score: 0.0,
-        placement_score: 0.0,
-        metrics: { dormancy_days: 31.5, activation_value_eth: 1.2 },
-        first_seen_at: '2024-10-15T08:00:00',
-        last_seen_at: '2024-11-15T18:45:00',
-        _isMock: true,
-    },
-    {
-        entity_id: '0xc9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8',
-        entity_name: null,
-        entity_type: 'address',
-        addresses: ['0xc9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8'],
-        integration_score: 0.74,
-        confidence_score: 0.74,
-        signals_fired: ['dormancy'],
-        signal_scores: { dormancy: 0.74 },
-        primary_signal: 'dormancy',
-        reasons: ['Dormancy-to-activation: 78.4 days silent, then 4.1000 ETH sent'],
-        reason: 'Dormancy-to-activation: 78.4 days silent, then 4.1000 ETH sent',
-        layering_score: 0.55,
-        placement_score: 0.0,
-        metrics: { dormancy_days: 78.4, activation_value_eth: 4.1 },
-        first_seen_at: '2024-08-25T10:00:00',
-        last_seen_at: '2024-11-11T13:20:00',
-        _isMock: true,
-    },
-    {
-        entity_id: '0xd0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9',
-        entity_name: null,
-        entity_type: 'address',
-        addresses: ['0xd0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9'],
-        integration_score: 0.83,
-        confidence_score: 0.83,
-        signals_fired: ['dormancy', 'terminal_node'],
-        signal_scores: { dormancy: 0.83, terminal_node: 0.69 },
-        primary_signal: 'dormancy',
-        reasons: ['Dormancy-to-activation: 88.0 days silent, then 11.6000 ETH sent', 'Terminal node: 11.6000 ETH received, never forwarded'],
-        reason: 'Dormancy-to-activation: 88.0 days silent, then 11.6000 ETH sent',
-        layering_score: 0.68,
-        placement_score: 0.60,
-        metrics: { dormancy_days: 88.0, activation_value_eth: 11.6 },
-        first_seen_at: '2024-08-10T00:00:00',
-        last_seen_at: '2024-11-06T09:55:00',
-        _isMock: true,
-    },
-];
 
 const formatNumber = (value, maximumFractionDigits = 2) => {
     const parsed = Number(value || 0);
@@ -243,6 +52,7 @@ export default function Integration({ onNavigateToGraph, onOpenWorkspace }) {
     const [error, setError] = useState(null);
     const [search, setSearch] = useState('');
     const [signalFilter, setSignalFilter] = useState('All');
+    const [chainFilter, setChainFilter] = useState('all');
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 10;
     const deferredSearch = useDeferredValue(search);
@@ -271,17 +81,11 @@ export default function Integration({ onNavigateToGraph, onOpenWorkspace }) {
         const beforeDate = dateTimeInput ? dateTimeInput.slice(0, 10) : null;
         Promise.all([
             getIntegrationSummary(selectedRunId || undefined),
-            getIntegrationAlerts({ runId: selectedRunId || undefined, beforeDate, limit: 500 }),
+            getIntegrationAlerts({ runId: selectedRunId || undefined, beforeDate, limit: 10000 }),
         ])
             .then(([s, l]) => {
                 setSummary(s);
-                const real = l.items || [];
-                // Add mock dormancy alerts only if no real dormancy signals exist
-                const realHasDormancy = real.some(a => (a.signals_fired || []).includes('dormancy'));
-                const merged = realHasDormancy
-                    ? real
-                    : [...real, ...MOCK_DORMANCY_ALERTS];
-                setAlerts(merged);
+                setAlerts(l.items || []);
             })
             .catch((e) => setError(e.message))
             .finally(() => setLoading(false));
@@ -297,7 +101,9 @@ export default function Integration({ onNavigateToGraph, onOpenWorkspace }) {
         const q = deferredSearch.trim().toLowerCase();
         const matchSearch = !q || alert.entity_id?.toLowerCase().includes(q);
         const matchSignal = signalFilter === 'All' || (alert.signals_fired || []).includes(signalFilter);
-        return matchSearch && matchSignal;
+        const alertChain = alert.chain_name || alert.chain || null;
+        const matchChain = chainFilter === 'all' || (alertChain !== null && alertChain === chainFilter);
+        return matchSearch && matchSignal && matchChain;
     });
 
     const totalPages = Math.max(1, Math.ceil(filteredAlerts.length / PAGE_SIZE));
@@ -346,6 +152,22 @@ export default function Integration({ onNavigateToGraph, onOpenWorkspace }) {
                         </div>
                     );
                 })}
+            </div>
+
+            {/* Chain filter dropdown */}
+            <div style={{ background: 'linear-gradient(145deg,#101D32,#0D1628)', border: '1px solid rgba(201,168,76,0.12)', borderRadius: '14px', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                <ChainFilter
+                    selectedChain={chainFilter}
+                    onChainChange={(c) => { setChainFilter(c); setPage(1); }}
+                    compact
+                    label="Filter by Chain"
+                />
+                {chainFilter !== 'all' && (
+                    <button onClick={() => { setChainFilter('all'); setPage(1); }}
+                        style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '7px', padding: '5px 10px', cursor: 'pointer', fontSize: '11px', color: '#4B5E72' }}>
+                        Clear
+                    </button>
+                )}
             </div>
 
             {/* Search + signal filter */}
@@ -443,7 +265,10 @@ export default function Integration({ onNavigateToGraph, onOpenWorkspace }) {
                         >
                             {/* Entity */}
                             <div style={{ minWidth: 0 }}>
-                                <div style={{ fontSize: '10px', fontWeight: '700', color: '#4B5E72', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '3px' }}>📍 Address</div>
+                                <div style={{ fontSize: '10px', fontWeight: '700', color: '#4B5E72', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    📍 Address
+                                    <ChainBadge chain={alert.chain_name || 'ethereum'} size="xs" />
+                                </div>
                                 <div style={{ fontSize: '13px', fontWeight: '700', color: alert.entity_name ? '#0f172a' : '#94a3b8', marginBottom: '2px', fontStyle: alert.entity_name ? 'normal' : 'italic' }}>
                                     {alert.entity_name || 'Unknown'}
                                 </div>
@@ -511,7 +336,7 @@ export default function Integration({ onNavigateToGraph, onOpenWorkspace }) {
                                     </button>
                                 </div>
                             </div>
-                            
+
                             {/* Analyze Button */}
                             <AnalyzeButton
                                 entityId={alert.entity_id}

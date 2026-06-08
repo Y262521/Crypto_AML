@@ -4,12 +4,13 @@ const CLUSTER_URL = `${API_BASE_URL}/clusters`;
 const PLACEMENT_URL = `${API_BASE_URL}/placement`;
 const LAYERING_URL = `${API_BASE_URL}/layering`;
 
-export const getLatestTransactions = async ({ limit = 200, offset = 0, sortBy = 'amount_desc' } = {}) => {
+export const getLatestTransactions = async ({ limit = 200, offset = 0, sortBy = 'value_usd_desc', chain = null } = {}) => {
   const params = new URLSearchParams({
     limit: String(limit),
     offset: String(offset),
     sort_by: sortBy,
   });
+  if (chain && chain !== 'all') params.set('chain', chain);
   const res = await fetch(`${BACKEND_URL}?${params.toString()}`);
   if (!res.ok) throw new Error(`Backend error: ${res.status}`);
   return await res.json();
@@ -107,13 +108,14 @@ export const getOwnerByAddress = async (address) => {
   return await res.json();
 };
 
-export const getPlacements = async ({ limit = 50, minConfidence = 0, runId = null, beforeDate = null } = {}) => {
+export const getPlacements = async ({ limit = 5000, minConfidence = 0, runId = null, beforeDate = null, chain = null } = {}) => {
   const params = new URLSearchParams({
     limit: String(limit),
     min_confidence: String(minConfidence),
   });
   if (runId) params.set('run_id', runId);
   if (beforeDate) params.set('before_date', beforeDate);
+  if (chain && chain !== 'all') params.set('chain', chain);
   const res = await fetch(`${PLACEMENT_URL}?${params.toString()}`);
   if (!res.ok) throw new Error(`Backend error: ${res.status}`);
   return await res.json();
@@ -137,12 +139,13 @@ export const getPlacementDetail = async (entityId) => {
   return await res.json();
 };
 
-export const getLayeringAlerts = async ({ limit = 50, minConfidence = 0, runId = null } = {}) => {
+export const getLayeringAlerts = async ({ limit = 5000, minConfidence = 0, runId = null, chain = null } = {}) => {
   const params = new URLSearchParams({
     limit: String(limit),
     min_confidence: String(minConfidence),
   });
   if (runId) params.set('run_id', runId);
+  if (chain && chain !== 'all') params.set('chain', chain);
   const res = await fetch(`${LAYERING_URL}?${params.toString()}`);
   if (!res.ok) throw new Error(`Backend error: ${res.status}`);
   return await res.json();
@@ -176,11 +179,12 @@ export const getLayeringDetail = async (entityId, runId = null) => {
 
 const INTEGRATION_URL = `${API_BASE_URL}/integration`;
 
-export const getIntegrationAlerts = async ({ limit = 200, minScore = 0, runId = null, beforeDate = null, signal = null } = {}) => {
+export const getIntegrationAlerts = async ({ limit = 10000, minScore = 0, runId = null, beforeDate = null, signal = null, chain = null } = {}) => {
   const params = new URLSearchParams({ limit: String(limit), minScore: String(minScore) });
   if (runId) params.set('run_id', runId);
   if (beforeDate) params.set('beforeDate', beforeDate);
   if (signal) params.set('signal', signal);
+  if (chain && chain !== 'all') params.set('chain', chain);
   const res = await fetch(`${INTEGRATION_URL}/?${params.toString()}`);
   if (!res.ok) throw new Error(`Backend error: ${res.status}`);
   return await res.json();
@@ -239,6 +243,54 @@ export const getMVAHistory = async (entityId, entityType = 'cluster', days = 30)
     days: String(days),
   });
   const res = await fetch(`${MVA_URL}/history/${encodeURIComponent(entityId)}?${params.toString()}`);
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};
+
+// ── Chain API (Phase 5) ───────────────────────────────────────────────────────
+const CHAINS_URL = `${API_BASE_URL}/chains`;
+
+export const getSupportedChains = async () => {
+  const res = await fetch(`${CHAINS_URL}/`);
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};
+
+export const getActiveChains = async () => {
+  const res = await fetch(`${CHAINS_URL}/active`);
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};
+
+export const getChainStats = async () => {
+  const res = await fetch(`${CHAINS_URL}/stats`);
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};
+
+export const getPlacementsFiltered = async ({ limit = 50, minConfidence = 0, runId = null, chain = null } = {}) => {
+  const params = new URLSearchParams({ limit: String(limit), min_confidence: String(minConfidence) });
+  if (runId) params.set('run_id', runId);
+  if (chain && chain !== 'all') params.set('chain', chain);
+  const res = await fetch(`${PLACEMENT_URL}?${params.toString()}`);
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};
+
+export const getLayeringAlertsFiltered = async ({ limit = 50, minConfidence = 0, runId = null, chain = null } = {}) => {
+  const params = new URLSearchParams({ limit: String(limit), min_confidence: String(minConfidence) });
+  if (runId) params.set('run_id', runId);
+  if (chain && chain !== 'all') params.set('chain', chain);
+  const res = await fetch(`${LAYERING_URL}?${params.toString()}`);
+  if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+  return await res.json();
+};
+
+export const getIntegrationAlertsFiltered = async ({ limit = 200, minScore = 0, runId = null, chain = null } = {}) => {
+  const params = new URLSearchParams({ limit: String(limit), minScore: String(minScore) });
+  if (runId) params.set('run_id', runId);
+  if (chain && chain !== 'all') params.set('chain', chain);
+  const res = await fetch(`${API_BASE_URL}/integration/?${params.toString()}`);
   if (!res.ok) throw new Error(`Backend error: ${res.status}`);
   return await res.json();
 };

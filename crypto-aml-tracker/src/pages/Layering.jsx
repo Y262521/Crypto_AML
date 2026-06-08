@@ -2,6 +2,8 @@
 import { useDeferredValue, useEffect, useRef, useState } from 'react';
 import Loader from '../components/common/Loader';
 import AnalyzeButton from '../components/common/AnalyzeButton';
+import ChainBadge from '../components/chain/ChainBadge';
+import ChainFilter from '../components/chain/ChainFilter';
 import { getLayeringAlerts, getLayeringRuns, getLayeringSummary } from '../services/transactionService';
 
 const formatNumber = (value, maximumFractionDigits = 2) => {
@@ -227,6 +229,7 @@ export default function Layering({ onNavigateToGraph, onOpenWorkspace }) {
     const [error, setError] = useState(null);
     const [search, setSearch] = useState('');
     const [methodFilter, setMethodFilter] = useState('All');
+    const [chainFilter, setChainFilter] = useState('all');
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 10;
     const [reasonPopup, setReasonPopup] = useState(null);
@@ -276,7 +279,11 @@ export default function Layering({ onNavigateToGraph, onOpenWorkspace }) {
             || alert.entity_id?.toLowerCase().includes(query)
             || (alert.addresses || []).some((address) => address?.toLowerCase().includes(query));
         const matchMethod = methodFilter === 'All' || (alert.methods || []).includes(methodFilter);
-        return matchSearch && matchMethod;
+        const alertChain = alert.chain_name || alert.chain || null;
+        // Strict chain filter: if a chain is selected, only show alerts for that chain.
+        // Alerts with no chain_name only show under "All Chains".
+        const matchChain = chainFilter === 'all' || (alertChain !== null && alertChain === chainFilter);
+        return matchSearch && matchMethod && matchChain;
     });
     const totalPages = Math.max(1, Math.ceil(filteredAlerts.length / PAGE_SIZE));
     const visibleAlerts = filteredAlerts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -335,6 +342,22 @@ export default function Layering({ onNavigateToGraph, onOpenWorkspace }) {
                 </div>
             </div>
 
+            {/* Chain filter dropdown */}
+            <div style={{ background: 'linear-gradient(145deg,#101D32,#0D1628)', border: '1px solid rgba(201,168,76,0.12)', borderRadius: '14px', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                <ChainFilter
+                    selectedChain={chainFilter}
+                    onChainChange={(c) => { setChainFilter(c); setPage(1); }}
+                    compact
+                    label="Filter by Chain"
+                />
+                {chainFilter !== 'all' && (
+                    <button onClick={() => { setChainFilter('all'); setPage(1); }}
+                        style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '7px', padding: '5px 10px', cursor: 'pointer', fontSize: '11px', color: '#4B5E72' }}>
+                        Clear
+                    </button>
+                )}
+            </div>
+
             <div style={{
                 background: 'linear-gradient(145deg,#101D32,#0D1628)',
                 border: '1px solid rgba(201,168,76,0.12)',
@@ -346,8 +369,6 @@ export default function Layering({ onNavigateToGraph, onOpenWorkspace }) {
                 alignItems: 'center',
             }}>
                 <input
-                    type="text"
-                    placeholder="Search entity or address"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     style={{ minWidth: '260px', flex: '1 1 260px', padding: '10px 12px', borderRadius: '10px', border: '1px solid rgba(201,168,76,0.15)', background: 'rgba(10,16,32,0.8)', color: '#E2D9C8', outline: 'none' }}
@@ -472,8 +493,9 @@ export default function Layering({ onNavigateToGraph, onOpenWorkspace }) {
                                             {alert.entity_name || 'Unknown'}
                                         </div>
                                         <div style={{ fontSize: '11px', fontFamily: 'monospace', color: '#6B7E94' }}>{truncate(alert.entity_id, 22)}</div>
-                                        <div style={{ fontSize: '12px', color: '#4B5E72', marginTop: '4px' }}>
+                                        <div style={{ fontSize: '12px', color: '#4B5E72', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                             {alert.address_count} address{alert.address_count === 1 ? '' : 'es'}
+                                            <ChainBadge chain={alert.chain_name || 'ethereum'} size="xs" />
                                         </div>
                                     </td>
                                     <td style={{ padding: '16px', borderBottom: '1px solid rgba(201,168,76,0.10)', verticalAlign: 'top' }}>

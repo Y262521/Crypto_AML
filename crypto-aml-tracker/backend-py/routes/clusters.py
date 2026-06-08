@@ -236,6 +236,8 @@ def _cluster_payload(
         "risk_level": row.get("risk_level") or "normal",
         "label_status": row.get("label_status") or "unlabeled",
         "matched_owner_address": row.get("matched_owner_address"),
+        "chain_name": row.get("chain_name") or "ethereum",
+        "blockchain_type": row.get("blockchain_type") or "EVM",
         "owner": _owner_payload(row),
         "location": _owner_location(row) or None,
         "addresses": cluster_addresses,
@@ -266,6 +268,8 @@ async def get_clusters(limit: int = Query(500, ge=1, le=5000)):
                COALESCE(m.member_count, 0) AS cluster_size,
                c.total_balance,
                c.risk_level,
+               c.chain_name,
+               c.blockchain_type,
                {_OWNER_SELECT}
         FROM wallet_clusters c
         LEFT JOIN (
@@ -493,6 +497,8 @@ async def get_cluster(cluster_id: str):
                COALESCE(m.member_count, 0) AS cluster_size,
                c.total_balance,
                c.risk_level,
+               c.chain_name,
+               c.blockchain_type,
                {_OWNER_SELECT}
         FROM wallet_clusters c
         LEFT JOIN (
@@ -548,6 +554,8 @@ async def get_cluster(cluster_id: str):
         "risk_level": row.get("risk_level") or "normal",
         "label_status": row.get("label_status") or "unlabeled",
         "matched_owner_address": row.get("matched_owner_address"),
+        "chain_name": row.get("chain_name") or "ethereum",
+        "blockchain_type": row.get("blockchain_type") or "EVM",
         "owner": _owner_payload(row),
         "location": _owner_location(row) or None,
         "addresses": [

@@ -44,8 +44,9 @@ class LayeringAnalysisEngine(PlacementAnalysisEngine):
         self,
         cfg: Config | None = None,
         service_registry: ServiceRegistry | None = None,
+        chain_name: str | None = None,
     ):
-        super().__init__(cfg=cfg)
+        super().__init__(cfg=cfg, chain_name=chain_name)
         self._service_registry_override = service_registry
         self.detectors = [
             PeelingChainDetector(),
@@ -511,24 +512,46 @@ class LayeringAnalysisEngine(PlacementAnalysisEngine):
 
     def _build_summary(
         self,
+        *,
         source: str,
-        placement_run_id: str | None,
+        placement_run_id: str | None = None,
         transactions: list[Any],
-        seeds: dict[str, LayeringSeed],
-        detections: list[Any],
-        alerts: list[LayeringAlert],
-        bridge_pairs: list[Any],
+        seeds: dict[str, LayeringSeed] | None = None,
+        detections: list[Any] | None = None,
+        alerts: list[LayeringAlert] | None = None,
+        bridge_pairs: list[Any] | None = None,
+        # Accept (and ignore) placement-parent kwargs so MRO dispatch works
+        entities: dict | None = None,
+        behaviors: list | None = None,
+        placements: list | None = None,
+        labels: list | None = None,
     ) -> dict[str, Any]:
+        # If called from the parent placement run() via super(), return a
+        # minimal placement-compatible summary so it doesn't crash.
+        if seeds is None:
+            from collections import Counter as _Counter
+            _entities = entities or {}
+            _behaviors = behaviors or []
+            _placements = placements or []
+            _labels = labels or []
+            return {
+                "source": source,
+                "transactions": len(transactions),
+                "entities": len(_entities),
+                "behaviors": dict(_Counter(b.behavior_type for b in _behaviors)),
+                "placements": len(_placements),
+                "labels": dict(_Counter(l.label for l in _labels)),
+            }
         return {
             "source": source,
             "placement_run_id": placement_run_id,
             "transactions": len(transactions),
             "seeds_analyzed": len(seeds),
-            "detections": dict(Counter(detection.detector_type for detection in detections)),
-            "alerts": len(alerts),
-            "bridge_pairs": len(bridge_pairs),
+            "detections": dict(Counter(detection.detector_type for detection in (detections or []))),
+            "alerts": len(alerts or []),
+            "bridge_pairs": len(bridge_pairs or []),
             "average_alert_confidence": round(
-                statistics.fmean(alert.confidence_score for alert in alerts),
+                statistics.fmean(alert.confidence_score for alert in (alerts or [])),
                 4,
             ) if alerts else 0.0,
         }
@@ -645,6 +668,7 @@ class LayeringAnalysisEngine(PlacementAnalysisEngine):
                 "supporting_tx_hashes_json": json_dumps(alert.supporting_tx_hashes),
                 "evidence_ids_json": json_dumps(alert.evidence_ids),
                 "metrics_json": json_dumps(alert.metrics),
+                "chain_name": self.chain_name,
                 "first_seen_at": _dt_from_iso(alert.first_seen_at),
                 "last_seen_at": _dt_from_iso(alert.last_seen_at),
             }
@@ -864,6 +888,7 @@ class LayeringAnalysisEngine(PlacementAnalysisEngine):
                                 supporting_tx_hashes_json,
                                 evidence_ids_json,
                                 metrics_json,
+                                chain_name,
                                 first_seen_at,
                                 last_seen_at
                             )
@@ -881,6 +906,7 @@ class LayeringAnalysisEngine(PlacementAnalysisEngine):
                                 :supporting_tx_hashes_json,
                                 :evidence_ids_json,
                                 :metrics_json,
+                                :chain_name,
                                 :first_seen_at,
                                 :last_seen_at
                             )

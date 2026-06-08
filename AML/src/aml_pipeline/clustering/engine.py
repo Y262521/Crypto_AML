@@ -157,11 +157,38 @@ class ClusteringEngine:
         cfg: Optional[Config] = None,
         adapter: Optional[BlockchainAdapter] = None,
         heuristics: Optional[List[type]] = None,
+        chain_name: Optional[str] = None,
     ):
         self.cfg = cfg or load_config()
-        self.adapter = adapter or EthereumAdapter(self.cfg)
+
+        # Resolve adapter: explicit > chain_name > default Ethereum
+        if adapter is not None:
+            self.adapter = adapter
+        elif chain_name is not None:
+            from ..etl.extract.factories import get_adapter
+            self.adapter = get_adapter(chain_name, cfg=self.cfg)
+        else:
+            self.adapter = EthereumAdapter(self.cfg)
+
         heuristic_classes = heuristics or _DEFAULT_HEURISTICS
         self.heuristics: List[BaseHeuristic] = [H(self.cfg) for H in heuristic_classes]
+
+    @property
+    def chain_name(self) -> str:
+        """Return the chain name from the adapter."""
+        return getattr(self.adapter, "chain_name", "ethereum")
+
+    @property
+    def chain_id(self) -> int:
+        return getattr(self.adapter, "chain_id", 1)
+
+    @property
+    def blockchain_type(self) -> str:
+        return getattr(self.adapter, "blockchain_type", "EVM")
+
+    @property
+    def native_asset(self) -> str:
+        return getattr(self.adapter, "native_asset", "ETH")
 
     def _find_pair_heuristics(self, G: nx.MultiDiGraph) -> Dict[tuple[str, str], List[str]]:
         """Run all heuristics in parallel using a thread pool.
@@ -349,8 +376,12 @@ class ClusteringEngine:
         try:
             with engine.begin() as conn:
                 cluster_ids = [r.cluster_id for r in results]
+                # Only compare against clusters for THIS chain — don't delete other chains' clusters
                 existing_cluster_ids = set(
-                    conn.execute(text("SELECT id FROM wallet_clusters")).scalars().all()
+                    conn.execute(
+                        text("SELECT id FROM wallet_clusters WHERE chain_name = :cn OR (chain_name IS NULL AND :cn = 'ethereum')"),
+                        {"cn": self.chain_name},
+                    ).scalars().all()
                 )
                 current_cluster_ids = set(cluster_ids)
                 stale_cluster_ids = sorted(existing_cluster_ids - current_cluster_ids)
@@ -369,6 +400,8 @@ class ClusteringEngine:
                             "risk_level": "normal",
                             "label_status": LABEL_STATUS_UNLABELED,
                             "matched_owner_address": None,
+                            "chain_name": self.chain_name,
+                            "blockchain_type": self.blockchain_type,
                         })
 
                     conn.execute(
@@ -381,7 +414,9 @@ class ClusteringEngine:
                                 total_balance,
                                 risk_level,
                                 label_status,
-                                matched_owner_address
+                                matched_owner_address,
+                                chain_name,
+                                blockchain_type
                             )
                             VALUES (
                                 :id,
@@ -390,7 +425,9 @@ class ClusteringEngine:
                                 :total_balance,
                                 :risk_level,
                                 :label_status,
-                                :matched_owner_address
+                                :matched_owner_address,
+                                :chain_name,
+                                :blockchain_type
                             )
                             ON DUPLICATE KEY UPDATE
                                 owner_id = VALUES(owner_id),
@@ -398,7 +435,9 @@ class ClusteringEngine:
                                 total_balance = VALUES(total_balance),
                                 risk_level = VALUES(risk_level),
                                 label_status = VALUES(label_status),
-                                matched_owner_address = VALUES(matched_owner_address)
+                                matched_owner_address = VALUES(matched_owner_address),
+                                chain_name = VALUES(chain_name),
+                                blockchain_type = VALUES(blockchain_type)
                             """
                         ),
                         cluster_rows,
@@ -418,8 +457,21 @@ class ClusteringEngine:
                             params,
                         )
 
-                # Reset address cluster mapping then re-assign
-                conn.execute(text("UPDATE addresses SET cluster_id = NULL"))
+                # Reset cluster mapping only for addresses belonging to THIS chain
+                conn.execute(
+                    text(
+                        """
+                        UPDATE addresses a
+                        JOIN (
+                            SELECT DISTINCT from_address AS addr FROM transactions WHERE chain_name = :cn
+                            UNION
+                            SELECT DISTINCT to_address FROM transactions WHERE chain_name = :cn
+                        ) t ON t.addr = a.address
+                        SET a.cluster_id = NULL
+                        """
+                    ),
+                    {"cn": self.chain_name},
+                )
                 address_rows = [
                     {
                         "address": address,

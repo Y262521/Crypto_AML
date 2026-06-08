@@ -43,8 +43,17 @@ class EthereumExtractor(BaseExtractor):
         return self.w3.eth.block_number
 
     def get_latest_saved_block(self) -> Optional[int]:
-        """Return the latest block number already saved to MongoDB."""
-        latest = self.raw_collection.find_one(sort=[("block_number", -1)])
+        """Return the latest Ethereum block number already saved to MongoDB."""
+        latest = self.raw_collection.find_one(
+            {
+                "$or": [
+                    {"chain_name": "ethereum"},
+                    {"chain_name": {"$exists": False}},   # legacy docs without chain_name
+                    {"network": "ethereum-mainnet"},
+                ]
+            },
+            sort=[("block_number", -1)],
+        )
         if not latest:
             return None
         return int(latest.get("block_number"))

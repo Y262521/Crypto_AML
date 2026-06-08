@@ -85,6 +85,32 @@ async def _latest_run() -> dict | None:
     )
 
 
+async def _latest_batch_run_ids() -> list[str]:
+    """Return the latest integration run ID for each chain."""
+    rows = await fetch_all(
+        """
+        SELECT a.run_id
+        FROM integration_alerts a
+        INNER JOIN (
+            SELECT chain_name, MAX(r2.completed_at) AS max_ts
+            FROM integration_alerts a2
+            JOIN integration_runs r2 ON r2.id = a2.run_id
+            WHERE r2.status = 'completed'
+            GROUP BY a2.chain_name
+        ) latest_per_chain
+          ON a.chain_name = latest_per_chain.chain_name
+        JOIN integration_runs r ON r.id = a.run_id
+          AND r.completed_at = latest_per_chain.max_ts
+          AND r.status = 'completed'
+        GROUP BY a.run_id
+        """
+    )
+    if rows:
+        return list({r["run_id"] for r in rows})
+    latest = await _latest_run()
+    return [latest["id"]] if latest else []
+
+
 async def _get_run(run_id: str | None, before_date: str | None = None) -> dict | None:
     if run_id:
         return await fetch_one(
@@ -179,23 +205,49 @@ async def get_integration_summary(
 ):
     """Return summary stats for the latest (or specified) integration run."""
     _require_mysql()
-    run = await _latest_run_safe(run_id, before_date)
-    if not run:
-        return {
-            "run_id": None,
-            "summary": {
-                "alerts": 0,
-                "high_confidence_alerts": 0,
-                "convergence_signals": 0,
-                "dormancy_signals": 0,
-                "terminal_signals": 0,
-                "reaggregation_signals": 0,
-            },
+    if run_id or before_date:
+        run = await _latest_run_safe(run_id, before_date)
+        if not run:
+            return {"run_id": None, "summary": {"alerts": 0}}
+        run_ids = [run["id"]]
+    else:
+        run_ids = await _latest_batch_run_ids()
+        if not run_ids:
+            return {"run_id": None, "summary": {"alerts": 0}}
+
+    # Aggregate summary across all batch runs
+    run_id_placeholders = ", ".join(["%s"] * len(run_ids))
+    try:
+        agg = await fetch_all(
+            f"""
+            SELECT
+                SUM(JSON_EXTRACT(summary_json, '$.alerts')) AS alerts,
+                SUM(JSON_EXTRACT(summary_json, '$.high_confidence_alerts')) AS high_confidence_alerts,
+                SUM(JSON_EXTRACT(summary_json, '$.convergence_signals')) AS convergence_signals,
+                SUM(JSON_EXTRACT(summary_json, '$.dormancy_signals')) AS dormancy_signals,
+                SUM(JSON_EXTRACT(summary_json, '$.terminal_signals')) AS terminal_signals,
+                SUM(JSON_EXTRACT(summary_json, '$.reaggregation_signals')) AS reaggregation_signals
+            FROM integration_runs
+            WHERE id IN ({run_id_placeholders})
+            """,
+            tuple(run_ids),
+        )
+        row = agg[0] if agg else {}
+        summary = {
+            "alerts":                  int(row.get("alerts") or 0),
+            "high_confidence_alerts":  int(row.get("high_confidence_alerts") or 0),
+            "convergence_signals":     int(row.get("convergence_signals") or 0),
+            "dormancy_signals":        int(row.get("dormancy_signals") or 0),
+            "terminal_signals":        int(row.get("terminal_signals") or 0),
+            "reaggregation_signals":   int(row.get("reaggregation_signals") or 0),
         }
-    summary = _decode_json(run.get("summary_json"), {})
+    except Exception:
+        summary = {"alerts": 0}
+
+    run_meta = await _latest_run()
     return {
-        "run_id": run["id"],
-        "completed_at": _format_ts(run.get("completed_at")),
+        "run_id": run_meta["id"] if run_meta else run_ids[0],
+        "completed_at": _format_ts(run_meta.get("completed_at")) if run_meta else None,
         "summary": summary,
     }
 
@@ -204,38 +256,56 @@ async def get_integration_summary(
 async def get_integration_alerts(
     run_id: str | None = Query(default=None),
     before_date: str | None = Query(default=None, alias="beforeDate"),
-    limit: int = Query(default=200, ge=1, le=1000),
+    limit: int = Query(default=10000, ge=1, le=50000),
     min_score: float = Query(default=0.0, alias="minScore"),
     signal: str | None = Query(default=None),
+    chain: str | None = Query(default=None),
 ):
     """Return integration alerts for the latest (or specified) run."""
     _require_mysql()
-    run = await _latest_run_safe(run_id, before_date)
-    if not run:
-        return {"run_id": None, "items": []}
 
-    active_run_id = run["id"]
+    if run_id or before_date:
+        run = await _latest_run_safe(run_id, before_date)
+        if not run:
+            return {"run_id": None, "items": []}
+        run_ids = [run["id"]]
+        run_meta = run
+    else:
+        run_ids = await _latest_batch_run_ids()
+        if not run_ids:
+            return {"run_id": None, "items": []}
+        run_meta = await _latest_run()
+
+    run_id_placeholders = ", ".join(["%s"] * len(run_ids))
+
+    chain_filter_sql = ""
+    chain_params: list = []
+    if chain and chain != "all":
+        chain_filter_sql = " AND (chain_name = %s OR (chain_name IS NULL AND %s = 'ethereum'))"
+        chain_params = [chain, chain]
 
     try:
         rows = await fetch_all(
-            """
+            f"""
             SELECT
                 entity_id, entity_type,
                 integration_score, confidence_score,
                 signals_fired_json, signal_scores_json,
                 reasons_json, supporting_tx_hashes_json,
                 layering_score, placement_score,
-                metrics_json, first_seen_at, last_seen_at
+                metrics_json, first_seen_at, last_seen_at,
+                chain_name
             FROM integration_alerts
-            WHERE run_id = %s
+            WHERE run_id IN ({run_id_placeholders})
               AND integration_score >= %s
+              {chain_filter_sql}
             ORDER BY integration_score DESC, confidence_score DESC
             LIMIT %s
             """,
-            (active_run_id, min_score, limit),
+            tuple(run_ids + [min_score] + chain_params + [limit]),
         )
     except ProgrammingError:
-        return {"run_id": active_run_id, "items": []}
+        return {"run_id": run_meta["id"] if run_meta else None, "items": []}
 
     # Apply signal filter, then batch-fetch owner names
     filtered_rows = [
@@ -256,8 +326,9 @@ async def get_integration_alerts(
 
         items.append({
             "entity_id": entity_id,
-            "entity_name": names_map.get(entity_id),  # None → frontend shows "Unknown"
+            "entity_name": names_map.get(entity_id),
             "entity_type": r.get("entity_type", "address"),
+            "chain_name": r.get("chain_name") or "ethereum",
             "addresses": [entity_id],
             "integration_score": float(r.get("integration_score") or 0),
             "confidence_score": float(r.get("confidence_score") or 0),
@@ -273,4 +344,4 @@ async def get_integration_alerts(
             "last_seen_at": _format_ts(r.get("last_seen_at")),
         })
 
-    return {"run_id": active_run_id, "items": items}
+    return {"run_id": run_meta["id"] if run_meta else run_ids[0], "items": items}

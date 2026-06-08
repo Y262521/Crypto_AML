@@ -1,76 +1,12 @@
 ﻿import { useDeferredValue, useEffect, useState } from 'react';
 import Loader from '../components/common/Loader';
 import AnalyzeButton from '../components/common/AnalyzeButton';
+import ChainBadge from '../components/chain/ChainBadge';
+import ChainFilter from '../components/chain/ChainFilter';
 import { getPlacements, getPlacementRuns, getPlacementSummary } from '../services/transactionService';
 
 const _BANNED = new Set(['funneling', 'funnel', 'immediate_utilization', 'immediate-utilization', 'immediate utilization']);
 
-const MOCK_ALERTS = [
-    {
-        entity_id: '0xf3a1b2c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0',
-        entity_type: 'address',
-        addresses: ['0xf3a1b2c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0'],
-        address_count: 1,
-        confidence: 0.81,
-        placement_score: 0.81,
-        risk_score: 81,
-        all_behaviors: ['structuring'],
-        behaviors: ['structuring'],
-        primary_behavior: 'structuring',
-        behavior_profile: { primary_behavior: 'structuring', display_behaviors: ['structuring'], display_mode: 'dominant', ranked_behaviors: [{ behavior_type: 'structuring', confidence_score: 0.81 }] },
-        reasons: ['transactions deliberately kept below reporting thresholds', 'high placement score from graph position analysis'],
-        reason: 'transactions deliberately kept below reporting thresholds',
-        _isMock: true,
-    },
-    {
-        entity_id: '0xc9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0',
-        entity_type: 'cluster',
-        addresses: ['0xc9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0', '0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b', '0x2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c'],
-        address_count: 3,
-        confidence: 0.74,
-        placement_score: 0.74,
-        risk_score: 74,
-        all_behaviors: ['structuring', 'smurfing'],
-        behaviors: ['structuring', 'smurfing'],
-        primary_behavior: 'structuring',
-        behavior_profile: { primary_behavior: 'structuring', display_behaviors: ['structuring', 'smurfing'], display_mode: 'paired', ranked_behaviors: [{ behavior_type: 'structuring', confidence_score: 0.74 }, { behavior_type: 'smurfing', confidence_score: 0.68 }] },
-        reasons: ['transactions deliberately kept below reporting thresholds', 'downstream suspicious behavior: smurfing', 'suspicious history observed upstream in analyzed graph'],
-        reason: 'transactions deliberately kept below reporting thresholds',
-        _isMock: true,
-    },
-    {
-        entity_id: '0x7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f',
-        entity_type: 'address',
-        addresses: ['0x7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f'],
-        address_count: 1,
-        confidence: 0.69,
-        placement_score: 0.69,
-        risk_score: 69,
-        all_behaviors: ['micro_funding'],
-        behaviors: ['micro_funding'],
-        primary_behavior: 'micro_funding',
-        behavior_profile: { primary_behavior: 'micro_funding', display_behaviors: ['micro_funding'], display_mode: 'dominant', ranked_behaviors: [{ behavior_type: 'micro_funding', confidence_score: 0.69 }] },
-        reasons: ['earliest reachable entity in traced suspicious flow', 'downstream suspicious behavior: micro_funding'],
-        reason: 'earliest reachable entity in traced suspicious flow',
-        _isMock: true,
-    },
-    {
-        entity_id: '0x4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e',
-        entity_type: 'cluster',
-        addresses: ['0x4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e', '0x5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f', '0x6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a', '0x7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b'],
-        address_count: 4,
-        confidence: 0.77,
-        placement_score: 0.77,
-        risk_score: 77,
-        all_behaviors: ['micro_funding', 'structuring'],
-        behaviors: ['micro_funding', 'structuring'],
-        primary_behavior: 'micro_funding',
-        behavior_profile: { primary_behavior: 'micro_funding', display_behaviors: ['micro_funding', 'structuring'], display_mode: 'paired', ranked_behaviors: [{ behavior_type: 'micro_funding', confidence_score: 0.77 }, { behavior_type: 'structuring', confidence_score: 0.61 }] },
-        reasons: ['downstream suspicious behavior: micro_funding', 'transactions deliberately kept below reporting thresholds', 'no prior suspicious history observed upstream in analyzed graph'],
-        reason: 'downstream suspicious behavior: micro_funding',
-        _isMock: true,
-    },
-];
 const DOMINANT_GAP = 0.15;
 const DOMINANT_RATIO = 0.82;
 const BALANCED_GAP = 0.06;
@@ -146,19 +82,20 @@ const humanizeReason = (reasons = [], primaryBehavior = '') => {
 export default function Placement({ onNavigateToGraph, onShowAnalysisMenu, onOpenWorkspace }) {
     const [runs, setRuns] = useState([]);
     const [selectedRunId, setSelectedRunId] = useState(null);
-    const [selectedDate, setSelectedDate] = useState(''); // YYYY-MM-DD
-    const [dateTimeInput, setDateTimeInput] = useState(''); // datetime-local string
+    const [selectedDate, setSelectedDate] = useState('');
+    const [dateTimeInput, setDateTimeInput] = useState('');
     const [summary, setSummary] = useState(null);
     const [alerts, setAlerts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [search, setSearch] = useState('');
     const [behaviorFilter, setBehaviorFilter] = useState('All');
+    const [chainFilter, setChainFilter] = useState('all');
     const [showAllAlerts, setShowAllAlerts] = useState(false);
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 10;
-    const [clusterPopup, setClusterPopup] = useState(null); // { entityId, addresses }
-    const [reasonPopup, setReasonPopup] = useState(null);   // { entityId, reasons, primaryBehavior }
+    const [clusterPopup, setClusterPopup] = useState(null);
+    const [reasonPopup, setReasonPopup] = useState(null);
     const deferredSearch = useDeferredValue(search);
 
     useEffect(() => {
@@ -181,13 +118,10 @@ export default function Placement({ onNavigateToGraph, onShowAnalysisMenu, onOpe
         setLoading(true);
         // Extract date part from datetime-local input (YYYY-MM-DD)
         const beforeDate = dateTimeInput ? dateTimeInput.slice(0, 10) : null;
-        Promise.all([getPlacementSummary(), getPlacements({ runId: selectedRunId || undefined, beforeDate })])
+        Promise.all([getPlacementSummary(), getPlacements({ runId: selectedRunId || undefined, beforeDate, limit: 5000 })])
             .then(([s, l]) => {
-                const real = l.items || [];
-                const realB = new Set(real.flatMap(a => a.all_behaviors || []));
-                const mocks = MOCK_ALERTS.filter(m => m.all_behaviors.some(b => !realB.has(b)));
                 setSummary(s);
-                setAlerts([...real, ...mocks]);
+                setAlerts(l.items || []);
             })
             .catch((e) => setError(e.message))
             .finally(() => setLoading(false));
@@ -221,7 +155,10 @@ export default function Placement({ onNavigateToGraph, onShowAnalysisMenu, onOpe
         const matchSearch = !q || alert.entity_id?.toLowerCase().includes(q) || (alert.addresses || []).some((a) => a?.toLowerCase().includes(q));
         const avail = (alert.all_behaviors || alert.behaviors || []).filter((b) => b && !_BANNED.has(String(b).toLowerCase()));
         const matchBehavior = behaviorFilter === 'All' || avail.some((b) => b === behaviorFilter);
-        return matchSearch && matchBehavior;
+        const alertChain = alert.chain_name || alert.chain || null;
+        // Strict: alerts with no chain_name only show under "All Chains"
+        const matchChain = chainFilter === 'all' || (alertChain !== null && alertChain === chainFilter);
+        return matchSearch && matchBehavior && matchChain;
     });
 
     const totalPages = Math.max(1, Math.ceil(filteredAlerts.length / PAGE_SIZE));
@@ -260,6 +197,22 @@ export default function Placement({ onNavigateToGraph, onShowAnalysisMenu, onOpe
                         </div>
                     );
                 })}
+            </div>
+
+            {/* Chain filter dropdown */}
+            <div style={{ background: 'linear-gradient(145deg,#101D32,#0D1628)', border: '1px solid rgba(201,168,76,0.12)', borderRadius: '14px', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                <ChainFilter
+                    selectedChain={chainFilter}
+                    onChainChange={(c) => { setChainFilter(c); setPage(1); }}
+                    compact
+                    label="Filter by Chain"
+                />
+                {chainFilter !== 'all' && (
+                    <button onClick={() => { setChainFilter('all'); setPage(1); }}
+                        style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '7px', padding: '5px 10px', cursor: 'pointer', fontSize: '11px', color: '#4B5E72' }}>
+                        Clear
+                    </button>
+                )}
             </div>
 
             {/* Search + filter */}
@@ -335,7 +288,7 @@ export default function Placement({ onNavigateToGraph, onShowAnalysisMenu, onOpe
                         : profile.highlighted;
                     const isCluster = alert.entity_type === 'cluster';
                     const addresses = alert.addresses || [];
-                    
+
                     return (
                         <div key={alert.entity_id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 120px', padding: '14px 20px', borderBottom: idx < visibleAlerts.length - 1 ? '1px solid rgba(201,168,76,0.06)' : 'none', background: idx % 2 === 0 ? '#0D1628' : '#101D32', borderLeft: '3px solid transparent', alignItems: 'center' }}
                             onMouseEnter={(e) => { e.currentTarget.style.background = '#132240'; e.currentTarget.style.borderLeft = '3px solid rgba(201,168,76,0.4)'; }}
@@ -343,7 +296,10 @@ export default function Placement({ onNavigateToGraph, onShowAnalysisMenu, onOpe
                         >
                             {/* Entity */}
                             <div style={{ minWidth: 0 }}>
-                                <div style={{ fontSize: '10px', fontWeight: '700', color: '#4B5E72', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '3px' }}>{isCluster ? '?? Cluster' : '?? Address'}</div>
+                                <div style={{ fontSize: '10px', fontWeight: '700', color: '#4B5E72', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {isCluster ? '🔗 Cluster' : '📍 Address'}
+                                    <ChainBadge chain={alert.chain_name || 'ethereum'} size="xs" />
+                                </div>
                                 <div style={{ fontSize: '13px', fontWeight: '700', color: alert.entity_name ? '#E2D9C8' : '#4B5E72', marginBottom: '2px', fontStyle: alert.entity_name ? 'normal' : 'italic' }}>
                                     {alert.entity_name || 'Unknown'}
                                 </div>
@@ -412,7 +368,7 @@ export default function Placement({ onNavigateToGraph, onShowAnalysisMenu, onOpe
                                 </div>
                                 <span style={{ fontSize: '11px', fontWeight: '700', color: '#8A9DB5', minWidth: '32px' }}>{formatNumber((alert.confidence || 0) * 100, 0)}%</span>
                             </div>
-                            
+
                             {/* Analyze Button */}
                             <AnalyzeButton
                                 entityId={alert.entity_id}

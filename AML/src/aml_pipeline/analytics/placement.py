@@ -335,9 +335,10 @@ def _select_behavior_highlights(
 class PlacementAnalysisEngine:
     """Run the placement-only AML pipeline on Ethereum transaction flows."""
 
-    def __init__(self, cfg: Config | None = None):
+    def __init__(self, cfg: Config | None = None, chain_name: str | None = None):
         self.cfg = cfg or load_config()
-        self.clustering_engine = ClusteringEngine(cfg=self.cfg)
+        self.chain_name = chain_name or "ethereum"
+        self.clustering_engine = ClusteringEngine(cfg=self.cfg, chain_name=self.chain_name)
 
     def run(self, source: str = "auto", persist: bool = False) -> PlacementAnalysisResult:
         transactions = self._load_transactions(source=source)
@@ -1387,6 +1388,7 @@ class PlacementAnalysisEngine:
                 "linked_root_entities_json": _json_dumps(placement.linked_root_entities),
                 "supporting_tx_hashes_json": _json_dumps(placement.supporting_tx_hashes),
                 "metrics_json": _json_dumps(placement.metrics),
+                "chain_name": self.chain_name,
                 "first_seen_at": datetime.fromisoformat(placement.first_seen_at).replace(tzinfo=None) if placement.first_seen_at else None,
                 "last_seen_at": datetime.fromisoformat(placement.last_seen_at).replace(tzinfo=None) if placement.last_seen_at else None,
             }
@@ -1567,6 +1569,7 @@ class PlacementAnalysisEngine:
                                 linked_root_entities_json,
                                 supporting_tx_hashes_json,
                                 metrics_json,
+                                chain_name,
                                 first_seen_at,
                                 last_seen_at
                             )
@@ -1585,6 +1588,7 @@ class PlacementAnalysisEngine:
                                 :linked_root_entities_json,
                                 :supporting_tx_hashes_json,
                                 :metrics_json,
+                                :chain_name,
                                 :first_seen_at,
                                 :last_seen_at
                             )

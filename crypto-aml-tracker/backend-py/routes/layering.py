@@ -197,6 +197,32 @@ async def _latest_run() -> dict | None:
     )
 
 
+async def _latest_batch_run_ids() -> list[str]:
+    """Return the latest layering run ID for each chain."""
+    rows = await fetch_all(
+        """
+        SELECT a.run_id
+        FROM layering_alerts a
+        INNER JOIN (
+            SELECT chain_name, MAX(r2.completed_at) AS max_ts
+            FROM layering_alerts a2
+            JOIN layering_runs r2 ON r2.id = a2.run_id
+            WHERE r2.status = 'completed'
+            GROUP BY a2.chain_name
+        ) latest_per_chain
+          ON a.chain_name = latest_per_chain.chain_name
+        JOIN layering_runs r ON r.id = a.run_id
+          AND r.completed_at = latest_per_chain.max_ts
+          AND r.status = 'completed'
+        GROUP BY a.run_id
+        """
+    )
+    if rows:
+        return list({r["run_id"] for r in rows})
+    latest = await _latest_run()
+    return [latest["id"]] if latest else []
+
+
 async def _get_run(run_id: str | None = None) -> dict | None:
     if run_id:
         return await fetch_one(
@@ -287,6 +313,7 @@ def _layering_payload(row: dict, addresses: list[str], names_map: dict | None = 
         "entity_id": row.get("entity_id"),
         "entity_name": next((names_map.get(addr) for addr in ([row.get("entity_id")] + addresses) if names_map and names_map.get(addr)), None),
         "entity_type": row.get("entity_type"),
+        "chain_name": row.get("chain_name") or "ethereum",
         "addresses": addresses,
         "address_count": len(addresses),
         "confidence": _coerce_float(row.get("confidence_score")),
@@ -339,22 +366,35 @@ async def get_layering_runs():
 
 @router.get("")
 async def get_layering_alerts(
-    limit: int = Query(50, ge=1, le=500),
+    limit: int = Query(5000, ge=1, le=10000),
     min_confidence: float = Query(0.0, ge=0.0, le=1.0),
     run_id: str | None = Query(None),
+    chain: str | None = Query(None),
 ):
     _require_mysql()
-    run = await _latest_run_safe(run_id)
-    if not run:
-        return {
-            "run_id": None,
-            "generated_at": None,
-            "summary": {},
-            "items": [],
-        }
+
+    if run_id:
+        run = await _latest_run_safe(run_id)
+        if not run:
+            return {"run_id": None, "generated_at": None, "summary": {}, "items": []}
+        run_ids = [run["id"]]
+        run_meta = run
+    else:
+        run_ids = await _latest_batch_run_ids()
+        if not run_ids:
+            return {"run_id": None, "generated_at": None, "summary": {}, "items": []}
+        run_meta = await _latest_run()
+
+    run_id_placeholders = ", ".join(["%s"] * len(run_ids))
+
+    chain_filter_sql = ""
+    chain_params: list = []
+    if chain and chain != "all":
+        chain_filter_sql = " AND (a.chain_name = %s OR (a.chain_name IS NULL AND %s = 'ethereum'))"
+        chain_params = [chain, chain]
 
     rows = await fetch_all(
-        """
+        f"""
         SELECT a.entity_id,
                a.entity_type,
                a.confidence_score,
@@ -369,6 +409,7 @@ async def get_layering_alerts(
                a.metrics_json,
                a.first_seen_at,
                a.last_seen_at,
+               a.chain_name,
                e.validation_status,
                e.validation_confidence,
                e.source_kind,
@@ -377,22 +418,28 @@ async def get_layering_alerts(
         JOIN layering_entities e
           ON e.run_id = a.run_id
          AND e.entity_id = a.entity_id
-        WHERE a.run_id = %s
+        WHERE a.run_id IN ({run_id_placeholders})
           AND a.confidence_score >= %s
+          {chain_filter_sql}
         ORDER BY a.layering_score DESC, a.confidence_score DESC, a.entity_id ASC
         LIMIT %s
         """,
-        (run["id"], min_confidence, limit),
+        tuple(run_ids + [min_confidence] + chain_params + [limit]),
     )
     entity_ids = [row["entity_id"] for row in rows]
-    address_map = await _fetch_addresses_map(run["id"], entity_ids)
+    address_map: dict[str, list[str]] = {}
+    for rid in run_ids:
+        partial = await _fetch_addresses_map(rid, entity_ids)
+        for eid, addrs in partial.items():
+            if eid not in address_map:
+                address_map[eid] = addrs
     all_addresses = [addr for addrs in address_map.values() for addr in addrs] + entity_ids
     names_map = await _fetch_names_map(all_addresses)
 
     return {
-        "run_id": run["id"],
-        "generated_at": _format_ts(run.get("completed_at")),
-        "summary": _decode_json(run.get("summary_json"), {}),
+        "run_id": run_meta["id"] if run_meta else run_ids[0],
+        "generated_at": _format_ts(run_meta.get("completed_at")) if run_meta else None,
+        "summary": _decode_json(run_meta.get("summary_json"), {}) if run_meta else {},
         "items": [
             _layering_payload(row, address_map.get(row["entity_id"], []), names_map)
             for row in rows
@@ -403,32 +450,40 @@ async def get_layering_alerts(
 @router.get("/summary")
 async def get_layering_summary(run_id: str | None = Query(None)):
     _require_mysql()
-    run = await _latest_run_safe(run_id)
-    if not run:
-        return {
-            "run_id": None,
-            "generated_at": None,
-            "summary": {},
-            "top_alerts": [],
-        }
+    if run_id:
+        run_ids_to_use = [run_id]
+        run_meta = await _latest_run_safe(run_id)
+    else:
+        run_ids_to_use = await _latest_batch_run_ids()
+        run_meta = await _latest_run()
+
+    if not run_ids_to_use:
+        return {"run_id": None, "generated_at": None, "summary": {}, "top_alerts": []}
+
+    run_id_placeholders = ", ".join(["%s"] * len(run_ids_to_use))
 
     top_rows = await fetch_all(
-        """
-        SELECT entity_id, layering_score, methods_json
+        f"""
+        SELECT entity_id, layering_score, methods_json, run_id
         FROM layering_alerts
-        WHERE run_id = %s
+        WHERE run_id IN ({run_id_placeholders})
         ORDER BY layering_score DESC, confidence_score DESC
         LIMIT 5
         """,
-        (run["id"],),
+        tuple(run_ids_to_use),
     )
     entity_ids = [row["entity_id"] for row in top_rows]
-    address_map = await _fetch_addresses_map(run["id"], entity_ids)
+    address_map: dict[str, list[str]] = {}
+    for rid in run_ids_to_use:
+        partial = await _fetch_addresses_map(rid, entity_ids)
+        for eid, addrs in partial.items():
+            if eid not in address_map:
+                address_map[eid] = addrs
 
     return {
-        "run_id": run["id"],
-        "generated_at": _format_ts(run.get("completed_at")),
-        "summary": _decode_json(run.get("summary_json"), {}),
+        "run_id": run_meta["id"] if run_meta else run_ids_to_use[0],
+        "generated_at": _format_ts(run_meta.get("completed_at")) if run_meta else None,
+        "summary": _decode_json(run_meta.get("summary_json"), {}) if run_meta else {},
         "top_alerts": [
             {
                 "entity_id": row.get("entity_id"),

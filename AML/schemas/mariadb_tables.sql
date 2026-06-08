@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS owner_list (
+﻿CREATE TABLE IF NOT EXISTS owner_list (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     full_name VARCHAR(255) NOT NULL,
     entity_type VARCHAR(64) NOT NULL DEFAULT 'individual',
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS owner_list_addresses (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     owner_list_id BIGINT NOT NULL,
     blockchain_network VARCHAR(64) NOT NULL DEFAULT 'ethereum',
-    address VARCHAR(64) NOT NULL,
+    address VARCHAR(128) NOT NULL,
     is_primary TINYINT(1) NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_owner_list_addresses_address (address),
@@ -40,13 +40,16 @@ CREATE TABLE IF NOT EXISTS wallet_clusters (
     total_balance DECIMAL(38,18) NOT NULL DEFAULT 0,
     risk_level VARCHAR(32) NOT NULL DEFAULT 'normal',
     label_status VARCHAR(32) NOT NULL DEFAULT 'unlabeled',
-    matched_owner_address VARCHAR(64) NULL,
+    matched_owner_address VARCHAR(128) NULL,
+    chain_name VARCHAR(64) NULL,
+    blockchain_type VARCHAR(32) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_labeled_at DATETIME NULL,
     KEY idx_wallet_clusters_owner_id (owner_id),
     KEY idx_wallet_clusters_size (cluster_size),
     KEY idx_wallet_clusters_balance (total_balance),
     KEY idx_wallet_clusters_label_status (label_status),
+    KEY idx_wallet_clusters_chain_name (chain_name),
     CONSTRAINT fk_wallet_clusters_owner
         FOREIGN KEY (owner_id) REFERENCES owner_list(id)
         ON DELETE SET NULL
@@ -54,9 +57,9 @@ CREATE TABLE IF NOT EXISTS wallet_clusters (
 
 CREATE TABLE IF NOT EXISTS transactions (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    tx_hash VARCHAR(66) NOT NULL,
-    from_address VARCHAR(64) NULL,
-    to_address VARCHAR(64) NULL,
+    tx_hash VARCHAR(128) NOT NULL,
+    from_address VARCHAR(128) NULL,
+    to_address VARCHAR(128) NULL,
     value_eth DECIMAL(38,18) NOT NULL DEFAULT 0,
     usd_at_execution DECIMAL(24,2) NULL,
     pricing_source VARCHAR(64) NULL COMMENT 'chainlink_oracle | backfill_chainlink | NULL if no price',
@@ -75,7 +78,7 @@ CREATE TABLE IF NOT EXISTS transactions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS addresses (
-    address VARCHAR(64) PRIMARY KEY,
+    address VARCHAR(128) PRIMARY KEY,
     is_contract TINYINT(1) NOT NULL DEFAULT 0,
     first_seen DATETIME NULL,
     last_seen DATETIME NULL,
@@ -143,7 +146,7 @@ CREATE TABLE IF NOT EXISTS placement_entity_addresses (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     run_id VARCHAR(64) NOT NULL,
     entity_id VARCHAR(64) NOT NULL,
-    address VARCHAR(64) NOT NULL,
+    address VARCHAR(128) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_placement_entity_addresses (run_id, entity_id, address),
     KEY idx_placement_entity_addresses_run_entity (run_id, entity_id),
@@ -286,7 +289,7 @@ CREATE TABLE IF NOT EXISTS layering_entity_addresses (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     run_id VARCHAR(64) NOT NULL,
     entity_id VARCHAR(64) NOT NULL,
-    address VARCHAR(64) NOT NULL,
+    address VARCHAR(128) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_layering_entity_addresses (run_id, entity_id, address),
     KEY idx_layering_entity_addresses_run_entity (run_id, entity_id),
@@ -347,15 +350,15 @@ CREATE TABLE IF NOT EXISTS layering_bridge_pairs (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     run_id VARCHAR(64) NOT NULL,
     entity_id VARCHAR(64) NOT NULL,
-    source_tx_hash VARCHAR(66) NOT NULL,
-    destination_tx_hash VARCHAR(66) NOT NULL,
+    source_tx_hash VARCHAR(128) NOT NULL,
+    destination_tx_hash VARCHAR(128) NOT NULL,
     bridge_contract VARCHAR(64) NOT NULL,
     token_symbol VARCHAR(64) NOT NULL DEFAULT 'ETH',
     amount DECIMAL(38,18) NOT NULL DEFAULT 0,
     latency_seconds DECIMAL(18,2) NOT NULL DEFAULT 0,
     confidence_score DECIMAL(6,4) NOT NULL DEFAULT 0,
-    source_address VARCHAR(64) NOT NULL,
-    destination_address VARCHAR(64) NOT NULL,
+    source_address VARCHAR(128) NOT NULL,
+    destination_address VARCHAR(128) NOT NULL,
     details_json LONGTEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     KEY idx_layering_bridge_pairs_run_entity (run_id, entity_id),
@@ -392,7 +395,7 @@ CREATE TABLE IF NOT EXISTS layering_alerts (
         ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ── Integration stage tables ─────────────────────────────────────────────────
+-- â”€â”€ Integration stage tables â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 CREATE TABLE IF NOT EXISTS integration_runs (
     id VARCHAR(64) PRIMARY KEY,
@@ -431,7 +434,7 @@ CREATE TABLE IF NOT EXISTS integration_alerts (
         ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ── Valuation audit log ──────────────────────────────────────────────────────
+-- â”€â”€ Valuation audit log â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- Immutable record of every backfill run. Never updated, only appended.
 
 CREATE TABLE IF NOT EXISTS valuation_audit_log (
@@ -440,7 +443,7 @@ CREATE TABLE IF NOT EXISTS valuation_audit_log (
     pricing_source VARCHAR(64) NOT NULL COMMENT 'chainlink_oracle | backfill_chainlink',
     price_date DATE NOT NULL COMMENT 'The date the oracle price applies to',
     eth_usd_price DECIMAL(24,8) NOT NULL COMMENT 'ETH/USD price used for this date',
-    tx_hash VARCHAR(66) NOT NULL COMMENT 'Transaction that was valued',
+    tx_hash VARCHAR(128) NOT NULL COMMENT 'Transaction that was valued',
     value_eth DECIMAL(38,18) NOT NULL COMMENT 'ETH amount at time of execution',
     usd_at_execution DECIMAL(24,2) NOT NULL COMMENT 'Computed USD value',
     valuation_version TINYINT UNSIGNED NOT NULL COMMENT 'Version written to transactions table',
@@ -450,3 +453,4 @@ CREATE TABLE IF NOT EXISTS valuation_audit_log (
     KEY idx_val_audit_price_date (price_date),
     KEY idx_val_audit_computed_at (computed_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

@@ -33,18 +33,20 @@ function App() {
   const [graphVersion, setGraphVersion] = useState(0)
   const [investigateAddress, setInvestigate] = useState(getInitialInvestigateAddress)
   const [lastUpdated, setLastUpdated] = useState(null)
+  const [selectedChain, setSelectedChain] = useState('all')   // Phase 5: global chain filter
+  const [sortBy, setSortBy] = useState('value_usd_desc')       // Phase 5: USD sort
   const intervalRef = useRef(null)
-  
+
   // Entity Intelligence Workspace state
   const [entityWorkspace, setEntityWorkspace] = useState(null) // { entityId, entityType, sourcePage, analysisType }
-  
+
   // Analysis Menu state
   const [analysisMenu, setAnalysisMenu] = useState(null) // { entityId, entityType, position }
 
   const fetchTransactions = useCallback(async ({ append = false, offset = 0 } = {}) => {
     if (append) { setTxLoadingMore(true) } else { setTxLoading(true); setTxError(null) }
     try {
-      const data = await getLatestTransactions({ limit: TX_BATCH_SIZE, offset, sortBy: 'amount_desc' })
+      const data = await getLatestTransactions({ limit: TX_BATCH_SIZE, offset, sortBy, chain: selectedChain })
       const nextItems = data.items || []
       setTransactions(prev => append ? [...prev, ...nextItems] : nextItems)
       setTxTotal(data.total || nextItems.length)
@@ -52,7 +54,7 @@ function App() {
       setLastUpdated(new Date())
     } catch (err) { setTxError(err.message) }
     finally { if (append) setTxLoadingMore(false); else setTxLoading(false) }
-  }, [])
+  }, [selectedChain, sortBy])
 
   useEffect(() => {
     fetchTransactions()
@@ -82,36 +84,48 @@ function App() {
 
   const handleInvestigate = (address) => navigate('graph', { address })
   const handleAddressClick = (address) => navigate('graph', { address })
-  
+
+  const handleChainChange = useCallback((chain) => {
+    setSelectedChain(chain)
+    setTransactions([])
+    setTxTotal(0)
+  }, [])
+
+  const handleSortChange = useCallback((newSort) => {
+    setSortBy(newSort)
+    setTransactions([])
+    setTxTotal(0)
+  }, [])
+
   // Show analysis menu when clicking an entity
   const showAnalysisMenu = useCallback((entityId, entityType, event) => {
     event.preventDefault();
     event.stopPropagation();
-    
+
     // Get click position
     const x = event.clientX;
     const y = event.clientY;
-    
+
     // Adjust position if menu would go off screen
     const adjustedX = x + 400 > window.innerWidth ? x - 400 : x;
     const adjustedY = y + 500 > window.innerHeight ? y - 500 : y;
-    
+
     setAnalysisMenu({
       entityId,
       entityType,
       position: { x: adjustedX, y: adjustedY }
     });
   }, []);
-  
+
   // Close analysis menu
   const closeAnalysisMenu = useCallback(() => {
     setAnalysisMenu(null);
   }, []);
-  
+
   // Handle analysis selection from menu
   const handleAnalysisSelect = useCallback((analysisType) => {
     if (!analysisMenu) return;
-    
+
     // Get current page name
     const pageNames = {
       'feed': 'Dashboard',
@@ -124,9 +138,9 @@ function App() {
       'analytics': 'Analytics',
       'risk': 'Risk Intelligence'
     };
-    
+
     const sourcePage = pageNames[activePage] || 'Unknown';
-    
+
     // Open workspace with selected analysis
     setEntityWorkspace({
       entityId: analysisMenu.entityId,
@@ -134,20 +148,20 @@ function App() {
       sourcePage,
       analysisType
     });
-    
+
     // Close menu
     setAnalysisMenu(null);
   }, [analysisMenu, activePage]);
-  
+
   // Open Entity Intelligence Workspace (legacy - for backward compatibility)
   const openEntityWorkspace = useCallback((entityId, entityType, sourcePage, analysisType = 'market-value') => {
     setEntityWorkspace({ entityId, entityType, sourcePage, analysisType })
   }, [])
-  
+
   const closeEntityWorkspace = useCallback(() => {
     setEntityWorkspace(null)
   }, [])
-  
+
   const walletWorkspaceUrl = import.meta.env.VITE_WALLET_ANALYSIS_URL
     || `http://${window.location.hostname}:3000`
 
@@ -160,7 +174,7 @@ function App() {
           <Sidebar activePage={activePage} onNavigate={(page) => navigate(page)} onHome={() => navigate('feed')} />
           <main style={{ flex: 1, padding: '24px', overflowY: activePage === 'graph' ? 'hidden' : 'auto', overflowX: 'hidden', minWidth: 0, height: '100vh', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', background: '#0F1829' }}>
             {activePage === 'feed'
-              ? <Dashboard transactions={transactions} loading={txLoading} loadingMore={txLoadingMore} error={txError} onInvestigate={handleInvestigate} onLoadMore={handleLoadMore} lastUpdated={lastUpdated} totalTransactions={txTotal} />
+              ? <Dashboard transactions={transactions} loading={txLoading} loadingMore={txLoadingMore} error={txError} onInvestigate={handleInvestigate} onLoadMore={handleLoadMore} lastUpdated={lastUpdated} totalTransactions={txTotal} selectedChain={selectedChain} onChainChange={handleChainChange} sortBy={sortBy} onSortChange={handleSortChange} />
               : activePage === 'graph'
                 ? <GraphExplorer initialAddress={investigateAddress} graphVersion={graphVersion} lastUpdated={lastUpdated} />
                 : activePage === 'placement'
@@ -174,13 +188,13 @@ function App() {
                         : activePage === 'market-value'
                           ? <MarketValueIndex onOpenWorkspace={openEntityWorkspace} onNavigateToGraph={(address) => navigate('graph', { address })} />
                           : activePage === 'analytics'
-                          ? <Analytics />
-                          : activePage === 'risk'
-                            ? <RiskIntelligence />
-                            : null
+                            ? <Analytics />
+                            : activePage === 'risk'
+                              ? <RiskIntelligence />
+                              : null
             }
           </main>
-          
+
           {/* Analysis Menu */}
           {analysisMenu && (
             <AnalysisMenu
@@ -191,7 +205,7 @@ function App() {
               onClose={closeAnalysisMenu}
             />
           )}
-          
+
           {/* Entity Intelligence Workspace */}
           {entityWorkspace && (
             <EntityIntelligenceWorkspace

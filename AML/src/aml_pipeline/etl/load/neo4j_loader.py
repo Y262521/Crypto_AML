@@ -16,7 +16,10 @@ logger = logging.getLogger(__name__)
 def _build_transactions_query(min_block: int | None = None) -> tuple[str, dict]:
     query = """
         SELECT tx_hash, from_address, to_address, value_eth, block_number, timestamp,
-               is_contract_call, gas_used, status
+               is_contract_call, gas_used, status,
+               COALESCE(chain_name, 'ethereum') AS chain_name,
+               COALESCE(chain_id, 1) AS chain_id,
+               COALESCE(native_asset, 'ETH') AS native_asset
         FROM transactions
         WHERE from_address IS NOT NULL
           AND to_address IS NOT NULL
@@ -33,26 +36,42 @@ def _build_transactions_query(min_block: int | None = None) -> tuple[str, dict]:
 
 def create_constraints(cfg: Config) -> None:
     driver = get_neo4j_driver(cfg)
-    query = """
-    CREATE CONSTRAINT address_unique IF NOT EXISTS
-    FOR (a:Address)
-    REQUIRE a.address IS UNIQUE
-    """
-    index_tx = """
-    CREATE INDEX transfer_tx_hash IF NOT EXISTS
-    FOR ()-[r:TRANSFER]-()
-    ON (r.tx_hash)
-    """
-    index_block = """
-    CREATE INDEX transfer_block_number IF NOT EXISTS
-    FOR ()-[r:TRANSFER]-()
-    ON (r.block_number)
-    """
+    statements = [
+        # Existing constraints
+        """
+        CREATE CONSTRAINT address_unique IF NOT EXISTS
+        FOR (a:Address)
+        REQUIRE a.address IS UNIQUE
+        """,
+        """
+        CREATE INDEX transfer_tx_hash IF NOT EXISTS
+        FOR ()-[r:TRANSFER]-()
+        ON (r.tx_hash)
+        """,
+        """
+        CREATE INDEX transfer_block_number IF NOT EXISTS
+        FOR ()-[r:TRANSFER]-()
+        ON (r.block_number)
+        """,
+        # Phase 1: chain-aware indexes
+        """
+        CREATE INDEX address_chain_name IF NOT EXISTS
+        FOR (a:Address)
+        ON (a.chain_name)
+        """,
+        """
+        CREATE INDEX transfer_chain_name IF NOT EXISTS
+        FOR ()-[r:TRANSFER]-()
+        ON (r.chain_name)
+        """,
+    ]
     try:
         with driver.session(database=cfg.neo4j_database) as session:
-            session.run(query).consume()
-            session.run(index_tx).consume()
-            session.run(index_block).consume()
+            for stmt in statements:
+                try:
+                    session.run(stmt).consume()
+                except Exception as exc:
+                    logger.debug("Neo4j constraint/index skipped: %s", exc)
     finally:
         driver.close()
 
@@ -86,6 +105,10 @@ def load_to_neo4j(
     cfg: Config | None = None,
     min_block: int | None = None,
     batch_size: int | None = None,
+    chain_name: str = "ethereum",
+    chain_id: int = 1,
+    blockchain_type: str = "EVM",
+    native_asset: str = "ETH",
 ) -> dict:
     cfg = cfg or load_config()
     create_constraints(cfg)
@@ -94,17 +117,30 @@ def load_to_neo4j(
     rows_loaded = 0
     rows_skipped = 0
 
+    # Chain-aware Cypher: nodes and edges carry chain identity
     query = """
     UNWIND $rows AS row
-    MERGE (s:Address {address: row.from_address})
-    MERGE (t:Address {address: row.to_address})
+    MERGE (s:Address {address: row.from_address, chain_name: row.chain_name})
+    ON CREATE SET
+        s.chain_id        = row.chain_id,
+        s.blockchain_type = row.blockchain_type,
+        s.native_asset    = row.native_asset
+    MERGE (t:Address {address: row.to_address, chain_name: row.chain_name})
+    ON CREATE SET
+        t.chain_id        = row.chain_id,
+        t.blockchain_type = row.blockchain_type,
+        t.native_asset    = row.native_asset
     MERGE (s)-[r:TRANSFER {tx_hash: row.tx_hash}]->(t)
-    SET r.value_eth = row.value_eth,
-        r.block_number = row.block_number,
-        r.timestamp = row.timestamp,
-        r.is_contract_call = row.is_contract_call,
-        r.gas_used = row.gas_used,
-        r.status = row.status
+    SET r.value_eth       = row.value_eth,
+        r.value_native    = row.value_native,
+        r.block_number    = row.block_number,
+        r.timestamp       = row.timestamp,
+        r.is_contract_call= row.is_contract_call,
+        r.gas_used        = row.gas_used,
+        r.status          = row.status,
+        r.chain_name      = row.chain_name,
+        r.chain_id        = row.chain_id,
+        r.native_asset    = row.native_asset
     """
 
     try:
@@ -116,16 +152,21 @@ def load_to_neo4j(
                     if not row.get("from_address") or not row.get("to_address"):
                         rows_skipped += 1
                         continue
+                    value_eth = float(row.get("value_eth") or 0.0)
                     formatted.append({
                         "tx_hash": row.get("tx_hash"),
                         "from_address": row.get("from_address"),
                         "to_address": row.get("to_address"),
-                        "value_eth": float(row.get("value_eth") or 0.0),
+                        "value_eth": value_eth,
+                        "value_native": float(row.get("value_native") or value_eth),
                         "block_number": int(row.get("block_number") or 0),
                         "timestamp": row.get("timestamp").isoformat() if row.get("timestamp") else None,
                         "is_contract_call": bool(row.get("is_contract_call")),
                         "gas_used": row.get("gas_used"),
                         "status": row.get("status"),
+                        "chain_name": row.get("chain_name") or chain_name,
+                        "chain_id": int(row.get("chain_id") or chain_id),
+                        "native_asset": row.get("native_asset") or native_asset,
                     })
                 if not formatted:
                     continue
@@ -134,7 +175,7 @@ def load_to_neo4j(
     finally:
         driver.close()
 
-    logger.info("Neo4j load complete: %s rows", rows_loaded)
+    logger.info("Neo4j load complete: %s rows (chain=%s)", rows_loaded, chain_name)
     return {"rows_loaded": rows_loaded, "rows_skipped": rows_skipped}
 
 

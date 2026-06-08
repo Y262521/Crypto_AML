@@ -79,7 +79,19 @@ class EthereumAdapter(BlockchainAdapter):
 
     @property
     def blockchain_type(self) -> str:
-        return "account"
+        return "EVM"
+
+    @property
+    def chain_name(self) -> str:
+        return "ethereum"
+
+    @property
+    def chain_id(self) -> int:
+        return 1
+
+    @property
+    def native_asset(self) -> str:
+        return "ETH"
 
     # ── internal readers ────────────────────────────────────────────────────
 
@@ -130,7 +142,8 @@ class EthereumAdapter(BlockchainAdapter):
                 value_eth,
                 is_contract_call,
                 gas_used,
-                status
+                status,
+                COALESCE(chain_name, 'ethereum') AS chain_name
             FROM transactions
             ORDER BY block_number ASC, tx_hash ASC
             """
@@ -142,17 +155,25 @@ class EthereumAdapter(BlockchainAdapter):
                     to = (row.get("to_address") or "").lower().strip()
                     if not frm and not to:
                         continue
+                    # Use the stored chain_name if present, else fall back to adapter's chain
+                    stored_chain = row.get("chain_name") or self.chain_name
+                    val = _to_float(row.get("value_eth"))
                     yield TxRecord(
                         tx_hash=row.get("tx_hash", ""),
                         block_number=_to_int(row.get("block_number")),
                         timestamp=_to_ts(row.get("timestamp")),
                         from_address=frm,
                         to_address=to,
-                        value_eth=_to_float(row.get("value_eth")),
+                        value_eth=val,
+                        value_native=val,
                         is_contract_call=bool(row.get("is_contract_call")),
                         input_method_id="",
                         gas_used=_to_int(row.get("gas_used")),
                         status=_to_int(row.get("status")),
+                        chain_name=stored_chain,
+                        chain_id=self.chain_id,
+                        blockchain_type=self.blockchain_type,
+                        native_asset=self.native_asset,
                     )
         finally:
             engine.dispose()
@@ -169,16 +190,22 @@ class EthereumAdapter(BlockchainAdapter):
             to = (ap.get("to") or "").lower().strip()
             if not frm and not to:
                 continue
+            eth_val = _to_float(val.get("eth"))
             yield TxRecord(
                 tx_hash=doc.get("tx_hash", ""),
                 block_number=_to_int(block.get("number")),
                 timestamp=_to_ts(block.get("timestamp")),
                 from_address=frm,
                 to_address=to,
-                value_eth=_to_float(val.get("eth")),
+                value_eth=eth_val,
+                value_native=eth_val,
                 is_contract_call=bool(forensics.get("is_contract")),
                 input_method_id=str(forensics.get("method_id") or "").lower().strip(),
                 gas_used=_to_int(doc.get("gas", {}).get("gas_used")),
+                chain_name=self.chain_name,
+                chain_id=self.chain_id,
+                blockchain_type=self.blockchain_type,
+                native_asset=self.native_asset,
             )
         client.close()
 
@@ -187,24 +214,29 @@ class EthereumAdapter(BlockchainAdapter):
         if not csv_path.exists():
             logger.warning("transactions.csv not found at %s", csv_path)
             return
-        # FIX: use itertuples() instead of iterrows() — ~10x faster for large CSVs
         for chunk in pd.read_csv(csv_path, chunksize=5000):
             for row in chunk.itertuples(index=False):
                 frm = str(getattr(row, "from_address", "") or "").lower().strip()
                 to = str(getattr(row, "to_address", "") or "").lower().strip()
                 if not frm and not to:
                     continue
+                val = _to_float(getattr(row, "value_eth", 0.0))
                 yield TxRecord(
                     tx_hash=str(getattr(row, "tx_hash", "")),
                     block_number=int(getattr(row, "block_number", 0) or 0),
                     timestamp=_to_ts(getattr(row, "timestamp", None)),
                     from_address=frm,
                     to_address=to,
-                    value_eth=_to_float(getattr(row, "value_eth", 0.0)),
+                    value_eth=val,
+                    value_native=val,
                     is_contract_call=bool(getattr(row, "is_contract_call", False)),
                     input_method_id=str(getattr(row, "input_method_id", "") or "").lower().strip(),
                     gas_used=int(getattr(row, "gas_used", 0) or 0),
                     status=int(getattr(row, "status", 0) or 0),
+                    chain_name=self.chain_name,
+                    chain_id=self.chain_id,
+                    blockchain_type=self.blockchain_type,
+                    native_asset=self.native_asset,
                 )
 
     # ── public interface ─────────────────────────────────────────────────────

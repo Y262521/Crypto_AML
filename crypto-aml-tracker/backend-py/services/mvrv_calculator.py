@@ -97,6 +97,23 @@ _CHAINLINK_ETH_USD = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
 _LATEST_ROUND_DATA_SELECTOR = "0xfeaf968c"   # keccak256("latestRoundData()")[:4]
 _BLOCKS_PER_DAY = 7150                        # post-Merge: 12s slots → 7200/day; 7150 is conservative
 
+# Chainlink price feed contracts on Ethereum Mainnet for all supported chains
+# Source: https://docs.chain.link/data-feeds/price-feeds/addresses
+_CHAINLINK_FEEDS: dict[str, str] = {
+    "ETH":  "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",  # ETH/USD
+    "WETH": "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",  # ETH/USD (same feed)
+    "BTC":  "0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88",  # BTC/USD
+    "BNB":  "0x14e613AC84a31f709eadbEF3bf98bBe1763Ba62c",  # BNB/USD
+    "SOL":  "0x4ffC43a60e009B551865A93d232E33Fce9f01507",  # SOL/USD
+    "POL":  "0x7bAC85A8a13A4BcD8abb3eB7d6b4d632c4Ef1cB",  # POL/USD (MATIC/USD feed)
+    "LTC":  "0x6AF09DF7563C363B5763b9102712EbeD3b9e859B",  # LTC/USD
+    "DOGE": "0x2465CefD3b488BE410b941b1d4b2767088e2A028", # DOGE/USD
+    "BCH":  "0x9F0F69428F923D6c95B781F89E165C9b2df9789D",  # BCH/USD
+}
+
+# Symbols we track for historical prices
+_PRICE_SYMBOLS = ["ETH", "WETH", "BTC", "BNB", "SOL", "POL", "LTC", "DOGE", "BCH"]
+
 
 def _get_alchemy_url() -> str:
     """Return the configured Alchemy RPC URL. Raises if not set."""
@@ -174,18 +191,14 @@ def _decode_chainlink_answer(hex_result: str) -> Optional[Decimal]:
         return None
 
 
-async def _fetch_hist_prices_chainlink(days: int = 730) -> Dict[str, Decimal]:
+async def _fetch_hist_prices_chainlink(days: int = 730, feed_contract: str | None = None) -> Dict[str, Decimal]:
     """
-    Fetch historical daily ETH/USD prices from the Chainlink oracle via Alchemy archive node.
+    Fetch historical daily prices from a Chainlink oracle feed via Alchemy archive node.
+    Supports any Chainlink USD price feed — ETH/USD, BTC/USD, BNB/USD, SOL/USD, etc.
 
-    Method:
-      1. Get current head block via eth_blockNumber.
-      2. For each of the past `days` days, subtract (day_index × 7150) blocks.
-      3. Call latestRoundData() on the Chainlink ETH/USD feed at that block.
-      4. Decode the answer (int256, 8 decimals) → USD price.
-      5. Return Dict["YYYY-MM-DD" → Decimal].
-
-    This is the ONLY pricing source. No fallbacks.
+    Args:
+        days:          Number of historical days to fetch
+        feed_contract: Chainlink feed contract address (defaults to ETH/USD feed)
     """
     import ssl as _ssl
     try:
@@ -193,6 +206,8 @@ async def _fetch_hist_prices_chainlink(days: int = 730) -> Dict[str, Decimal]:
     except RuntimeError as exc:
         print(f"  ✗ Chainlink fetch skipped: {exc}")
         return {}
+
+    contract = feed_contract or _CHAINLINK_ETH_USD
 
     ssl_ctx = _ssl.create_default_context()
     try:
@@ -226,20 +241,18 @@ async def _fetch_hist_prices_chainlink(days: int = 730) -> Dict[str, Decimal]:
         targets = []
         for day_index in range(days):
             target_block = max(head_block - day_index * _BLOCKS_PER_DAY, 1)
-            date = today.replace(
-                hour=0, minute=0, second=0, microsecond=0
-            )
+            date = today.replace(hour=0, minute=0, second=0, microsecond=0)
             from datetime import timedelta
             date = date - timedelta(days=day_index)
             targets.append((date.strftime("%Y-%m-%d"), hex(target_block)))
 
-        # Step 3: batch eth_call requests concurrently (50 at a time to avoid rate limits)
+        # Step 3: batch eth_call requests concurrently (50 at a time)
         BATCH = 50
         for i in range(0, len(targets), BATCH):
             batch = targets[i:i + BATCH]
             tasks = [
                 _eth_call_at_block(
-                    session, url, _CHAINLINK_ETH_USD,
+                    session, url, contract,
                     _LATEST_ROUND_DATA_SELECTOR, block_hex
                 )
                 for _, block_hex in batch
@@ -252,10 +265,9 @@ async def _fetch_hist_prices_chainlink(days: int = 730) -> Dict[str, Decimal]:
                 if price and price > 0:
                     out[date_str] = price
 
-            # Small pause between batches to respect Alchemy rate limits
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.15)  # slightly longer pause for multi-symbol fetches
 
-    print(f"  ✓ Chainlink ETH/USD: {len(out)}/{days} days resolved")
+    print(f"  ✓ Chainlink {contract[:10]}…: {len(out)}/{days} days resolved")
     return out
 
 
@@ -320,38 +332,179 @@ async def _fetch_current_price_chainlink() -> Optional[Decimal]:
 async def warm_hist_price_cache():
     """
     Called ONCE at server startup.
-    Single source of truth: Chainlink ETH/USD oracle via Alchemy archive node.
-    No CoinGecko. No fallbacks. No external market APIs.
-
-    Flow:
-      1. Load existing prices from token_price_history DB table into memory.
-      2. If DB is empty, fetch 730 days from Chainlink oracle and persist.
-      3. If Chainlink fetch fails (Alchemy not configured), log a clear error.
-         usd_at_execution will remain NULL until ALCHEMY_RPC is configured.
+    Loads prices from DB cache. Only fetches from Chainlink if ETH/WETH are missing.
+    Non-ETH chains (BNB, SOL, etc.) are loaded from DB only — no blocking fetch at startup.
     """
-    print("🌡  Warming historical price cache (Chainlink/Alchemy oracle)…")
+    print("🌡  Warming historical price cache (Chainlink/Alchemy oracle — all chains)…")
     for sym in _PRICE_SYMBOLS:
         db_prices = await _load_hist_prices_from_db(sym)
         if db_prices:
             _HIST_PRICE_CACHE.setdefault(sym, {}).update(db_prices)
             print(f"  ✓ {sym}: {len(db_prices)} days loaded from DB (Chainlink oracle data)")
         else:
-            print(f"  ↓ {sym}: no DB data, querying Chainlink oracle via Alchemy…")
-            # ETH and WETH share the same Chainlink ETH/USD feed
-            fresh = await _fetch_hist_prices_chainlink(days=730)
-            if fresh:
-                _HIST_PRICE_CACHE.setdefault(sym, {}).update(fresh)
-                await _save_hist_prices_to_db(sym, fresh)
-                print(f"  ✓ {sym}: {len(fresh)} days fetched from Chainlink and persisted")
+            # Only block startup for ETH/WETH — they're needed for the Ethereum price
+            # Other assets skip the slow fetch; they'll use the backfill path instead
+            if sym in ("ETH", "WETH"):
+                feed = _CHAINLINK_FEEDS.get(sym)
+                if not feed:
+                    continue
+                print(f"  ↓ {sym}: no DB data, querying Chainlink oracle via Alchemy…")
+                try:
+                    fresh = await _fetch_hist_prices_chainlink(days=730, feed_contract=feed)
+                    if fresh:
+                        _HIST_PRICE_CACHE.setdefault(sym, {}).update(fresh)
+                        await _save_hist_prices_to_db(sym, fresh)
+                        print(f"  ✓ {sym}: {len(fresh)} days fetched from Chainlink and persisted")
+                    else:
+                        print(
+                            f"  ✗ {sym}: Chainlink oracle fetch failed. "
+                            "Ensure ALCHEMY_RPC is set in .env. "
+                            "usd_at_execution will be NULL until prices are loaded."
+                        )
+                except Exception as exc:
+                    print(f"  ✗ {sym}: Chainlink oracle fetch failed. Ensure ALCHEMY_RPC is set in .env. usd_at_execution will be NULL until prices are loaded.")
             else:
-                print(
-                    f"  ✗ {sym}: Chainlink oracle fetch failed. "
-                    "Ensure ALCHEMY_RPC is set in .env. "
-                    "usd_at_execution will be NULL until prices are loaded."
-                )
+                print(f"  -- {sym}: no DB data (will fetch on next scheduled backfill)")
         _HIST_CACHE_WARMED.add(sym)
+
     total = sum(len(v) for v in _HIST_PRICE_CACHE.values())
-    print(f"✓ Historical price cache warm ({total} total entries, source: Chainlink/Alchemy)")
+    symbols_loaded = [s for s in _PRICE_SYMBOLS if _HIST_PRICE_CACHE.get(s)]
+    print(f"✓ Historical price cache warm ({total} total entries across {len(symbols_loaded)} symbols: {', '.join(symbols_loaded)})")
+
+
+async def backfill_usd_at_execution_all_chains() -> dict:
+    """
+    Backfill usd_at_execution for ALL chains using Chainlink oracle prices.
+
+    For each transaction where usd_at_execution IS NULL:
+      1. Look up the native_asset (ETH, BTC, BNB, SOL, etc.)
+      2. Find the historical USD price for the transaction date
+         from the _HIST_PRICE_CACHE (Chainlink oracle data)
+      3. Compute usd_at_execution = value_eth × price_usd
+      4. Write back to the transactions table
+
+    This is the correct way to do cross-chain USD comparison:
+    every transaction gets a real oracle-sourced USD value at execution time.
+    """
+    pool = get_pool()
+    if not pool:
+        return {"error": "MySQL not connected"}
+
+    summary = {"updated": {}, "skipped": {}, "total_updated": 0}
+
+    # Map native_asset → symbol for price lookup
+    ASSET_TO_SYMBOL = {
+        "ETH": "ETH", "WETH": "WETH",
+        "BNB": "BNB", "POL": "POL",
+        "BTC": "BTC", "LTC": "LTC",
+        "DOGE": "DOGE", "BCH": "BCH",
+        "SOL": "SOL",
+    }
+
+    async with pool.acquire() as conn:
+        import aiomysql
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            # Fetch all transactions missing USD value
+            await cur.execute(
+                """
+                SELECT id, tx_hash, native_asset, value_eth, timestamp
+                FROM transactions
+                WHERE usd_at_execution IS NULL
+                  AND value_eth > 0
+                  AND native_asset IS NOT NULL
+                ORDER BY native_asset, timestamp
+                LIMIT 50000
+                """
+            )
+            rows = await cur.fetchall()
+
+    if not rows:
+        return {"message": "No transactions need USD backfill", "total_updated": 0}
+
+    # Group by native_asset for efficient processing
+    by_asset: dict[str, list] = {}
+    for row in rows:
+        asset = (row.get("native_asset") or "ETH").upper()
+        by_asset.setdefault(asset, []).append(row)
+
+    updates = []
+    for asset, asset_rows in by_asset.items():
+        sym = ASSET_TO_SYMBOL.get(asset)
+        if not sym:
+            summary["skipped"][asset] = len(asset_rows)
+            continue
+
+        price_cache = _HIST_PRICE_CACHE.get(sym, {})
+        if not price_cache:
+            summary["skipped"][asset] = len(asset_rows)
+            continue
+
+        asset_updated = 0
+        for row in asset_rows:
+            ts = row.get("timestamp")
+            if ts is None:
+                continue
+            # Get date string for price lookup
+            if hasattr(ts, "strftime"):
+                date_str = ts.strftime("%Y-%m-%d")
+            elif isinstance(ts, str):
+                date_str = ts[:10]
+            else:
+                continue
+
+            price = price_cache.get(date_str)
+            if not price or price <= 0:
+                # Try adjacent dates (±1 day) as fallback
+                from datetime import timedelta, date as date_cls
+                try:
+                    d = date_cls.fromisoformat(date_str)
+                    for delta in [1, -1, 2, -2]:
+                        nearby = (d + timedelta(days=delta)).isoformat()
+                        price = price_cache.get(nearby)
+                        if price and price > 0:
+                            break
+                except Exception:
+                    pass
+
+            if not price or price <= 0:
+                continue
+
+            value_eth = Decimal(str(row.get("value_eth") or 0))
+            if value_eth <= 0:
+                continue
+
+            usd_value = float(value_eth * price)
+            updates.append({
+                "id":              row["id"],
+                "usd":             usd_value,
+                "source":          f"chainlink_{sym.lower()}",
+            })
+            asset_updated += 1
+
+        summary["updated"][asset] = asset_updated
+
+    # Batch write updates
+    if updates:
+        async with pool.acquire() as conn:
+            import aiomysql
+            async with conn.cursor() as cur:
+                BATCH = 500
+                for i in range(0, len(updates), BATCH):
+                    batch = updates[i:i + BATCH]
+                    await cur.executemany(
+                        """
+                        UPDATE transactions
+                        SET usd_at_execution  = %(usd)s,
+                            pricing_source    = %(source)s,
+                            valuation_version = 2
+                        WHERE id = %(id)s
+                        """,
+                        batch,
+                    )
+                await conn.commit()
+
+    summary["total_updated"] = len(updates)
+    return summary
 
 
 async def get_hist_price(symbol: str, dt: datetime) -> Decimal:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Optional
 
 import pandas as pd
 from sqlalchemy import text
@@ -269,8 +269,10 @@ def _ensure_owner_address_indexes(engine: Engine, cfg: Config) -> None:
 def _ensure_wallet_cluster_label_columns(engine: Engine, cfg: Config) -> None:
     required = {
         "label_status": "VARCHAR(32) NOT NULL DEFAULT 'unlabeled'",
-        "matched_owner_address": "VARCHAR(64) NULL",
+        "matched_owner_address": "VARCHAR(128) NULL",
         "last_labeled_at": "DATETIME NULL",
+        "chain_name": "VARCHAR(64) NULL",
+        "blockchain_type": "VARCHAR(32) NULL",
     }
 
     with engine.begin() as conn:
@@ -449,6 +451,12 @@ def create_tables_if_not_exist(cfg: Config | None = None) -> None:
         _drop_legacy_placement_poi_table(engine, cfg)
         _ensure_utf8mb4_tables(engine, cfg)
         _ensure_usd_at_execution_column(engine, cfg)
+        # Phase 1: add chain identity columns to all tables
+        try:
+            from ...chains.migrations import run_mariadb_chain_migrations
+            run_mariadb_chain_migrations(engine, cfg.mysql_db)
+        except Exception as exc:
+            logger.warning("Chain column migration non-fatal error: %s", exc)
     finally:
         engine.dispose()
 
@@ -475,7 +483,7 @@ def _trim_to_limit(chunk: pd.DataFrame, rows_remaining: int | None) -> pd.DataFr
     return chunk.head(rows_remaining)
 
 
-def _prepare_transaction_chunk(chunk: pd.DataFrame) -> tuple[pd.DataFrame, int]:
+def _prepare_transaction_chunk(chunk: pd.DataFrame, chain_name: str = "ethereum") -> tuple[pd.DataFrame, int]:
     missing_columns = [column for column in TRANSACTION_COLUMNS if column not in chunk.columns]
     if missing_columns:
         raise ValueError(f"transactions.csv is missing columns: {missing_columns}")
@@ -493,7 +501,153 @@ def _prepare_transaction_chunk(chunk: pd.DataFrame) -> tuple[pd.DataFrame, int]:
     valid_mask = df["tx_hash"].notna() & (df["tx_hash"].astype(str).str.strip() != "")
     skipped = int((~valid_mask).sum())
     df = df.loc[valid_mask].drop_duplicates(subset=["tx_hash"], keep="last")
-    return _replace_nan_with_none(df), skipped
+    df = _replace_nan_with_none(df)
+
+    # Stamp chain identity (only if column exists — safe on legacy DBs)
+    df["chain_name"] = chain_name
+    return df, skipped
+
+
+def load_utxo_pairs_to_mariadb(
+    cfg: Optional[Config] = None,
+    chain_name: str = "bitcoin",
+) -> dict:
+    """
+    Load UTXO input→output pairs (and Solana transfers) from MongoDB flat_transactions
+    into the shared MariaDB transactions table with correct chain identity fields.
+    """
+    cfg = cfg or load_config()
+    create_tables_if_not_exist(cfg)
+
+    # Resolve chain metadata from registry
+    try:
+        from ...chains.registry import get_chain as _get_chain
+        _chain_cfg = _get_chain(chain_name)
+        _chain_id        = _chain_cfg.chain_id
+        _blockchain_type = _chain_cfg.blockchain_type
+        _native_asset    = _chain_cfg.native_asset
+    except Exception:
+        # Fallback defaults per chain type
+        _CHAIN_META = {
+            "bitcoin":      (0,   "UTXO",          "BTC"),
+            "litecoin":     (2,   "UTXO",          "LTC"),
+            "dogecoin":     (3,   "UTXO",          "DOGE"),
+            "bitcoin_cash": (145, "UTXO",          "BCH"),
+            "solana":       (900, "ACCOUNT_BASED", "SOL"),
+            "ethereum":     (1,   "EVM",           "ETH"),
+            "bnb":          (56,  "EVM",           "BNB"),
+            "polygon":      (137, "EVM",           "POL"),
+            "arbitrum":     (42161, "EVM",         "ETH"),
+            "base":         (8453,  "EVM",         "ETH"),
+        }
+        meta = _CHAIN_META.get(chain_name, (0, "UNKNOWN", "???"))
+        _chain_id, _blockchain_type, _native_asset = meta
+    create_tables_if_not_exist(cfg)
+    engine = get_maria_engine(cfg)
+
+    try:
+        from pymongo import MongoClient
+        client = MongoClient(
+            cfg.mongo_uri,
+            serverSelectionTimeoutMS=2000,
+        )
+        col = client[cfg.mongo_flat_tx_db][cfg.mongo_flat_tx_collection]
+        cursor = col.find(
+            {"chain_name": chain_name, "metadata.processed": {"$ne": True}},
+            sort=[("block.number", 1)],
+        )
+
+        rows_loaded = 0
+        batch: list[dict] = []
+
+        def _flush(batch: list[dict]) -> int:
+            if not batch:
+                return 0
+            return _upsert_rows("transactions", engine, batch)
+
+        for doc in cursor:
+            block   = doc.get("block", {})
+            ap      = doc.get("address_pair", {})
+            val     = doc.get("value", {})
+
+            from_addr = (ap.get("from") or "").lower().strip()
+            to_addr   = (ap.get("to")   or "").lower().strip()
+            if not from_addr or not to_addr:
+                continue
+
+            # native value (BTC, LTC, etc.) stored in value.native or value.eth
+            raw_native = val.get("native") or val.get("eth") or val.get("sol") or 0
+            # Handle BSON Decimal128
+            if hasattr(raw_native, "to_decimal"):
+                native_val = float(raw_native.to_decimal())
+            else:
+                try:
+                    native_val = float(raw_native or 0.0)
+                except (TypeError, ValueError):
+                    native_val = 0.0
+
+            ts_raw = block.get("timestamp")
+            ts = None
+            if ts_raw is not None:
+                from datetime import datetime, timezone
+                try:
+                    if isinstance(ts_raw, (int, float)):
+                        ts = datetime.fromtimestamp(int(ts_raw), tz=timezone.utc).replace(tzinfo=None)
+                    elif hasattr(ts_raw, "strftime"):
+                        ts = ts_raw
+                    elif isinstance(ts_raw, str) and ts_raw.strip().isdigit():
+                        ts = datetime.fromtimestamp(int(ts_raw), tz=timezone.utc).replace(tzinfo=None)
+                except (TypeError, ValueError, OSError):
+                    ts = None
+
+            row = {
+                "tx_hash":         str(doc.get("tx_hash", doc.get("_id", "")))[:128],
+                "block_number":    int(block.get("number") or 0),
+                "timestamp":       ts,
+                "from_address":    from_addr[:128],
+                "to_address":      to_addr[:128],
+                "value_eth":       f"{native_val:.18f}",
+                "usd_at_execution": None,
+                "pricing_source":  None,
+                "valuation_version": 0,
+                "gas_used":        None,
+                "status":          1,
+                "is_contract_call": 0,
+                "chain_name":      chain_name,
+                "chain_id":        _chain_id,
+                "blockchain_type": _blockchain_type,
+                "native_asset":    _native_asset,
+            }
+            batch.append(row)
+
+            if len(batch) >= (cfg.batch_size or 1000):
+                rows_loaded += _flush(batch)
+                batch = []
+
+        rows_loaded += _flush(batch)
+
+        # Mark processed in MongoDB
+        col.update_many(
+            {"chain_name": chain_name, "metadata.processed": {"$ne": True}},
+            {"$set": {"metadata.processed": True}},
+        )
+        client.close()
+
+        # Refresh addresses table
+        _ensure_address_columns(engine, cfg)
+        _refresh_addresses(engine, cfg)
+
+        logger.info(
+            "UTXO load complete: chain=%s  rows_loaded=%d",
+            chain_name, rows_loaded,
+        )
+        return {
+            "transactions_loaded": rows_loaded,
+            "chain_name": chain_name,
+        }
+
+    finally:
+        engine.dispose()
 
 
 def _upsert_rows(table_name: str, engine: Engine, rows: Iterable[dict]) -> int:
@@ -658,6 +812,7 @@ def load_to_mariadb(
     cfg: Config | None = None,
     chunk_size: int | None = None,
     limit: int | None = None,
+    chain_name: str = "ethereum",
 ) -> dict:
     """Load processed CSV files into MariaDB with idempotent upserts."""
     cfg = cfg or load_config()
@@ -671,6 +826,7 @@ def load_to_mariadb(
     summary = {
         "transactions_loaded": 0,
         "rows_skipped": 0,
+        "chain_name": chain_name,
     }
 
     try:
@@ -679,7 +835,7 @@ def load_to_mariadb(
             chunk = _trim_to_limit(chunk, tx_rows_remaining)
             if chunk.empty:
                 break
-            prepared_chunk, skipped = _prepare_transaction_chunk(chunk)
+            prepared_chunk, skipped = _prepare_transaction_chunk(chunk, chain_name=chain_name)
             summary["rows_skipped"] += skipped
             summary["transactions_loaded"] += _upsert_rows(
                 "transactions", engine, prepared_chunk.to_dict(orient="records")
@@ -697,8 +853,9 @@ def load_to_mariadb(
         engine.dispose()
 
     logger.info(
-        "Loaded %s transactions to MariaDB | skipped %s rows",
+        "Loaded %s transactions to MariaDB (chain=%s) | skipped %s rows",
         summary["transactions_loaded"],
+        chain_name,
         summary["rows_skipped"],
     )
     return summary

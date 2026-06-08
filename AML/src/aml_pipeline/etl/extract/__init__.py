@@ -27,8 +27,9 @@ def fetch_and_store_raw(
 
 
 def get_latest_saved_block(cfg: Optional[Config] = None) -> Optional[int]:
-    """Return the latest saved Ethereum block number from MongoDB."""
-    extractor = EthereumExtractor(cfg)
+    """Return the latest saved Ethereum block number from MongoDB (chain-aware)."""
+    from .evm import EVMExtractor
+    extractor = EVMExtractor(cfg=cfg, chain="ethereum")
     return extractor.get_latest_saved_block()
 
 
