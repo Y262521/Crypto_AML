@@ -290,6 +290,55 @@ async def get_analytics():
     }
 
 
+@router.get("/chains")
+async def get_transaction_chains():
+    _require_mysql()
+    eth_network = get_env("ETH_NETWORK", default="ethereum")
+    try:
+        rows = await fetch_all(
+            """
+            SELECT
+                COALESCE(chain_name, %s) AS chain_name,
+                COALESCE(blockchain_type, 'EVM') AS blockchain_type,
+                COUNT(*) AS transaction_count,
+                COALESCE(SUM(value_eth), 0) AS total_eth
+            FROM transactions
+            GROUP BY COALESCE(chain_name, %s), COALESCE(blockchain_type, 'EVM')
+            ORDER BY transaction_count DESC
+            """,
+            (eth_network, eth_network),
+        )
+    except Exception:
+        totals = await fetch_one(
+            "SELECT COUNT(*) AS total, COALESCE(SUM(value_eth), 0) AS total_eth FROM transactions"
+        ) or {}
+        return {
+            "chains": [
+                {
+                    "chainName": eth_network,
+                    "blockchainType": "EVM",
+                    "transactionCount": int(totals.get("total") or 0),
+                    "totalEth": float(totals.get("total_eth") or 0.0),
+                }
+            ],
+            "totalChains": 1,
+            "note": "Chain metadata is not available from the current transactions schema.",
+        }
+
+    return {
+        "chains": [
+            {
+                "chainName": row.get("chain_name") or eth_network,
+                "blockchainType": row.get("blockchain_type") or "EVM",
+                "transactionCount": int(row.get("transaction_count") or 0),
+                "totalEth": float(row.get("total_eth") or 0.0),
+            }
+            for row in rows
+        ],
+        "totalChains": len(rows),
+    }
+
+
 def _require_neo4j():
     driver = get_driver()
     if not driver:

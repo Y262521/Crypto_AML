@@ -110,13 +110,15 @@ CREATE TABLE IF NOT EXISTS cluster_evidence (
 CREATE TABLE IF NOT EXISTS placement_runs (
     id VARCHAR(64) PRIMARY KEY,
     source VARCHAR(32) NOT NULL DEFAULT 'auto',
+    chain_name VARCHAR(64) DEFAULT 'ethereum',
     status VARCHAR(32) NOT NULL DEFAULT 'completed',
     started_at DATETIME NULL,
     completed_at DATETIME NULL,
     summary_json LONGTEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     KEY idx_placement_runs_completed_at (completed_at),
-    KEY idx_placement_runs_status (status)
+    KEY idx_placement_runs_status (status),
+    KEY idx_placement_runs_chain_name (chain_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS placement_entities (

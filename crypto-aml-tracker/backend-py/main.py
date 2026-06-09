@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from fastapi import FastAPI
@@ -9,6 +10,7 @@ from db.neo4j import close_neo4j, connect_neo4j
 from db.mysql import close_mysql, connect_mysql
 from routes.transactions import router as tx_router
 from routes.clusters import router as cluster_router
+from routes.etl import router as etl_router, get_databases_health as etl_get_databases_health
 from routes.layering import ensure_layering_schema, router as layering_router
 from routes.placement import ensure_placement_schema, router as placement_router
 from routes.risk import router as risk_router
@@ -20,6 +22,53 @@ from routes.chains import router as chains_router
 from services.mvrv_calculator import _ensure_hist_price_schema, warm_hist_price_cache
 from scheduler import create_scheduler, get_next_run_time, pipeline_status
 from settings import get_env
+
+logger = logging.getLogger(__name__)
+
+
+async def _cleanup_stale_running_rows() -> None:
+    """
+    Mark any placement_runs rows left in status='running' as 'failed'.
+
+    These rows are stale — they belong to a previous server process that
+    crashed or was killed before it could finalise the run.  Leaving them
+    as 'running' causes the dashboard to show a ghost RUNNING state even
+    when no ETL execution is active.  Called once at startup.
+    """
+    try:
+        from db.mysql import get_pool
+        pool = get_pool()
+        if pool is None:
+            return
+
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """
+                    UPDATE placement_runs
+                    SET    status       = 'failed',
+                           completed_at = NOW(),
+                           summary_json = JSON_SET(
+                               COALESCE(summary_json, '{}'),
+                               '$.error',
+                               'Run interrupted: server restarted before pipeline completed.'
+                           )
+                    WHERE  status = 'running'
+                    """
+                )
+                affected = cur.rowcount
+
+        if affected:
+            logger.warning(
+                "Startup cleanup: marked %d stale 'running' placement_run(s) as 'failed'.",
+                affected,
+            )
+        else:
+            logger.debug("Startup cleanup: no stale running placement_runs found.")
+
+    except Exception as exc:
+        # Non-fatal — log and continue.  The status endpoint has its own guard.
+        logger.warning("Startup cleanup of stale running rows failed (non-fatal): %s", exc)
 
 
 @asynccontextmanager
@@ -45,6 +94,7 @@ async def lifespan(app: FastAPI):
                 await asyncio.to_thread(run_neo4j_chain_migrations, _neo4j_driver, _neo4j_db)
         except Exception as _e:
             print(f"Neo4j chain migration skipped (non-fatal): {_e}")
+
     except Exception as e:
         print(f"Neo4j not available - graph features disabled: {e}")
 
@@ -72,6 +122,11 @@ async def lifespan(app: FastAPI):
                 print("💰 USD backfill: all transactions already have USD values")
         except Exception as bf_e:
             print(f"USD backfill non-fatal: {bf_e}")
+        # ── Stale run cleanup ─────────────────────────────────────────────────
+        # Any placement_run row left with status='running' from a previous
+        # server process is stale — that process is gone.  Mark them failed so
+        # the dashboard never shows a ghost RUNNING state.
+        await _cleanup_stale_running_rows()
     except Exception as e:
         print(f"MariaDB schema bootstrap failed - processed transaction features may be unavailable: {e}")
 
@@ -100,6 +155,7 @@ app.add_middleware(
 
 app.include_router(tx_router,          prefix="/api/transactions")
 app.include_router(cluster_router,     prefix="/api/clusters")
+app.include_router(etl_router,         prefix="/api/etl")
 app.include_router(placement_router,   prefix="/api/placement")
 app.include_router(layering_router,    prefix="/api/layering")
 app.include_router(risk_router,        prefix="/api/risk")
@@ -125,6 +181,15 @@ async def get_status():
             "schedule":         get_env("PIPELINE_SCHEDULE_HOURS", default="8,20") + ":00 UTC daily",
         },
     }
+
+
+@app.get("/api/databases/health")
+async def get_databases_health():
+    """
+    Wrapper endpoint for database health — mirrors /api/etl/databases/health.
+    Frontend ETL dashboard expects this path specifically.
+    """
+    return await etl_get_databases_health()
 
 
 if __name__ == "__main__":

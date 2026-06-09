@@ -4,7 +4,6 @@ const SECTIONS = [
     items: [
       { id: 'feed', label: 'Transaction Table', icon: '▦' },
       { id: 'clusters', label: 'Wallet Clusters', icon: '⬡' },
-      // { id: 'analytics', label: 'Analytics', icon: '📊' },
     ],
   },
   {
@@ -15,13 +14,12 @@ const SECTIONS = [
       { id: 'integration', label: 'Integration Alerts', icon: '💰' },
     ],
   },
-  // {
-  //   title: 'Intelligence',
-  //   items: [
-  //     { id: 'risk', label: 'Risk Intelligence', icon: '🛡' },
-  //     { id: 'graph', label: 'Graph Explorer', icon: '🕸' },
-  //   ],
-  // },
+  {
+    title: 'Infrastructure',
+    items: [
+      { id: 'etl-control', label: 'ETL Control Center', icon: '⛓' },
+    ],
+  },
 ];
 
 const Sidebar = ({ activePage, onNavigate, onHome }) => (

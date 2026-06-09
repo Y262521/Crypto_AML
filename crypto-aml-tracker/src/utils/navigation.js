@@ -8,6 +8,7 @@ export const PAGE_ROUTES = Object.freeze({
   graph: '/graph',
   analytics: '/analytics',
   risk: '/risk',
+  'etl-control': '/etl-control',
   'coming-soon': '/coming-soon',
 })
 

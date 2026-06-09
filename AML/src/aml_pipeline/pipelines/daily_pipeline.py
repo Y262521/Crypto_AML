@@ -1,6 +1,9 @@
 """Daily Extract -> Transform -> Load pipeline — multi-chain aware."""
 
+import hashlib
+import json
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 from ..config import Config, load_config
@@ -19,6 +22,89 @@ EVM_CHAINS = ["ethereum", "bnb", "polygon", "arbitrum", "base"]
 
 # UTXO chains (Phase 3) — add RPC URLs in .env to enable
 UTXO_CHAINS = ["bitcoin", "litecoin", "dogecoin", "bitcoin_cash"]
+
+
+def _generate_etl_run_id(started_at: datetime) -> str:
+    """Generate a stable unique run ID from pipeline start timestamp."""
+    seed = started_at.isoformat()
+    digest = hashlib.sha1(seed.encode()).hexdigest()[:8].upper()
+    return f"ETL-{started_at.strftime('%Y%m%d%H%M%S')}-{digest}"
+
+
+def _persist_etl_run_record(
+    *,
+    cfg: Config,
+    run_id: str,
+    started_at: datetime,
+    summary_json: dict,
+    status: str,
+    completed_at: Optional[datetime] = None,
+) -> None:
+    """
+    Insert or update a placement_runs row that tracks the full ETL pipeline run.
+
+    On first call (status='running') an INSERT is performed.
+    On the final call (status='completed' or 'failed') an UPDATE replaces
+    the row with the definitive timestamps and summary.
+    """
+    try:
+        from sqlalchemy import text
+        from ..etl.load.mariadb_loader import create_tables_if_not_exist
+        from ..utils.connections import get_maria_engine
+
+        create_tables_if_not_exist(cfg)
+        engine = get_maria_engine(cfg)
+        # Strip timezone info — MariaDB DATETIME columns don't store TZ
+        started_naive = started_at.replace(tzinfo=None)
+        completed_naive = (
+            completed_at.replace(tzinfo=None) if completed_at else None
+        )
+        summary_str = json.dumps(summary_json, sort_keys=True, default=str)
+
+        with engine.begin() as conn:
+            if status == "running":
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO placement_runs
+                            (id, source, chain_name, status, started_at, completed_at, summary_json)
+                        VALUES
+                            (:id, 'pipeline', 'ethereum', 'running', :started_at, NULL, :summary_json)
+                        ON DUPLICATE KEY UPDATE
+                            status       = 'running',
+                            started_at   = :started_at,
+                            summary_json = :summary_json
+                        """
+                    ),
+                    {"id": run_id, "started_at": started_naive, "summary_json": summary_str},
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO placement_runs
+                            (id, source, chain_name, status, started_at, completed_at, summary_json)
+                        VALUES
+                            (:id, 'pipeline', 'ethereum', :status,
+                             :started_at, :completed_at, :summary_json)
+                        ON DUPLICATE KEY UPDATE
+                            status       = :status,
+                            completed_at = :completed_at,
+                            summary_json = :summary_json
+                        """
+                    ),
+                    {
+                        "id": run_id,
+                        "status": status,
+                        "started_at": started_naive,
+                        "completed_at": completed_naive,
+                        "summary_json": summary_str,
+                    },
+                )
+        logger.debug("ETL run record persisted: id=%s status=%s", run_id, status)
+    except Exception as exc:
+        # Non-fatal — never let persistence errors abort the pipeline
+        logger.warning("_persist_etl_run_record failed (non-fatal): %s", exc)
 
 
 def run_daily_extract(start_block=None, batch=None):
@@ -138,6 +224,9 @@ def run_daily_pipeline(
     cfg = cfg or load_config()
     setup_logging(cfg.log_level)
 
+    # Capture pipeline start time for accurate duration tracking
+    pipeline_started_at = datetime.now(timezone.utc)
+
     active_evm_chains  = chains       or EVM_CHAINS
     active_utxo_chains = utxo_chains  or UTXO_CHAINS
 
@@ -189,6 +278,11 @@ def run_daily_pipeline(
         end_block=eth_end,
         cfg=cfg,
     )
+
+    # Derive extract block range for run record
+    extract_start_block = eth_start
+    extract_end_block   = eth_end
+
     any_new_txs = transform_summary["transactions_created"] > 0 or bool(utxo_extract_results)
 
     if not any_new_txs:
@@ -213,9 +307,38 @@ def run_daily_pipeline(
         skip_neo4j=skip_neo4j,
         strict_neo4j=strict_neo4j,
     )
-    mongo_summary  = load_summary["mongo_backup"]
+    mongo_summary   = load_summary["mongo_backup"]
     mariadb_summary = load_summary["mariadb"]
-    neo4j_summary  = load_summary["neo4j"]
+    neo4j_summary   = load_summary["neo4j"]
+
+    # Generate ETL run ID and persist ETL metrics BEFORE analytics stages
+    etl_run_id = _generate_etl_run_id(pipeline_started_at)
+    blocks_extracted = (
+        (extract_end_block - extract_start_block + 1)
+        if extract_start_block is not None and extract_end_block is not None
+        else 0
+    )
+    transactions_loaded = mariadb_summary.get("transactions_loaded", 0) if mariadb_summary else 0
+    neo4j_edges         = neo4j_summary.get("rows_loaded", 0) if neo4j_summary else 0
+    records_normalized  = transform_summary.get("transactions_created", 0)
+
+    etl_summary_json = {
+        "blocks_extracted":          blocks_extracted,
+        "extract_start_block":       extract_start_block,
+        "extract_end_block":         extract_end_block,
+        "records_normalized":        records_normalized,
+        "transactions_loaded":       transactions_loaded,
+        "transactions_total_in_db":  transactions_loaded,
+        "neo4j_edges":               neo4j_edges,
+    }
+
+    _persist_etl_run_record(
+        cfg=cfg,
+        run_id=etl_run_id,
+        started_at=pipeline_started_at,
+        summary_json=etl_summary_json,
+        status="running",
+    )
 
     # ── Clustering — run per chain type immediately after ETL ────────────────
     clustering_summary = None
@@ -280,9 +403,13 @@ def run_daily_pipeline(
 
     # ── Placement — run per chain ─────────────────────────────────────────────
     placement_summary = None
-    placement_result = None   # Keep last ETH result for layering seed reuse
+    placement_result  = None   # Keep last ETH result for layering seed reuse
     if run_placement:
-        all_chains = list(active_evm_chains) + list(active_utxo_chains) + (["solana"] if "solana" in utxo_extract_results else [])
+        all_chains = (
+            list(active_evm_chains)
+            + list(active_utxo_chains)
+            + (["solana"] if "solana" in utxo_extract_results else [])
+        )
         placement_summary = {"by_chain": {}, "total_placements": 0}
         for chain_name in all_chains:
             try:
@@ -298,11 +425,17 @@ def run_daily_pipeline(
                 logger.warning("[%s] Placement failed (non-fatal): %s", chain_name, exc)
                 placement_summary["by_chain"][chain_name] = {"error": str(exc)[:60]}
 
+        etl_summary_json["placements_found"] = placement_summary["total_placements"]
+
     # ── Layering — run per chain ──────────────────────────────────────────────
     layering_summary = None
-    layering_result = None   # Keep last ETH result for integration seed reuse
+    layering_result  = None   # Keep last ETH result for integration seed reuse
     if run_layering:
-        all_chains = list(active_evm_chains) + list(active_utxo_chains) + (["solana"] if "solana" in utxo_extract_results else [])
+        all_chains = (
+            list(active_evm_chains)
+            + list(active_utxo_chains)
+            + (["solana"] if "solana" in utxo_extract_results else [])
+        )
         layering_summary = {"by_chain": {}, "total_alerts": 0, "utxo_hits": {}, "solana_hits": {}}
         for chain_name in all_chains:
             try:
@@ -323,6 +456,8 @@ def run_daily_pipeline(
             except Exception as exc:
                 logger.warning("[%s] Layering failed (non-fatal): %s", chain_name, exc)
                 layering_summary["by_chain"][chain_name] = {"error": str(exc)[:60]}
+
+        etl_summary_json["layering_alerts"] = layering_summary["total_alerts"]
 
         # UTXO-specific layering detectors (CoinJoin, Change-Peeling, Multi-Hop)
         try:
@@ -365,7 +500,11 @@ def run_daily_pipeline(
     # ── Integration — run per chain ───────────────────────────────────────────
     integration_summary = None
     if run_integration:
-        all_chains = list(active_evm_chains) + list(active_utxo_chains) + (["solana"] if "solana" in utxo_extract_results else [])
+        all_chains = (
+            list(active_evm_chains)
+            + list(active_utxo_chains)
+            + (["solana"] if "solana" in utxo_extract_results else [])
+        )
         integration_summary = {"by_chain": {}, "total_alerts": 0}
         for chain_name in all_chains:
             try:
@@ -383,6 +522,22 @@ def run_daily_pipeline(
             except Exception as exc:
                 logger.warning("[%s] Integration failed (non-fatal): %s", chain_name, exc)
                 integration_summary["by_chain"][chain_name] = {"error": str(exc)[:60]}
+
+        etl_summary_json["integration_alerts"] = integration_summary["total_alerts"]
+
+    # ── Finalize run record ───────────────────────────────────────────────────
+    pipeline_completed_at = datetime.now(timezone.utc)
+    if clustering_summary and not clustering_summary.get("error"):
+        etl_summary_json["clusters_found"] = clustering_summary.get("total_clusters", 0)
+
+    _persist_etl_run_record(
+        cfg=cfg,
+        run_id=etl_run_id,
+        started_at=pipeline_started_at,
+        completed_at=pipeline_completed_at,
+        summary_json=etl_summary_json,
+        status="completed",
+    )
 
     logger.info(
         "Load stage complete | MariaDB: %s | Neo4j: %s | Mongo: %s",
