@@ -67,109 +67,35 @@ def _require_mysql():
         )
 
 
-def _latest_transactions_sql(sort_by: str = "value_usd_desc", chain: str | None = None) -> tuple[str, list]:
-    # Sorting options:
-    #   value_usd_desc  — sort by USD value (cross-chain comparable)
-    #   amount_desc     — sort by native asset amount (legacy, chain-specific)
-    #   latest          — sort by most recent block
+def _latest_transactions_sql(sort_by: str = "amount_desc") -> str:
     order_clause = {
-        "value_usd_desc":  "ORDER BY COALESCE(usd_at_execution, 0) DESC, value_eth DESC, block_number DESC, tx_hash DESC",
-        "amount_desc":     "ORDER BY value_eth DESC, block_number DESC, tx_hash DESC",
-        "latest":          "ORDER BY block_number DESC, tx_hash DESC",
-    }.get(sort_by, "ORDER BY COALESCE(usd_at_execution, 0) DESC, value_eth DESC, block_number DESC, tx_hash DESC")
-
-    where_clauses = []
-    params: list = []
-
-    if chain and chain != "all":
-        where_clauses.append("(chain_name = %s OR (chain_name IS NULL AND %s = 'ethereum'))")
-        params.extend([chain, chain])
-
-    where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
-
-    sql = f"""
+        "amount_desc": "ORDER BY value_eth DESC, block_number DESC, tx_hash DESC",
+        "value_usd_desc": "ORDER BY value_eth DESC, block_number DESC, tx_hash DESC",
+        "latest": "ORDER BY block_number DESC, tx_hash DESC",
+    }.get(sort_by, "ORDER BY value_eth DESC, block_number DESC, tx_hash DESC")
+    return f"""
         SELECT tx_hash, from_address, to_address, value_eth, timestamp, block_number,
-               is_contract_call, gas_used, status,
-               usd_at_execution,
-               COALESCE(chain_name, 'ethereum') AS chain_name,
-               COALESCE(chain_id, 1) AS chain_id,
-               COALESCE(blockchain_type, 'EVM') AS blockchain_type,
-               COALESCE(native_asset, 'ETH') AS native_asset
+               is_contract_call, gas_used, status
         FROM transactions
-        {where_sql}
         {order_clause}
         LIMIT %s OFFSET %s
         """
-    params.extend(["__limit__", "__offset__"])
-    return sql, params
 
 @router.get("/")
 async def get_latest_transactions(
     limit: int = Query(200, ge=1, le=1000),
     offset: int = Query(0, ge=0),
-    sort_by: Literal["value_usd_desc", "amount_desc", "latest"] = Query("value_usd_desc"),
-    chain: str | None = Query(default=None, description="Filter by chain name (e.g. ethereum, bnb, polygon)"),
+    sort_by: str = Query("amount_desc"),
 ):
     _require_mysql()
     threshold = _threshold_eth()
-
-    # Build count query with optional chain filter
-    if chain and chain != "all":
-        total_row = await fetch_one(
-            "SELECT COUNT(*) AS total FROM transactions "
-            "WHERE chain_name = %s OR (chain_name IS NULL AND %s = 'ethereum')",
-            (chain, chain),
-        ) or {}
-    else:
-        total_row = await fetch_one("SELECT COUNT(*) AS total FROM transactions") or {}
-
-    sql, base_params = _latest_transactions_sql(sort_by, chain)
-    # Replace placeholder params with actual limit/offset
-    sql = sql.replace("'__limit__'", "%s").replace("'__offset__'", "%s")
-    # Fix: base_params ends with ["__limit__", "__offset__"], replace them
-    actual_params = [p for p in base_params if p not in ("__limit__", "__offset__")]
-    actual_params.extend([limit, offset])
-
-    rows = await fetch_all(sql, actual_params)
-
-    # Native-asset to USD rates — loaded from MVA price cache (Chainlink oracle)
-    # Current market rates — live prices from Binance public API (no auth needed)
-    def _get_current_rates() -> dict:
-        try:
-            from services.live_prices import get_live_prices
-            return get_live_prices()
-        except Exception:
-            return {}
-
-    # Current market rates (cached 5 min, from Binance)
-    _CURRENT_RATES = _get_current_rates()
-    _FALLBACK_RATES: dict = {}  # empty — show "—" if fetch failed
+    total_row = await fetch_one("SELECT COUNT(*) AS total FROM transactions") or {}
+    rows = await fetch_all(_latest_transactions_sql(sort_by), (limit, offset))
 
     results = []
     for row in rows:
         value_eth = float(row.get("value_eth") or 0.0)
         score = _risk_score(value_eth, threshold)
-        native_asset = row.get("native_asset") or "ETH"
-        chain_name   = row.get("chain_name") or "ethereum"
-
-        # Historical USD value — what actually moved at execution time (AML relevant)
-        usd_stored = row.get("usd_at_execution")
-        if usd_stored is not None and float(usd_stored) > 0:
-            usd_at_execution = float(usd_stored)
-            usd_source = "chainlink_oracle"
-        else:
-            usd_at_execution = 0.0
-            usd_source = "unavailable"
-
-        # Current market USD value — what it's worth TODAY
-        current_rate = _CURRENT_RATES.get(native_asset) or _FALLBACK_RATES.get(native_asset, 0.0)
-        current_usd_value = value_eth * current_rate
-
-        # The displayed USD value depends on which sort mode is active:
-        # value_usd_desc  → use usd_at_execution (historical, oracle-sourced)
-        # For display in table always show current market value alongside historical
-        display_usd = usd_at_execution if usd_at_execution > 0 else current_usd_value
-
         results.append({
             "hash": row.get("tx_hash"),
             "sender": row.get("from_address"),
@@ -182,16 +108,6 @@ async def get_latest_transactions(
             "status": row.get("status"),
             "riskScore": round(score, 1),
             "riskLabel": _risk_label(value_eth, threshold),
-            # Chain identity
-            "chain": chain_name,
-            "chainId": int(row.get("chain_id") or 1),
-            "blockchainType": row.get("blockchain_type") or "EVM",
-            "nativeAsset": native_asset,
-            # USD values — both historical and current
-            "usdValue": round(display_usd, 2),          # shown in table
-            "usdAtExecution": round(usd_at_execution, 2),  # at time of tx
-            "currentUsdValue": round(current_usd_value, 2),  # today's price
-            "usdSource": usd_source,
         })
 
     total = int(total_row.get("total") or 0)
@@ -201,7 +117,6 @@ async def get_latest_transactions(
         "limit": limit,
         "offset": offset,
         "sortBy": sort_by,
-        "chain": chain or "all",
         "hasMore": offset + len(results) < total,
     }
 

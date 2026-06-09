@@ -104,7 +104,7 @@ async def _latest_batch_run_ids() -> list[str]:
         SELECT d.run_id
         FROM placement_detections d
         INNER JOIN (
-            SELECT chain_name, MAX(r2.completed_at) AS max_ts
+            SELECT d2.chain_name, MAX(r2.completed_at) AS max_ts
             FROM placement_detections d2
             JOIN placement_runs r2 ON r2.id = d2.run_id
             WHERE r2.status = 'completed'
