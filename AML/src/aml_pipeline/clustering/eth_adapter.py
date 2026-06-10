@@ -107,8 +107,16 @@ class EthereumAdapter(BlockchainAdapter):
         try:
             engine = get_maria_engine(self.cfg)
             with engine.connect() as conn:
+                # CRITICAL: Must filter by chain_name to match what _iter_from_mariadb() returns
+                # Otherwise we count transactions from ALL chains but only iterate over THIS chain's transactions
                 return int(
-                    conn.execute(text("SELECT COUNT(*) FROM transactions")).scalar_one()
+                    conn.execute(
+                        text("""
+                            SELECT COUNT(*) FROM transactions
+                            WHERE chain_name = :chain_name OR (chain_name IS NULL AND :chain_name = 'ethereum')
+                        """),
+                        {"chain_name": self.chain_name}
+                    ).scalar_one()
                 )
         except Exception as exc:
             logger.warning("EthereumAdapter: MariaDB unavailable, falling back: %s", exc)
@@ -145,12 +153,13 @@ class EthereumAdapter(BlockchainAdapter):
                 status,
                 COALESCE(chain_name, 'ethereum') AS chain_name
             FROM transactions
+            WHERE chain_name = :chain_name OR (chain_name IS NULL AND :chain_name = 'ethereum')
             ORDER BY block_number ASC, tx_hash ASC
             """
         )
         try:
             with engine.connect() as conn:
-                for row in conn.execute(query).mappings():
+                for row in conn.execute(query, {"chain_name": self.chain_name}).mappings():
                     frm = (row.get("from_address") or "").lower().strip()
                     to = (row.get("to_address") or "").lower().strip()
                     if not frm and not to:

@@ -1,5 +1,4 @@
 import asyncio
-import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from fastapi import FastAPI
@@ -18,57 +17,9 @@ from routes.integration import ensure_integration_schema, router as integration_
 from routes.chain_of_custody import router as custody_router
 from routes.mva import ensure_mva_schema, router as mva_router
 from routes.mvrv import router as mvrv_router
-from routes.chains import router as chains_router
 from services.mvrv_calculator import _ensure_hist_price_schema, warm_hist_price_cache
 from scheduler import create_scheduler, get_next_run_time, pipeline_status
 from settings import get_env
-
-logger = logging.getLogger(__name__)
-
-
-async def _cleanup_stale_running_rows() -> None:
-    """
-    Mark any placement_runs rows left in status='running' as 'failed'.
-
-    These rows are stale — they belong to a previous server process that
-    crashed or was killed before it could finalise the run.  Leaving them
-    as 'running' causes the dashboard to show a ghost RUNNING state even
-    when no ETL execution is active.  Called once at startup.
-    """
-    try:
-        from db.mysql import get_pool
-        pool = get_pool()
-        if pool is None:
-            return
-
-        async with pool.acquire() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(
-                    """
-                    UPDATE placement_runs
-                    SET    status       = 'failed',
-                           completed_at = NOW(),
-                           summary_json = JSON_SET(
-                               COALESCE(summary_json, '{}'),
-                               '$.error',
-                               'Run interrupted: server restarted before pipeline completed.'
-                           )
-                    WHERE  status = 'running'
-                    """
-                )
-                affected = cur.rowcount
-
-        if affected:
-            logger.warning(
-                "Startup cleanup: marked %d stale 'running' placement_run(s) as 'failed'.",
-                affected,
-            )
-        else:
-            logger.debug("Startup cleanup: no stale running placement_runs found.")
-
-    except Exception as exc:
-        # Non-fatal — log and continue.  The status endpoint has its own guard.
-        logger.warning("Startup cleanup of stale running rows failed (non-fatal): %s", exc)
 
 
 @asynccontextmanager
@@ -78,23 +29,6 @@ async def lifespan(app: FastAPI):
 
     try:
         await connect_neo4j()
-        # Phase 1: run Neo4j chain migrations (adds chain_name indexes)
-        try:
-            from db.neo4j import get_driver as get_neo4j_driver
-            from settings import get_env as _get_env
-            _neo4j_driver = get_neo4j_driver()
-            if _neo4j_driver is not None:
-                import sys as _sys
-                from pathlib import Path as _Path
-                _aml_src = str(_Path(__file__).resolve().parents[2] / "AML" / "src")
-                if _aml_src not in _sys.path:
-                    _sys.path.insert(0, _aml_src)
-                from aml_pipeline.chains.migrations import run_neo4j_chain_migrations
-                _neo4j_db = _get_env("NEO4J_DATABASE", default="neo4j")
-                await asyncio.to_thread(run_neo4j_chain_migrations, _neo4j_driver, _neo4j_db)
-        except Exception as _e:
-            print(f"Neo4j chain migration skipped (non-fatal): {_e}")
-
     except Exception as e:
         print(f"Neo4j not available - graph features disabled: {e}")
 
@@ -110,23 +44,6 @@ async def lifespan(app: FastAPI):
         await _ensure_hist_price_schema()
         # Warm historical price cache once at startup
         await warm_hist_price_cache()
-        # Backfill usd_at_execution for all chains using Chainlink prices
-        try:
-            from services.mvrv_calculator import backfill_usd_at_execution_all_chains
-            backfill_result = await backfill_usd_at_execution_all_chains()
-            total_updated = backfill_result.get("total_updated", 0)
-            if total_updated > 0:
-                print(f"💰 USD backfill complete: {total_updated:,} transactions updated across all chains")
-                print(f"   Per asset: {backfill_result.get('updated', {})}")
-            else:
-                print("💰 USD backfill: all transactions already have USD values")
-        except Exception as bf_e:
-            print(f"USD backfill non-fatal: {bf_e}")
-        # ── Stale run cleanup ─────────────────────────────────────────────────
-        # Any placement_run row left with status='running' from a previous
-        # server process is stale — that process is gone.  Mark them failed so
-        # the dashboard never shows a ghost RUNNING state.
-        await _cleanup_stale_running_rows()
     except Exception as e:
         print(f"MariaDB schema bootstrap failed - processed transaction features may be unavailable: {e}")
 
@@ -163,7 +80,6 @@ app.include_router(integration_router, prefix="/api/integration")
 app.include_router(custody_router,     prefix="/api/chain-of-custody")
 app.include_router(mva_router,         prefix="/api/mva")
 app.include_router(mvrv_router,        prefix="/api/mvrv")
-app.include_router(chains_router,      prefix="/api/chains")
 
 
 @app.get("/api/status")

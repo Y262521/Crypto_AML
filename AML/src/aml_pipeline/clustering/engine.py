@@ -92,22 +92,40 @@ def _compute_indicators(
     contract_calls = 0
     timestamps = []
 
-    for u, v, data in G.edges(data=True):
-        if u in addr_set or v in addr_set:
+    # PERFORMANCE FIX: Only iterate over edges incident to cluster addresses
+    # instead of ALL edges in the graph
+    for addr in addresses:
+        if not G.has_node(addr):
+            continue
+        
+        # Outgoing edges from this address
+        for _, v, data in G.out_edges(addr, data=True):
             tx_count += 1
-            total_eth += data.get("value_eth", 0.0) or 0.0
+            val = data.get("value_eth", 0.0) or 0.0
+            total_eth += val
+            total_out += val
             if data.get("is_contract_call"):
                 contract_calls += 1
             ts = data.get("timestamp")
             if ts:
                 timestamps.append(float(ts))
-        if u in addr_set and v in addr_set:
-            internal_tx += 1
-            internal_eth += data.get("value_eth", 0.0) or 0.0
-        if v in addr_set:
-            total_in += data.get("value_eth", 0.0) or 0.0
-        if u in addr_set:
-            total_out += data.get("value_eth", 0.0) or 0.0
+            if v in addr_set:
+                internal_tx += 1
+                internal_eth += val
+        
+        # Incoming edges to this address
+        for u, _, data in G.in_edges(addr, data=True):
+            val = data.get("value_eth", 0.0) or 0.0
+            total_in += val
+            # Don't double-count internal transactions
+            if u not in addr_set:
+                tx_count += 1
+                total_eth += val
+                if data.get("is_contract_call"):
+                    contract_calls += 1
+                ts = data.get("timestamp")
+                if ts:
+                    timestamps.append(float(ts))
 
     time_span_seconds = (max(timestamps) - min(timestamps)) if len(timestamps) >= 2 else 0
 
@@ -472,25 +490,43 @@ class ClusteringEngine:
                     ),
                     {"cn": self.chain_name},
                 )
-                address_rows = [
-                    {
-                        "address": address,
-                        "cluster_id": r.cluster_id,
-                    }
-                    for r in results
-                    for address in r.addresses
-                ]
-                if address_rows:
-                    conn.execute(
-                        text(
-                            """
+                
+                # Build address->cluster mapping
+                address_cluster_map = {}
+                for r in results:
+                    for address in r.addresses:
+                        address_cluster_map[address] = r.cluster_id
+                
+                # Batch update addresses using CASE statement for better performance
+                if address_cluster_map:
+                    # Split into smaller batches to avoid query size limits
+                    addresses_list = list(address_cluster_map.items())
+                    batch_size = 1000
+                    
+                    for batch_start in range(0, len(addresses_list), batch_size):
+                        batch = addresses_list[batch_start:batch_start + batch_size]
+                        
+                        # Build CASE statement
+                        case_parts = []
+                        params = {}
+                        for idx, (addr, cluster_id) in enumerate(batch):
+                            case_parts.append(f"WHEN :addr{idx} THEN :cid{idx}")
+                            params[f"addr{idx}"] = addr
+                            params[f"cid{idx}"] = cluster_id
+                        
+                        case_sql = " ".join(case_parts)
+                        addr_list = ", ".join([f":addr{idx}" for idx in range(len(batch))])
+                        
+                        update_query = text(
+                            f"""
                             UPDATE addresses
-                            SET cluster_id = :cluster_id
-                            WHERE address = :address
+                            SET cluster_id = CASE address
+                                {case_sql}
+                            END
+                            WHERE address IN ({addr_list})
                             """
-                        ),
-                        address_rows,
-                    )
+                        )
+                        conn.execute(update_query, params)
 
                 retained_cluster_ids = set(cluster_ids)
                 if cluster_ids:

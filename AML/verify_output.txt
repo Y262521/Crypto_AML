@@ -1,0 +1,28 @@
+======================================================================
+CLUSTERING FIX VERIFICATION
+======================================================================
+
+[TEST 1] Verifying EthereumAdapter filters by chain...
+Sample of 1001 transactions:
+  ethereum: 1001
+✅ PASS: Only ethereum transactions loaded
+
+[TEST 2] Testing clustering with limited dataset...
+This test uses only the first 5000 transactions to verify performance
+✅ PASS: Clustering completed in 1.87s
+   Found 21 clusters
+
+[TEST 3] Verifying persistence mechanism...
+Existing clusters in DB: 7
+✅ PASS: Database connection and schema verified
+
+======================================================================
+ALL TESTS PASSED!
+======================================================================
+
+Summary of fixes:
+1. ✅ EthereumAdapter now filters by chain_name='ethereum'
+2. ✅ _compute_indicators performance fix (O(edges) -> O(cluster edges))
+3. ✅ run_analytics_only.py simplified output handling
+
+The clustering should now work correctly with run_analytics_only.py

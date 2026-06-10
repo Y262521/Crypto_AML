@@ -545,29 +545,6 @@ def run_daily_pipeline(
         0 if neo4j_summary   is None else neo4j_summary.get("rows_loaded", 0),
         0 if mongo_summary   is None else mongo_summary.get("rows_loaded", 0),
     )
-    # Close any long-lived DB/drivers to allow process exit when run as CLI
-    try:
-        from ..utils.connections import get_maria_engine, get_neo4j_driver, get_mongo_client
-        try:
-            engine = get_maria_engine(cfg)
-            engine.dispose()
-        except Exception:
-            pass
-        try:
-            driver = get_neo4j_driver(cfg)
-            # neo4j driver may be None in some configs
-            if driver:
-                driver.close()
-        except Exception:
-            pass
-        try:
-            client = get_mongo_client(cfg)
-            client.close()
-        except Exception:
-            pass
-    except Exception:
-        # Best-effort cleanup — do not fail the pipeline
-        logger.debug("Cleanup of DB clients/drivers failed or not available")
     return {
         "extract":      extract_results,
         "utxo_extract": utxo_extract_results,

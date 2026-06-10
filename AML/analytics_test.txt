@@ -1,0 +1,126 @@
+INFO:aml_pipeline.clustering.engine:ClusteringEngine: loading transactions (source=auto)
+INFO:aml_pipeline.clustering.evm_adapter:EVMAdapter[ethereum]: reading 41723 transactions from MariaDB
+INFO:aml_pipeline.clustering.engine:Building graph from 41723 transactions
+INFO:aml_pipeline.clustering.graph_builder:Graph built: 31552 nodes, 41713 edges from 41713 transactions
+INFO:aml_pipeline.clustering.engine:Running 9 heuristics in parallel
+INFO:aml_pipeline.clustering.engine:  -> coordinated_cashout produced 3038 links
+INFO:aml_pipeline.clustering.engine:  -> deposit_address_reuse produced 7 links
+INFO:aml_pipeline.clustering.engine:  -> repeated_flow produced 851 links
+INFO:aml_pipeline.clustering.engine:  -> common_funder produced 2080 links
+INFO:aml_pipeline.clustering.engine:  -> contract_interaction produced 868 links
+INFO:aml_pipeline.clustering.engine:  -> fan_pattern produced 488915 links
+INFO:aml_pipeline.clustering.engine:  -> loop_detection produced 272 links
+INFO:aml_pipeline.clustering.engine:  -> behavioral_similarity produced 2342 links
+INFO:aml_pipeline.clustering.engine:  -> temporal_coordination produced 91362 links
+INFO:aml_pipeline.clustering.engine:    coordinated_cashout retained 3038 unique address pairs
+INFO:aml_pipeline.clustering.engine:    deposit_address_reuse retained 7 unique address pairs
+INFO:aml_pipeline.clustering.engine:    repeated_flow retained 837 unique address pairs
+INFO:aml_pipeline.clustering.engine:    common_funder retained 2080 unique address pairs
+INFO:aml_pipeline.clustering.engine:    contract_interaction retained 858 unique address pairs
+INFO:aml_pipeline.clustering.engine:    fan_pattern retained 488915 unique address pairs
+INFO:aml_pipeline.clustering.engine:    loop_detection retained 272 unique address pairs
+INFO:aml_pipeline.clustering.engine:    behavioral_similarity retained 2342 unique address pairs
+INFO:aml_pipeline.clustering.engine:    temporal_coordination retained 91362 unique address pairs
+INFO:aml_pipeline.clustering.engine:Accepted 93753/490940 heuristic pairs after evidence gating
+INFO:aml_pipeline.clustering.engine:Clustering complete: 214 clusters found
+INFO:aml_pipeline.chains.migrations:Chain migrations complete: 0 columns added across 0 tables (0 skipped)
+Loaded config: localhost aml_clean
+Running clustering for ethereum
+Engine created, about to run clustering...
+Traceback (most recent call last):
+  File "/home/hakim/Crypto_AML/AML/scripts/run_analytics_only.py", line 33, in <module>
+    results = engine.run(
+        source="auto",  # Try mariadb first, fallback to csv/mongo
+        persist=True,
+        min_cluster_size=cfg.clustering_min_cluster_size
+    )
+  File "/home/hakim/Crypto_AML/AML/src/aml_pipeline/clustering/engine.py", line 345, in run
+    self._persist(results)
+    ~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/hakim/Crypto_AML/AML/src/aml_pipeline/clustering/engine.py", line 380, in _persist
+    self._save_to_mysql(persisted)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "/home/hakim/Crypto_AML/AML/src/aml_pipeline/clustering/engine.py", line 502, in _save_to_mysql
+    conn.execute(
+    ~~~~~~~~~~~~^
+        text(
+        ^^^^^
+    ...<6 lines>...
+        address_rows,
+        ^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/hakim/.local/lib/python3.14/site-packages/sqlalchemy/engine/base.py", line 1416, in execute
+    return meth(
+        self,
+        distilled_parameters,
+        execution_options or NO_OPTIONS,
+    )
+  File "/home/hakim/.local/lib/python3.14/site-packages/sqlalchemy/sql/elements.py", line 515, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self, distilled_params, execution_options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/hakim/.local/lib/python3.14/site-packages/sqlalchemy/engine/base.py", line 1638, in _execute_clauseelement
+    ret = self._execute_context(
+        dialect,
+    ...<8 lines>...
+        cache_hit=cache_hit,
+    )
+  File "/home/hakim/.local/lib/python3.14/site-packages/sqlalchemy/engine/base.py", line 1843, in _execute_context
+    return self._exec_single_context(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        dialect, context, statement, parameters
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/hakim/.local/lib/python3.14/site-packages/sqlalchemy/engine/base.py", line 1983, in _exec_single_context
+    self._handle_dbapi_exception(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        e, str_statement, effective_parameters, cursor, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/hakim/.local/lib/python3.14/site-packages/sqlalchemy/engine/base.py", line 2355, in _handle_dbapi_exception
+    raise exc_info[1].with_traceback(exc_info[2])
+  File "/home/hakim/.local/lib/python3.14/site-packages/sqlalchemy/engine/base.py", line 1933, in _exec_single_context
+    self.dialect.do_executemany(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor,
+        ^^^^^^^
+    ...<2 lines>...
+        context,
+        ^^^^^^^^
+    )
+    ^
+  File "/home/hakim/.local/lib/python3.14/site-packages/sqlalchemy/dialects/mysql/mysqldb.py", line 172, in do_executemany
+    rowcount = cursor.executemany(statement, parameters)
+  File "/home/hakim/.local/lib/python3.14/site-packages/pymysql/cursors.py", line 191, in executemany
+    self.rowcount = sum(self.execute(query, arg) for arg in args)
+                    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hakim/.local/lib/python3.14/site-packages/pymysql/cursors.py", line 191, in <genexpr>
+    self.rowcount = sum(self.execute(query, arg) for arg in args)
+                        ~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/home/hakim/.local/lib/python3.14/site-packages/pymysql/cursors.py", line 153, in execute
+    result = self._query(query)
+  File "/home/hakim/.local/lib/python3.14/site-packages/pymysql/cursors.py", line 322, in _query
+    conn.query(q)
+    ~~~~~~~~~~^^^
+  File "/home/hakim/.local/lib/python3.14/site-packages/pymysql/connections.py", line 563, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+                          ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hakim/.local/lib/python3.14/site-packages/pymysql/connections.py", line 825, in _read_query_result
+    result.read()
+    ~~~~~~~~~~~^^
+  File "/home/hakim/.local/lib/python3.14/site-packages/pymysql/connections.py", line 1199, in read
+    first_packet = self.connection._read_packet()
+  File "/home/hakim/.local/lib/python3.14/site-packages/pymysql/connections.py", line 744, in _read_packet
+    packet_header = self._read_bytes(4)
+  File "/home/hakim/.local/lib/python3.14/site-packages/pymysql/connections.py", line 782, in _read_bytes
+    data = self._rfile.read(num_bytes)
+  File "/usr/lib64/python3.14/socket.py", line 725, in readinto
+    return self._sock.recv_into(b)
+           ~~~~~~~~~~~~~~~~~~~~^^^
+KeyboardInterrupt
