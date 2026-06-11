@@ -5,6 +5,7 @@ import {
     getClusters,
     getClustersSummary,
     getGraphData,
+    getCluster,
     runClustering,
 } from '../services/transactionService';
 import { filterEdgesData, applyRadialLayout } from '../utils/graphUtils';
@@ -654,7 +655,8 @@ export default function Clusters({ onAddressClick, onShowAnalysisMenu }) {
     const loadData = () => {
         setLoading(true);
         setError(null);
-        Promise.all([getClusters(), getClustersSummary()])
+        // Limit clusters fetched on initial load to avoid heavy payloads and long load times
+        Promise.all([getClusters({ limit: 200 }), getClustersSummary()])
             .then(([clusterRows, summaryRow]) => {
                 setClusters(clusterRows);
                 setSummary(summaryRow);
@@ -671,30 +673,47 @@ export default function Clusters({ onAddressClick, onShowAnalysisMenu }) {
     }, []);
 
     useEffect(() => {
-        if (!selectedCluster) {
-            setShowAllAddresses(false);
-            setPreview({ nodes: [], edges: [] });
+        async function fetchPreview() {
+            if (!selectedCluster) {
+                setShowAllAddresses(false);
+                setPreview({ nodes: [], edges: [] });
+                setPreviewError(null);
+                return;
+            }
+
+            setPreviewLoading(true);
             setPreviewError(null);
-            return;
-        }
 
-        const centerAddress = selectedCluster.addresses?.[0]?.address || selectedCluster.addresses?.[0];
-        if (!centerAddress) {
-            setPreview({ nodes: [], edges: [] });
-            return;
-        }
+            try {
+                // If we don't have detailed addresses/activity/evidence for the
+                // selected cluster, fetch them on demand. This prevents the
+                // initial listing from loading heavy maps for every cluster.
+                let full = selectedCluster;
+                if (!selectedCluster.addresses || selectedCluster.addresses.length === 0) {
+                    const details = await getCluster(selectedCluster.cluster_id || selectedCluster.id);
+                    full = { ...selectedCluster, ...details };
+                    setSelectedCluster(full);
+                }
 
-        setPreviewLoading(true);
-        setPreviewError(null);
-        getGraphData({ center: centerAddress, maxEdges: 80, minValue: 0 })
-            .then((data) => {
+                const centerAddress = full.addresses?.[0]?.address || full.matched_owner_address;
+                if (!centerAddress) {
+                    setPreview({ nodes: [], edges: [] });
+                    setPreviewLoading(false);
+                    return;
+                }
+
+                const data = await getGraphData({ center: centerAddress, maxEdges: 80, minValue: 0 });
                 setPreview(buildPreviewGraph(data, centerAddress));
-            })
-            .catch((err) => {
+            } catch (err) {
+                console.error('Graph preview failed', err);
                 setPreviewError(err.message || 'Unable to load cluster preview.');
                 setPreview({ nodes: [], edges: [] });
-            })
-            .finally(() => setPreviewLoading(false));
+            } finally {
+                setPreviewLoading(false);
+            }
+        }
+
+        fetchPreview();
     }, [selectedCluster]);
 
     const handleRunClustering = async () => {

@@ -35,7 +35,7 @@ function App() {
   const [investigateAddress, setInvestigate] = useState(getInitialInvestigateAddress)
   const [lastUpdated, setLastUpdated] = useState(null)
   const [selectedChain, setSelectedChain] = useState('all')   // Phase 5: global chain filter
-  const [sortBy, setSortBy] = useState('value_usd_desc')       // Phase 5: USD sort
+  const [sortBy, setSortBy] = useState('amount_desc')       // Phase 5: USD sort
   const intervalRef = useRef(null)
 
   // Entity Intelligence Workspace state

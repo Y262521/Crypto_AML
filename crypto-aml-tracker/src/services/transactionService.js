@@ -33,11 +33,13 @@ async function _post(url, body = {}) {
 
 /**
  * Get latest transactions (feed).
- * @param {{ limit?: number, offset?: number, sortBy?: 'amount_desc' | 'latest' }} opts
+ * @param {{ limit?: number, offset?: number, sortBy?: 'amount_desc' | 'latest', chain?: string }} opts
  */
-export const getLatestTransactions = ({ limit = 200, offset = 0, sortBy = 'amount_desc' } = {}) => {
+export const getLatestTransactions = ({ limit = 200, offset = 0, sortBy = 'amount_desc', chain } = {}) => {
   const params = new URLSearchParams({ limit: String(limit), offset: String(offset), sort_by: sortBy });
-  return _get(`${API_BASE}/transactions?${params}`);
+  if (chain && chain !== 'all') params.set('chain', chain);
+  // Use explicit trailing slash to match FastAPI route and avoid 307 redirect
+  return _get(`${API_BASE}/transactions/?${params}`);
 };
 
 /**
@@ -59,6 +61,16 @@ export const getAnalytics = () => _get(`${API_BASE}/transactions/analytics`);
 // ── Clusters ────────────────────────────────────────────────────────────────────
 
 /**
+ * Get all clusters.
+ * @param {{ limit?: number, minSize?: number }} opts
+ */
+export const getClusters = ({ limit = 1000, minSize = 2 } = {}) => {
+  const params = new URLSearchParams({ limit: String(limit), min_size: String(minSize) });
+  // We request only summary payloads here; detailed data is fetched per-cluster.
+  return _get(`${API_BASE}/clusters?${params}`);
+};
+
+/**
  * Get clusters summary.
  */
 export const getClustersSummary = () => _get(`${API_BASE}/clusters/summary`);
@@ -72,6 +84,24 @@ export const runClustering = () => _post(`${API_BASE}/clusters/run`);
  * Get owner by address.
  */
 export const getOwnerByAddress = (address) => _get(`${API_BASE}/clusters/owner-by-address/${address}`);
+
+/**
+ * Get cluster details by ID.
+ * @param {string} clusterId
+ */
+export async function getCluster(clusterId) {
+  const url = new URL(`${API_BASE}/clusters/${clusterId}`);
+  const resp = await fetch(url.toString());
+  if (!resp.ok) {
+    throw new Error(`Failed to fetch cluster ${clusterId}: ${resp.status}`);
+  }
+  return resp.json();
+}
+/**
+ * Create or update owner list entry.
+ * @param {object} ownerData - Owner information with addresses
+ */
+export const createOwnerListEntry = (ownerData) => _post(`${API_BASE}/clusters/owner`, ownerData);
 
 // ── Placement ───────────────────────────────────────────────────────────────────
 

@@ -60,7 +60,6 @@ const formatUSD = (value) => {
 };
 
 const SORT_OPTIONS = [
-  { value: 'value_usd_desc', label: 'USD at Execution (Chainlink oracle)' },
   { value: 'amount_desc', label: 'Native Amount (high to low)' },
   { value: 'latest', label: 'Most Recent' },
 ];
@@ -84,7 +83,7 @@ export default function Dashboard({
   transactions, loading, loadingMore, error,
   onInvestigate, onLoadMore, lastUpdated, totalTransactions = 0,
   selectedChain = 'all', onChainChange,
-  sortBy = 'value_usd_desc', onSortChange,
+  sortBy = 'amount_desc', onSortChange,
 }) {
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
@@ -134,7 +133,6 @@ export default function Dashboard({
           <div style={{ fontSize: '18px', fontWeight: '700', color: S.textGold }}>Transaction Ledger</div>
           <div style={{ fontSize: '12px', color: S.textSecondary, marginTop: '4px' }}>
             {transactions.length.toLocaleString()} of {(totalTransactions || transactions.length).toLocaleString()} transactions
-            {sortBy === 'value_usd_desc' && ' · sorted by USD value (cross-chain)'}
             {sortBy === 'amount_desc' && ' · sorted by native amount'}
             {sortBy === 'latest' && ' · sorted by most recent'}
             {filtered.length !== transactions.length && ` · ${filtered.length.toLocaleString()} visible`}

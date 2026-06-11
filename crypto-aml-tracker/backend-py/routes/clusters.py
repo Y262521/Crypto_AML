@@ -259,115 +259,174 @@ def _cluster_payload(
 @router.get("/")
 async def get_clusters(limit: int = Query(500, ge=1, le=5000)):
     _require_mysql()
-
-    clusters = await fetch_all(
+    # Return lightweight cluster summaries on initial listing to avoid loading
+    # large address/activity/evidence payloads for every cluster. Detailed
+    # data will be fetched on demand via the `GET /api/clusters/{id}` route.
+    
+    # OPTIMIZED: Pre-compute cluster sizes in a materialized subquery, then join once.
+    # This is much faster than the correlated subquery approach.
+    import time
+    start_time = time.time()
+    rows = await fetch_all(
         f"""
         SELECT c.id,
-               COALESCE(m.member_count, 0) AS cluster_size,
+               COALESCE(cluster_sizes.member_count, 0) AS cluster_size,
                c.total_balance,
                c.risk_level,
-               {_OWNER_SELECT}
+               c.label_status,
+               c.matched_owner_address,
+               c.owner_id,
+               o.id AS owner_registry_id,
+               o.full_name,
+               o.entity_type,
+               o.list_category,
+               o.country,
+               o.city,
+               o.specifics,
+               o.street_address,
+               o.locality,
+               o.administrative_area,
+               o.postal_code,
+               o.source_reference,
+               o.notes
         FROM wallet_clusters c
         LEFT JOIN (
             SELECT cluster_id, COUNT(*) AS member_count
             FROM addresses
             WHERE cluster_id IS NOT NULL
             GROUP BY cluster_id
-        ) m ON m.cluster_id = c.id
+            HAVING COUNT(*) >= %s
+        ) cluster_sizes ON cluster_sizes.cluster_id = c.id
         LEFT JOIN owner_list o ON c.owner_id = o.id
-        WHERE COALESCE(m.member_count, 0) >= %s
-        ORDER BY COALESCE(m.member_count, 0) DESC, c.total_balance DESC
+        WHERE cluster_sizes.member_count IS NOT NULL
+        ORDER BY cluster_sizes.member_count DESC, c.total_balance DESC
         LIMIT %s
         """,
         (MIN_CLUSTER_SIZE, limit),
     )
-    if not clusters:
+    elapsed = time.time() - start_time
+    print(f"⚡ get_clusters query completed in {elapsed:.3f}s (returned {len(rows)} clusters)")
+    if not rows:
         return []
 
-    cluster_ids = [row["id"] for row in clusters]
-    addresses_map, activity_map, evidence_map = await _fetch_cluster_maps(cluster_ids)
+    # Map DB rows into a compact summary payload used by the frontend list view.
+    def summary_payload(row: dict) -> dict:
+        return {
+            "cluster_id": row.get("id"),
+            "cluster_size": int(row.get("cluster_size") or 0),
+            "total_balance": float(row.get("total_balance") or 0.0),
+            "risk_level": row.get("risk_level") or "normal",
+            "label_status": row.get("label_status") or "unlabeled",
+            "matched_owner_address": row.get("matched_owner_address"),
+            "owner": _owner_payload(row),
+            # details (addresses/activity/evidence) intentionally omitted
+        }
 
-    return [
-        _cluster_payload(
-            row,
-            addresses_map=addresses_map,
-            activity_map=activity_map,
-            evidence_map=evidence_map,
-        )
-        for row in clusters
-    ]
+    return [summary_payload(r) for r in rows]
+
 
 
 @router.get("/summary")
 async def get_clusters_summary():
     _require_mysql()
 
-    total_row = await fetch_one(
+    # OPTIMIZED: Use a materialized CTE and separate simple queries
+    # Computing cluster sizes once is the key optimization
+    import time
+    start_time = time.time()
+    
+    # First, get the total count and status counts (fast with CTE)
+    stats = await fetch_all(
         """
-        SELECT COUNT(*) AS total
-        FROM (
-            SELECT cluster_id
-            FROM addresses
-            WHERE cluster_id IS NOT NULL
-            GROUP BY cluster_id
-            HAVING COUNT(*) >= %s
-        ) t
-        """,
-        (MIN_CLUSTER_SIZE,),
-    ) or {}
-    top_balance = await fetch_all(
-        """
-        SELECT c.id,
-               COUNT(a.address) AS cluster_size,
-               c.total_balance
-        FROM wallet_clusters c
-        JOIN addresses a ON a.cluster_id = c.id
-        GROUP BY c.id, c.total_balance
-        HAVING COUNT(a.address) >= %s
-        ORDER BY c.total_balance DESC, COUNT(a.address) DESC
-        LIMIT 5
-        """,
-        (MIN_CLUSTER_SIZE,),
-    )
-    top_size = await fetch_all(
-        """
-        SELECT c.id,
-               COUNT(a.address) AS cluster_size,
-               c.total_balance
-        FROM wallet_clusters c
-        JOIN addresses a ON a.cluster_id = c.id
-        GROUP BY c.id, c.total_balance
-        HAVING COUNT(a.address) >= %s
-        ORDER BY COUNT(a.address) DESC, c.total_balance DESC
-        LIMIT 5
-        """,
-        (MIN_CLUSTER_SIZE,),
-    )
-    status_rows = await fetch_all(
-        """
-        SELECT c.label_status, COUNT(*) AS total
-        FROM wallet_clusters c
-        JOIN (
+        WITH cluster_sizes AS (
             SELECT cluster_id, COUNT(*) AS member_count
             FROM addresses
             WHERE cluster_id IS NOT NULL
             GROUP BY cluster_id
             HAVING COUNT(*) >= %s
-        ) m ON m.cluster_id = c.id
+        )
+        SELECT 
+            'total' AS metric,
+            COUNT(DISTINCT cs.cluster_id) AS value,
+            NULL AS label_status
+        FROM cluster_sizes cs
+        
+        UNION ALL
+        
+        SELECT 
+            'status_count' AS metric,
+            COUNT(*) AS value,
+            COALESCE(c.label_status, 'unlabeled') AS label_status
+        FROM cluster_sizes cs
+        JOIN wallet_clusters c ON c.id = cs.cluster_id
         GROUP BY c.label_status
         """,
         (MIN_CLUSTER_SIZE,),
     )
-    status_counts = {row.get("label_status") or "unlabeled": int(row.get("total") or 0) for row in status_rows}
+    
+    # Parse stats
+    total = 0
+    status_counts = {}
+    for row in stats:
+        if row.get("metric") == "total":
+            total = int(row.get("value") or 0)
+        elif row.get("metric") == "status_count":
+            label = row.get("label_status") or "unlabeled"
+            status_counts[label] = int(row.get("value") or 0)
+    
+    # Get top clusters by balance (separate query, but fast with proper indexes)
+    top_balance = await fetch_all(
+        """
+        WITH cluster_sizes AS (
+            SELECT cluster_id, COUNT(*) AS member_count
+            FROM addresses
+            WHERE cluster_id IS NOT NULL
+            GROUP BY cluster_id
+            HAVING COUNT(*) >= %s
+        )
+        SELECT c.id AS cluster_id,
+               cs.member_count AS cluster_size,
+               c.total_balance
+        FROM cluster_sizes cs
+        JOIN wallet_clusters c ON c.id = cs.cluster_id
+        ORDER BY c.total_balance DESC, cs.member_count DESC
+        LIMIT 5
+        """,
+        (MIN_CLUSTER_SIZE,),
+    )
+    
+    # Get top clusters by size (separate query, but fast with proper indexes)
+    top_size = await fetch_all(
+        """
+        WITH cluster_sizes AS (
+            SELECT cluster_id, COUNT(*) AS member_count
+            FROM addresses
+            WHERE cluster_id IS NOT NULL
+            GROUP BY cluster_id
+            HAVING COUNT(*) >= %s
+        )
+        SELECT c.id AS cluster_id,
+               cs.member_count AS cluster_size,
+               c.total_balance
+        FROM cluster_sizes cs
+        JOIN wallet_clusters c ON c.id = cs.cluster_id
+        ORDER BY cs.member_count DESC, c.total_balance DESC
+        LIMIT 5
+        """,
+        (MIN_CLUSTER_SIZE,),
+    )
+    
+    elapsed = time.time() - start_time
+    print(f"⚡ get_clusters_summary completed in {elapsed:.3f}s")
 
     return {
-        "total": int(total_row.get("total") or 0),
+        "total": total,
         "matched": status_counts.get("matched", 0),
         "unlabeled": status_counts.get("unlabeled", 0),
         "conflict": status_counts.get("conflict", 0),
         "top_by_balance": [
             {
-                "cluster_id": row.get("id"),
+                "cluster_id": row.get("cluster_id"),
                 "cluster_size": int(row.get("cluster_size") or 0),
                 "total_balance": float(row.get("total_balance") or 0.0),
             }
@@ -375,7 +434,7 @@ async def get_clusters_summary():
         ],
         "top_by_size": [
             {
-                "cluster_id": row.get("id"),
+                "cluster_id": row.get("cluster_id"),
                 "cluster_size": int(row.get("cluster_size") or 0),
                 "total_balance": float(row.get("total_balance") or 0.0),
             }
@@ -486,7 +545,9 @@ async def get_owner_by_address(address: str):
 
 @router.get("/{cluster_id}")
 async def get_cluster(cluster_id: str):
+    """Return full cluster details (addresses, activity, evidence) for a single cluster."""
     _require_mysql()
+    # Fetch the cluster row
     row = await fetch_one(
         f"""
         SELECT c.id,
@@ -502,74 +563,21 @@ async def get_cluster(cluster_id: str):
             GROUP BY cluster_id
         ) m ON m.cluster_id = c.id
         LEFT JOIN owner_list o ON c.owner_id = o.id
-        WHERE c.id = %s
+        -- Match cluster by id robustly: cast stored id to CHAR so numeric
+        -- and string forms (UUID/text) both match incoming identifier.
+        WHERE CAST(c.id AS CHAR) = %s
+        LIMIT 1
         """,
         (cluster_id,),
     )
     if not row:
         raise HTTPException(status_code=404, detail="Cluster not found")
-    if int(row.get("cluster_size") or 0) < MIN_CLUSTER_SIZE:
-        raise HTTPException(status_code=404, detail="Cluster not found")
 
-    addresses = await fetch_all(
-        """
-        SELECT address, total_in, total_out
-        FROM addresses
-        WHERE cluster_id = %s
-        ORDER BY address
-        """,
-        (cluster_id,),
+    # Fetch detailed maps for this single cluster
+    addresses_map, activity_map, evidence_map = await _fetch_cluster_maps([row["id"]])
+    return _cluster_payload(
+        row,
+        addresses_map=addresses_map,
+        activity_map=activity_map,
+        evidence_map=evidence_map,
     )
-    activity = await fetch_one(
-        """
-        SELECT COUNT(*) AS address_count,
-               COALESCE(SUM(total_in), 0) AS total_in,
-               COALESCE(SUM(total_out), 0) AS total_out,
-               COALESCE(SUM(tx_count), 0) AS total_tx_count
-        FROM addresses
-        WHERE cluster_id = %s
-        """,
-        (cluster_id,),
-    ) or {}
-    evidence = await fetch_all(
-        """
-        SELECT heuristic_name, evidence_text, confidence
-        FROM cluster_evidence
-        WHERE cluster_id = %s
-        ORDER BY confidence DESC
-        """,
-        (cluster_id,),
-    )
-
-    return {
-        "cluster_id": row.get("id"),
-        "cluster_size": len(addresses),
-        "total_balance": float(row.get("total_balance") or 0.0),
-        "risk_level": row.get("risk_level") or "normal",
-        "label_status": row.get("label_status") or "unlabeled",
-        "matched_owner_address": row.get("matched_owner_address"),
-        "owner": _owner_payload(row),
-        "location": _owner_location(row) or None,
-        "addresses": [
-            {
-                "address": addr.get("address"),
-                "total_in": float(addr.get("total_in") or 0.0),
-                "total_out": float(addr.get("total_out") or 0.0),
-            }
-            for addr in addresses
-        ],
-        "activity": {
-            "total_in": float(activity.get("total_in") or 0.0),
-            "total_out": float(activity.get("total_out") or 0.0),
-            "total_tx_count": int(activity.get("total_tx_count") or 0),
-            "address_count": int(activity.get("address_count") or 0),
-        },
-        "evidence": [
-            {
-                "heuristic_name": item.get("heuristic_name"),
-                "evidence_text": item.get("evidence_text"),
-                "confidence": float(item.get("confidence") or 0.0),
-            }
-            for item in evidence
-        ],
-    }
