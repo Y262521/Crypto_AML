@@ -6,16 +6,9 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import {
-  useValuationMode,
-  ValuationToggle,
-  fmtValue,
-  fmtPnl,
-  MODES,
-} from '../utils/valuationMode.jsx';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 25;
 
 const fmt$ = (n) =>
   new Intl.NumberFormat('en-US', {
@@ -90,8 +83,6 @@ export default function MarketValueIndex({ onOpenWorkspace, onNavigateToGraph })
   const [page,      setPage]      = useState(0);
   const [sortCol,   setSortCol]   = useState('market_value_usd');
   const [sortOrder, setSortOrder] = useState('desc');
-
-  const [valMode, setValMode] = useValuationMode();
 
   // Debounce search
   useEffect(() => {
@@ -200,9 +191,6 @@ export default function MarketValueIndex({ onOpenWorkspace, onNavigateToGraph })
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
-          {/* Valuation mode toggle */}
-          <ValuationToggle mode={valMode} onChange={setValMode} />
-
           {/* Sort selector */}
           <select
             value={`${sortCol}:${sortOrder}`}
@@ -311,12 +299,12 @@ export default function MarketValueIndex({ onOpenWorkspace, onNavigateToGraph })
                 <th style={{ textAlign: 'left', padding: '12px 14px', color: '#64748B', fontSize: '10px', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', borderBottom: '1px solid rgba(201,168,76,0.1)', whiteSpace: 'nowrap' }}>
                   Address / Label
                 </th>
-                <SortTh label={valMode === MODES.ETH ? 'Market Value (Ξ)' : 'Market Value'}    col="market_value_usd" />
-                <SortTh label={valMode === MODES.ETH ? 'Realized Value (Ξ)' : 'Realized Value'}  col="market_value_usd" />
+                <SortTh label="Market Value"    col="market_value_usd" />
+                <SortTh label="Realized Value"  col="market_value_usd" />
                 <SortTh label="MVRV Ratio"      col="mvrv_ratio" />
                 <SortTh label="Unreal. PnL %"   col="unrealized_pnl_usd" />
-                <SortTh label={valMode === MODES.ETH ? 'Unreal. PnL (Ξ)' : 'Unreal. PnL $'}   col="unrealized_pnl_usd" />
-                <SortTh label={valMode === MODES.ETH ? 'Realized PnL (Ξ)' : 'Realized PnL'}    col="realized_pnl_usd" />
+                <SortTh label="Unreal. PnL $"   col="unrealized_pnl_usd" />
+                <SortTh label="Realized PnL"    col="realized_pnl_usd" />
                 <SortTh label="ETH (Ξ)"         col="eth_total_units" />
                 <SortTh label="Last Activity"   col="updated_at" />
                 <th style={{ textAlign: 'right', padding: '12px 14px', color: '#64748B', fontSize: '10px', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', borderBottom: '1px solid rgba(201,168,76,0.1)', whiteSpace: 'nowrap' }}>
@@ -340,19 +328,11 @@ export default function MarketValueIndex({ onOpenWorkspace, onNavigateToGraph })
                 </tr>
               )}
               {items.map((row, idx) => {
-                const ratio   = row.mvrv_ratio || 0;
-                const upnl    = row.unrealized_pnl_usd || 0;
+                const ratio  = row.mvrv_ratio || 0;
+                const upnl   = row.unrealized_pnl_usd || 0;
                 const upnlPct = row.unrealized_pnl_pct || 0;
-                const rpnl    = row.realized_pnl_usd || 0;
+                const rpnl   = row.realized_pnl_usd || 0;
                 const hasSnap = row.mvrv_snapshot_at != null;
-
-                // Per-row ETH conversion using eth_total_units as the ETH proxy for market_value_usd
-                const ethUnits  = Number(row.eth_total_units) || 0;
-                const mvUsd     = Number(row.market_value_usd) || 0;
-                const ethPerUsd = mvUsd > 0 && ethUnits > 0 ? ethUnits / mvUsd : 0;
-                const rowToEth  = (usd) => ethPerUsd > 0 ? usd * ethPerUsd : 0;
-                const rowFv     = (usd) => fmtValue(usd, rowToEth(usd), valMode);
-                const rowFp     = (usd) => fmtPnl(usd, rowToEth(usd), valMode);
 
                 return (
                   <tr
@@ -401,15 +381,15 @@ export default function MarketValueIndex({ onOpenWorkspace, onNavigateToGraph })
 
                     {/* Market Value */}
                     <td style={{ padding: '12px 14px', textAlign: 'right', color: '#C9A84C', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                      {rowFv(row.market_value_usd)}
+                      {fmt$(row.market_value_usd)}
                     </td>
 
                     {/* Realized Value */}
                     <td style={{ padding: '12px 14px', textAlign: 'right', color: hasSnap ? '#627EEA' : '#4B5E72', whiteSpace: 'nowrap' }}>
-                      {hasSnap ? rowFv(row.realized_value_usd) : '—'}
+                      {hasSnap ? fmt$(row.realized_value_usd) : '—'}
                     </td>
 
-                    {/* MVRV Ratio — dimensionless, same in both modes */}
+                    {/* MVRV Ratio */}
                     <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, fontFamily: 'monospace', color: hasSnap && ratio != null ? ratioColor(ratio) : '#4B5E72', whiteSpace: 'nowrap' }}>
                       {hasSnap && ratio != null ? ratio.toFixed(3) : '—'}
                     </td>
@@ -419,18 +399,18 @@ export default function MarketValueIndex({ onOpenWorkspace, onNavigateToGraph })
                       {hasSnap ? `${upnlPct >= 0 ? '+' : ''}${upnlPct.toFixed(2)}%` : '—'}
                     </td>
 
-                    {/* Unrealized PnL $ / Ξ */}
+                    {/* Unrealized PnL $ */}
                     <td style={{ padding: '12px 14px', textAlign: 'right', color: hasSnap ? pnlColor(upnl) : '#4B5E72', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                      {hasSnap ? rowFp(upnl) : '—'}
+                      {hasSnap ? `${upnl >= 0 ? '+' : ''}${fmt$(upnl)}` : '—'}
                     </td>
 
                     {/* Realized PnL */}
                     <td style={{ padding: '12px 14px', textAlign: 'right', color: hasSnap ? pnlColor(rpnl) : '#4B5E72', whiteSpace: 'nowrap' }}>
-                      {hasSnap ? rowFp(rpnl) : '—'}
+                      {hasSnap ? `${rpnl >= 0 ? '+' : ''}${fmt$(rpnl)}` : '—'}
                     </td>
 
-                    {/* ETH — highlighted as primary column in ETH mode */}
-                    <td style={{ padding: '12px 14px', textAlign: 'right', color: valMode === MODES.ETH ? '#C9A84C' : '#93A8FF', fontWeight: valMode === MODES.ETH ? 700 : 400, whiteSpace: 'nowrap' }}>
+                    {/* ETH */}
+                    <td style={{ padding: '12px 14px', textAlign: 'right', color: '#93A8FF', whiteSpace: 'nowrap' }}>
                       {fmtEth(row.eth_total_units)} Ξ
                     </td>
 

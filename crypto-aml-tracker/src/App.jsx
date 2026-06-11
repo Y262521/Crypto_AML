@@ -189,12 +189,12 @@ function App() {
                         : activePage === 'market-value'
                           ? <MarketValueIndex onOpenWorkspace={openEntityWorkspace} onNavigateToGraph={(address) => navigate('graph', { address })} />
                           : activePage === 'analytics'
-                          ? <Analytics />
-                          : activePage === 'risk'
-                            ? <RiskIntelligence />
-                            : activePage === 'etl-control'
-                              ? <ETLControlCenter />
-                              : null
+                            ? <Analytics />
+                            : activePage === 'risk'
+                              ? <RiskIntelligence />
+                              : activePage === 'etl-control'
+                                ? <ETLControlCenter />
+                                : null
             }
           </main>
 

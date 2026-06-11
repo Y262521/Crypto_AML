@@ -70,7 +70,6 @@ def _require_mysql():
 def _latest_transactions_sql(sort_by: str = "amount_desc") -> str:
     order_clause = {
         "amount_desc": "ORDER BY value_eth DESC, block_number DESC, tx_hash DESC",
-        "value_usd_desc": "ORDER BY value_eth DESC, block_number DESC, tx_hash DESC",
         "latest": "ORDER BY block_number DESC, tx_hash DESC",
     }.get(sort_by, "ORDER BY value_eth DESC, block_number DESC, tx_hash DESC")
     return f"""
@@ -85,7 +84,7 @@ def _latest_transactions_sql(sort_by: str = "amount_desc") -> str:
 async def get_latest_transactions(
     limit: int = Query(200, ge=1, le=1000),
     offset: int = Query(0, ge=0),
-    sort_by: str = Query("amount_desc"),
+    sort_by: Literal["amount_desc", "latest"] = Query("amount_desc"),
 ):
     _require_mysql()
     threshold = _threshold_eth()
@@ -202,55 +201,6 @@ async def get_analytics():
             }
             for row in top_clusters_size
         ],
-    }
-
-
-@router.get("/chains")
-async def get_transaction_chains():
-    _require_mysql()
-    eth_network = get_env("ETH_NETWORK", default="ethereum")
-    try:
-        rows = await fetch_all(
-            """
-            SELECT
-                COALESCE(chain_name, %s) AS chain_name,
-                COALESCE(blockchain_type, 'EVM') AS blockchain_type,
-                COUNT(*) AS transaction_count,
-                COALESCE(SUM(value_eth), 0) AS total_eth
-            FROM transactions
-            GROUP BY COALESCE(chain_name, %s), COALESCE(blockchain_type, 'EVM')
-            ORDER BY transaction_count DESC
-            """,
-            (eth_network, eth_network),
-        )
-    except Exception:
-        totals = await fetch_one(
-            "SELECT COUNT(*) AS total, COALESCE(SUM(value_eth), 0) AS total_eth FROM transactions"
-        ) or {}
-        return {
-            "chains": [
-                {
-                    "chainName": eth_network,
-                    "blockchainType": "EVM",
-                    "transactionCount": int(totals.get("total") or 0),
-                    "totalEth": float(totals.get("total_eth") or 0.0),
-                }
-            ],
-            "totalChains": 1,
-            "note": "Chain metadata is not available from the current transactions schema.",
-        }
-
-    return {
-        "chains": [
-            {
-                "chainName": row.get("chain_name") or eth_network,
-                "blockchainType": row.get("blockchain_type") or "EVM",
-                "transactionCount": int(row.get("transaction_count") or 0),
-                "totalEth": float(row.get("total_eth") or 0.0),
-            }
-            for row in rows
-        ],
-        "totalChains": len(rows),
     }
 
 

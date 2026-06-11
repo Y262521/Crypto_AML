@@ -157,22 +157,13 @@ def _owner_location(row: dict) -> str:
     ]
     return ", ".join(part for part in parts if part)
 
-def _strip_chain_prefix(value: str | None) -> str | None:
-    if not value:
-        return value
-    if ":" not in value:
-        return value
-    prefix, candidate = value.split(":", 1)
-    if candidate.startswith("0x"):
-        return candidate
-    return value
 
 async def _fetch_cluster_maps(cluster_ids: list[str]) -> tuple[dict, dict, dict]:
     placeholders = ", ".join(["%s"] * len(cluster_ids))
 
     addresses_rows = await fetch_all(
         f"""
-        SELECT cluster_id, address, chain_name, total_in, total_out
+        SELECT cluster_id, address, total_in, total_out
         FROM addresses
         WHERE cluster_id IN ({placeholders})
         ORDER BY address
@@ -184,7 +175,6 @@ async def _fetch_cluster_maps(cluster_ids: list[str]) -> tuple[dict, dict, dict]
         addresses_map.setdefault(row["cluster_id"], []).append(
             {
                 "address": row.get("address"),
-                "chain_name": row.get("chain_name") or 'ethereum',
                 "total_in": float(row.get("total_in") or 0.0),
                 "total_out": float(row.get("total_out") or 0.0),
             }
@@ -237,7 +227,7 @@ def _cluster_payload(
     cid = row["id"]
     activity = activity_map.get(cid, {})
     cluster_addresses = addresses_map.get(cid, [])
-    sample_addresses = [f"{addr.get('chain_name') or 'ethereum'}:{addr.get('address')}" for addr in cluster_addresses[:3]]
+    sample_addresses = [addr["address"] for addr in cluster_addresses[:3]]
 
     return {
         "cluster_id": cid,
@@ -246,8 +236,6 @@ def _cluster_payload(
         "risk_level": row.get("risk_level") or "normal",
         "label_status": row.get("label_status") or "unlabeled",
         "matched_owner_address": row.get("matched_owner_address"),
-        "chain_name": row.get("chain_name") or "ethereum",
-        "blockchain_type": row.get("blockchain_type") or "EVM",
         "owner": _owner_payload(row),
         "location": _owner_location(row) or None,
         "addresses": cluster_addresses,
@@ -278,8 +266,6 @@ async def get_clusters(limit: int = Query(500, ge=1, le=5000)):
                COALESCE(m.member_count, 0) AS cluster_size,
                c.total_balance,
                c.risk_level,
-               c.chain_name,
-               c.blockchain_type,
                {_OWNER_SELECT}
         FROM wallet_clusters c
         LEFT JOIN (
@@ -469,8 +455,6 @@ async def get_owner_by_address(address: str):
     """Look up owner profile by blockchain address."""
     _require_mysql()
 
-    lookup_address = _strip_chain_prefix(address)
-
     row = await fetch_one(
         """
         SELECT o.id AS owner_id,
@@ -485,7 +469,7 @@ async def get_owner_by_address(address: str):
         WHERE ola.address = %s
         LIMIT 1
         """,
-        (lookup_address,),
+        (address,),
     )
 
     if not row:
@@ -509,8 +493,6 @@ async def get_cluster(cluster_id: str):
                COALESCE(m.member_count, 0) AS cluster_size,
                c.total_balance,
                c.risk_level,
-               c.chain_name,
-               c.blockchain_type,
                {_OWNER_SELECT}
         FROM wallet_clusters c
         LEFT JOIN (
@@ -531,10 +513,10 @@ async def get_cluster(cluster_id: str):
 
     addresses = await fetch_all(
         """
-        SELECT address, chain_name, total_in, total_out
+        SELECT address, total_in, total_out
         FROM addresses
         WHERE cluster_id = %s
-        ORDER BY chain_name, address
+        ORDER BY address
         """,
         (cluster_id,),
     )
@@ -566,14 +548,11 @@ async def get_cluster(cluster_id: str):
         "risk_level": row.get("risk_level") or "normal",
         "label_status": row.get("label_status") or "unlabeled",
         "matched_owner_address": row.get("matched_owner_address"),
-        "chain_name": row.get("chain_name") or "ethereum",
-        "blockchain_type": row.get("blockchain_type") or "EVM",
         "owner": _owner_payload(row),
         "location": _owner_location(row) or None,
         "addresses": [
             {
                 "address": addr.get("address"),
-                "chain_name": addr.get("chain_name") or 'ethereum',
                 "total_in": float(addr.get("total_in") or 0.0),
                 "total_out": float(addr.get("total_out") or 0.0),
             }

@@ -97,23 +97,6 @@ async def run_pipeline():
         pipeline_status["last_run_summary"] = {"error": str(exc)}
         logger.error("Scheduled pipeline run failed: %s", exc, exc_info=True)
 
-    except BaseException as exc:
-        pipeline_status["last_run_status"]  = "failed"
-        pipeline_status["last_run_summary"] = {"error": f"Pipeline terminated unexpectedly: {exc}"}
-        logger.error("Scheduled pipeline run interrupted: %s", exc, exc_info=True)
-        raise
-
-    finally:
-        if pipeline_status["last_run_status"] == "running":
-            pipeline_status["last_run_status"] = "failed"
-            if not pipeline_status.get("last_run_summary"):
-                pipeline_status["last_run_summary"] = {
-                    "error": "Pipeline ended without reaching a terminal status."
-                }
-            logger.warning(
-                "Scheduled pipeline run ended without a terminal result; marking as failed."
-            )
-
 
 def create_scheduler() -> AsyncIOScheduler:
     """Create and configure the APScheduler instance."""
