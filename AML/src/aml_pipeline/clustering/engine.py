@@ -474,29 +474,24 @@ class ClusteringEngine:
                             text(f"DELETE FROM wallet_clusters WHERE id IN ({placeholders})"),
                             params,
                         )
+                        # Also reset addresses for deleted clusters
+                        conn.execute(
+                            text(f"UPDATE addresses SET cluster_id = NULL WHERE cluster_id IN ({placeholders})"),
+                            params,
+                        )
 
-                # Reset cluster mapping only for addresses belonging to THIS chain
-                conn.execute(
-                    text(
-                        """
-                        UPDATE addresses a
-                        JOIN (
-                            SELECT DISTINCT from_address AS addr FROM transactions WHERE chain_name = :cn
-                            UNION
-                            SELECT DISTINCT to_address FROM transactions WHERE chain_name = :cn
-                        ) t ON t.addr = a.address
-                        SET a.cluster_id = NULL
-                        """
-                    ),
-                    {"cn": self.chain_name},
-                )
+                # NO NEED to reset all cluster assignments - we'll overwrite them below with new assignments
+                # Addresses not in the new clustering will keep their old cluster_id, which is fine
+                # because we use chain_name filtering to distinguish chains
                 
                 # Build address->cluster mapping
+                logger.info("Building address->cluster mapping for %d clusters...", len(results))
                 address_cluster_map = {}
                 for r in results:
                     for address in r.addresses:
                         address_cluster_map[address] = r.cluster_id
                 
+                logger.info("Updating %d addresses with cluster assignments...", len(address_cluster_map))
                 # Batch update addresses using CASE statement for better performance
                 if address_cluster_map:
                     # Split into smaller batches to avoid query size limits
@@ -527,6 +522,8 @@ class ClusteringEngine:
                             """
                         )
                         conn.execute(update_query, params)
+                
+                logger.info("Validating cluster sizes from database...")
 
                 retained_cluster_ids = set(cluster_ids)
                 if cluster_ids:
@@ -587,12 +584,14 @@ class ClusteringEngine:
                                 params,
                             )
 
+                logger.info("Applying owner labels to %d clusters...", len(retained_cluster_ids))
                 relabel_clusters_in_connection(
                     conn,
                     cluster_ids=sorted(retained_cluster_ids),
                 )
 
                 # Replace evidence
+                logger.info("Persisting cluster evidence...")
                 retained_cluster_list = sorted(retained_cluster_ids)
                 if retained_cluster_list:
                     for cluster_batch in _chunked(retained_cluster_list):

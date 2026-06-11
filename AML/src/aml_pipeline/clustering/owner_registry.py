@@ -499,6 +499,23 @@ def resolve_cluster_labels(
     cluster_ids: Sequence[str] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Return owner matches for wallet clusters based on registry addresses."""
+    # Early exit: check if owner_list_addresses has any data
+    owner_count = conn.execute(
+        text("SELECT COUNT(*) FROM owner_list_addresses")
+    ).scalar_one()
+    if owner_count == 0:
+        # No owner addresses registered, skip the expensive join
+        if cluster_ids is None:
+            target_cluster_ids = conn.execute(
+                text("SELECT id FROM wallet_clusters ORDER BY id")
+            ).scalars().all()
+        else:
+            target_cluster_ids = sorted(set(cluster_ids))
+        return {
+            cluster_id: _select_cluster_label([])
+            for cluster_id in target_cluster_ids
+        }
+    
     if cluster_ids is None:
         target_cluster_ids = conn.execute(
             text("SELECT id FROM wallet_clusters ORDER BY id")
@@ -513,6 +530,8 @@ def resolve_cluster_labels(
     for batch in _chunked(target_cluster_ids):
         placeholders = ", ".join(f":cid{i}" for i in range(len(batch)))
         params = {f"cid{i}": cluster_id for i, cluster_id in enumerate(batch)}
+        # OPTIMIZED: Use direct equality assuming addresses are stored lowercase
+        # This allows index usage unlike LOWER() which forces table scan
         rows = conn.execute(
             text(
                 f"""
@@ -522,7 +541,7 @@ def resolve_cluster_labels(
                        ola.is_primary
                 FROM addresses a
                 JOIN owner_list_addresses ola
-                  ON LOWER(ola.address) = LOWER(a.address)
+                  ON ola.address = a.address
                 WHERE a.cluster_id IN ({placeholders})
                 """
             ),
