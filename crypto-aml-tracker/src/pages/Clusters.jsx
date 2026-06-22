@@ -948,6 +948,7 @@ export default function Clusters({ onAddressClick, onShowAnalysisMenu }) {
                     <ChainFilter
                         selectedChain={chainFilter}
                         onChainChange={setChainFilter}
+                        countKey="cluster_count"
                         compact
                         showTypeFilter={false}
                     />

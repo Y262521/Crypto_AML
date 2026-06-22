@@ -38,6 +38,7 @@ def _persist_etl_run_record(
     started_at: datetime,
     summary_json: dict,
     status: str,
+    chain_name: str = "ethereum",
     completed_at: Optional[datetime] = None,
 ) -> None:
     """
@@ -69,14 +70,15 @@ def _persist_etl_run_record(
                         INSERT INTO placement_runs
                             (id, source, chain_name, status, started_at, completed_at, summary_json)
                         VALUES
-                            (:id, 'pipeline', 'ethereum', 'running', :started_at, NULL, :summary_json)
+                            (:id, 'pipeline', :chain_name, 'running', :started_at, NULL, :summary_json)
                         ON DUPLICATE KEY UPDATE
                             status       = 'running',
+                            chain_name   = :chain_name,
                             started_at   = :started_at,
                             summary_json = :summary_json
                         """
                     ),
-                    {"id": run_id, "started_at": started_naive, "summary_json": summary_str},
+                    {"id": run_id, "chain_name": chain_name, "started_at": started_naive, "summary_json": summary_str},
                 )
             else:
                 conn.execute(
@@ -85,16 +87,18 @@ def _persist_etl_run_record(
                         INSERT INTO placement_runs
                             (id, source, chain_name, status, started_at, completed_at, summary_json)
                         VALUES
-                            (:id, 'pipeline', 'ethereum', :status,
+                            (:id, 'pipeline', :chain_name, :status,
                              :started_at, :completed_at, :summary_json)
                         ON DUPLICATE KEY UPDATE
                             status       = :status,
+                            chain_name   = :chain_name,
                             completed_at = :completed_at,
                             summary_json = :summary_json
                         """
                     ),
                     {
                         "id": run_id,
+                        "chain_name": chain_name,
                         "status": status,
                         "started_at": started_naive,
                         "completed_at": completed_naive,
@@ -332,12 +336,18 @@ def run_daily_pipeline(
         "neo4j_edges":               neo4j_edges,
     }
 
+    processed_chains = list(extract_results.keys()) + list(utxo_extract_results.keys())
+    if not processed_chains:
+        processed_chains = list(active_evm_chains) + list(active_utxo_chains)
+    run_chain_name = ",".join(processed_chains) if processed_chains else "ethereum"
+
     _persist_etl_run_record(
         cfg=cfg,
         run_id=etl_run_id,
         started_at=pipeline_started_at,
         summary_json=etl_summary_json,
         status="running",
+        chain_name=run_chain_name,
     )
 
     # ── Clustering — run per chain type immediately after ETL ────────────────
@@ -537,6 +547,7 @@ def run_daily_pipeline(
         completed_at=pipeline_completed_at,
         summary_json=etl_summary_json,
         status="completed",
+        chain_name=run_chain_name,
     )
 
     logger.info(

@@ -10,6 +10,7 @@ from db.mysql import close_mysql, connect_mysql
 from routes.transactions import router as tx_router
 from routes.clusters import router as cluster_router
 from routes.etl import router as etl_router, get_databases_health as etl_get_databases_health
+from routes.chains import router as chains_router
 from routes.layering import ensure_layering_schema, router as layering_router
 from routes.placement import ensure_placement_schema, router as placement_router
 from routes.risk import router as risk_router
@@ -72,6 +73,7 @@ app.add_middleware(
 
 app.include_router(tx_router,          prefix="/api/transactions")
 app.include_router(cluster_router,     prefix="/api/clusters")
+app.include_router(chains_router,      prefix="/api/chains")
 app.include_router(etl_router,         prefix="/api/etl")
 app.include_router(placement_router,   prefix="/api/placement")
 app.include_router(layering_router,    prefix="/api/layering")

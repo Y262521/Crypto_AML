@@ -1,4 +1,4 @@
-﻿CREATE TABLE IF NOT EXISTS owner_list (
+CREATE TABLE IF NOT EXISTS owner_list (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     full_name VARCHAR(255) NOT NULL,
     entity_type VARCHAR(64) NOT NULL DEFAULT 'individual',
@@ -108,6 +108,7 @@ CREATE TABLE IF NOT EXISTS placement_runs (
     id VARCHAR(64) PRIMARY KEY,
     source VARCHAR(32) NOT NULL DEFAULT 'auto',
     status VARCHAR(32) NOT NULL DEFAULT 'completed',
+    chain_name VARCHAR(255) NULL,
     started_at DATETIME NULL,
     completed_at DATETIME NULL,
     summary_json LONGTEXT NULL,

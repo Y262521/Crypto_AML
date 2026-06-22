@@ -27,7 +27,7 @@ _CHAIN_METADATA: dict[str, dict[str, Any]] = {
         "chain_id": 1,
         "display_name": "Ethereum",
         "native_asset": "ETH",
-        "blockchain_type": "EVM",
+        "blockchain_type": "Account based",
         "color": "#627EEA",
         "icon": "ETH",
     },
@@ -36,7 +36,7 @@ _CHAIN_METADATA: dict[str, dict[str, Any]] = {
         "chain_id": 56,
         "display_name": "BNB Chain",
         "native_asset": "BNB",
-        "blockchain_type": "EVM",
+        "blockchain_type": "Account based",
         "color": "#F3BA2F",
         "icon": "BNB",
     },
@@ -45,7 +45,7 @@ _CHAIN_METADATA: dict[str, dict[str, Any]] = {
         "chain_id": 137,
         "display_name": "Polygon",
         "native_asset": "POL",
-        "blockchain_type": "EVM",
+        "blockchain_type": "Account based",
         "color": "#8247E5",
         "icon": "POL",
     },
@@ -54,7 +54,7 @@ _CHAIN_METADATA: dict[str, dict[str, Any]] = {
         "chain_id": 42161,
         "display_name": "Arbitrum",
         "native_asset": "ETH",
-        "blockchain_type": "EVM",
+        "blockchain_type": "Account based",
         "color": "#2D374B",
         "icon": "ARB",
     },
@@ -63,7 +63,7 @@ _CHAIN_METADATA: dict[str, dict[str, Any]] = {
         "chain_id": 8453,
         "display_name": "Base",
         "native_asset": "ETH",
-        "blockchain_type": "EVM",
+        "blockchain_type": "Account based",
         "color": "#0052FF",
         "icon": "BASE",
     },
@@ -108,7 +108,7 @@ _CHAIN_METADATA: dict[str, dict[str, Any]] = {
         "chain_id": 900,
         "display_name": "Solana",
         "native_asset": "SOL",
-        "blockchain_type": "ACCOUNT_BASED",
+        "blockchain_type": "Account based",
         "color": "#9945FF",
         "icon": "SOL",
     },
@@ -167,7 +167,7 @@ async def get_active_chains():
             "chain_id": 0,
             "display_name": chain_name.title(),
             "native_asset": "???",
-            "blockchain_type": "EVM",
+            "blockchain_type": "Account based",
             "color": "#888888",
             "icon": "?",
         })
@@ -235,6 +235,67 @@ async def get_chain_stats():
         logger.warning("Could not query cluster chain stats: %s", exc)
         cluster_rows = []
 
+    try:
+        placement_rows = await fetch_all(
+            """
+            SELECT
+                COALESCE(pd.chain_name, 'ethereum') AS chain_name,
+                COUNT(*) AS placement_count
+            FROM placement_detections pd
+            JOIN placement_runs pr ON pd.run_id = pr.id
+            GROUP BY COALESCE(pd.chain_name, 'ethereum')
+            """
+        )
+    except Exception as exc:
+        logger.warning("Could not query placement chain stats: %s", exc)
+        placement_rows = []
+
+    try:
+        layering_rows = await fetch_all(
+            """
+            SELECT
+                COALESCE(la.chain_name, 'ethereum') AS chain_name,
+                COUNT(*) AS layering_count
+            FROM layering_alerts la
+            JOIN layering_runs lr ON la.run_id = lr.id
+            LEFT JOIN placement_runs lr_pr ON lr.placement_run_id = lr_pr.id
+            GROUP BY COALESCE(la.chain_name, 'ethereum')
+            """
+        )
+    except Exception as exc:
+        logger.warning("Could not query layering chain stats: %s", exc)
+        layering_rows = []
+
+    try:
+        integration_rows = await fetch_all(
+            """
+            SELECT
+                COALESCE(ia.chain_name, 'ethereum') AS chain_name,
+                COUNT(*) AS integration_count
+            FROM integration_alerts ia
+            JOIN integration_runs ir ON ia.run_id = ir.id
+            GROUP BY COALESCE(ia.chain_name, 'ethereum')
+            """
+        )
+    except Exception as exc:
+        logger.warning("Could not query integration chain stats: %s", exc)
+        integration_rows = []
+
+    try:
+        etl_run_rows = await fetch_all(
+            """
+            SELECT
+                COALESCE(chain_name, 'ethereum') AS chain_name,
+                COUNT(*) AS etl_run_count
+            FROM placement_runs
+            WHERE source = 'pipeline'
+            GROUP BY COALESCE(chain_name, 'ethereum')
+            """
+        )
+    except Exception as exc:
+        logger.warning("Could not query etl run chain stats: %s", exc)
+        etl_run_rows = []
+
     # Merge into per-chain stats
     stats: dict[str, dict] = {}
 
@@ -245,37 +306,69 @@ async def get_chain_stats():
             "chain_name": cn,
             "display_name": meta.get("display_name", cn.title()),
             "native_asset": meta.get("native_asset", "???"),
-            "blockchain_type": meta.get("blockchain_type", "EVM"),
+            "blockchain_type": meta.get("blockchain_type", "Account based"),
             "color": meta.get("color", "#888888"),
             "tx_count": int(row.get("tx_count") or 0),
             "total_value_native": float(row.get("total_value") or 0.0),
             "high_value_tx_count": int(row.get("high_value_count") or 0),
             "address_count": 0,
             "cluster_count": 0,
+            "placement_count": 0,
+            "layering_count": 0,
+            "integration_count": 0,
+            "etl_run_count": 0,
         }
 
-    for row in addr_rows:
-        cn = row.get("chain_name", "ethereum")
+    def _ensure_cn(cn: str):
         if cn not in stats:
             meta = _CHAIN_METADATA.get(cn, {})
             stats[cn] = {
                 "chain_name": cn,
                 "display_name": meta.get("display_name", cn.title()),
                 "native_asset": meta.get("native_asset", "???"),
-                "blockchain_type": meta.get("blockchain_type", "EVM"),
+                "blockchain_type": meta.get("blockchain_type", "Account based"),
                 "color": meta.get("color", "#888888"),
                 "tx_count": 0,
                 "total_value_native": 0.0,
                 "high_value_tx_count": 0,
                 "address_count": 0,
                 "cluster_count": 0,
+                "placement_count": 0,
+                "layering_count": 0,
+                "integration_count": 0,
+                "etl_run_count": 0,
             }
+
+    for row in addr_rows:
+        cn = row.get("chain_name", "ethereum")
+        _ensure_cn(cn)
         stats[cn]["address_count"] = int(row.get("address_count") or 0)
 
     for row in cluster_rows:
         cn = row.get("chain_name", "ethereum")
-        if cn in stats:
-            stats[cn]["cluster_count"] = int(row.get("cluster_count") or 0)
+        _ensure_cn(cn)
+        stats[cn]["cluster_count"] = int(row.get("cluster_count") or 0)
+
+    for row in placement_rows:
+        cn = row.get("chain_name", "ethereum")
+        _ensure_cn(cn)
+        stats[cn]["placement_count"] += int(row.get("placement_count") or 0)
+
+    for row in layering_rows:
+        cn = row.get("chain_name", "ethereum")
+        _ensure_cn(cn)
+        stats[cn]["layering_count"] += int(row.get("layering_count") or 0)
+
+    for row in integration_rows:
+        cn = row.get("chain_name", "ethereum")
+        _ensure_cn(cn)
+        stats[cn]["integration_count"] += int(row.get("integration_count") or 0)
+
+    for row in etl_run_rows:
+        cn_raw = row.get("chain_name", "ethereum")
+        for cn in cn_raw.split(","):
+            _ensure_cn(cn)
+            stats[cn]["etl_run_count"] += int(row.get("etl_run_count") or 0)
 
     return {
         "chains": sorted(stats.values(), key=lambda x: x["tx_count"], reverse=True),

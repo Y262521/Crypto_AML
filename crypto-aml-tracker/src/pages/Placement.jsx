@@ -1,4 +1,4 @@
-﻿import { useDeferredValue, useEffect, useState } from 'react';
+import { useDeferredValue, useEffect, useState } from 'react';
 import Loader from '../components/common/Loader';
 import AnalyzeButton from '../components/common/AnalyzeButton';
 import ChainBadge from '../components/chain/ChainBadge';
@@ -19,7 +19,7 @@ const formatNumber = (value, maximumFractionDigits = 2) => {
 };
 const formatBehaviorLabel = (behavior) => (behavior || '').replaceAll('_', ' ');
 const truncate = (value, maxLength = 18) => {
-    if (!value) return '�';
+    if (!value) return '-';
     if (value.length <= maxLength) return value;
     return `${value.slice(0, maxLength - 3)}...`;
 };
@@ -61,11 +61,11 @@ const humanizeReason = (reasons = [], primaryBehavior = '') => {
         return 'Flagged by placement detection algorithm.';
     }
     const map = {
-        'earliest reachable entity in traced suspicious flow': 'Origin point of a traced suspicious money flow funds entered the system through this entity.',
-        'downstream suspicious behavior: smurfing': 'Downstream addresses receiving funds from this entity show smurfing splitting large amounts into many small transactions.',
-        'downstream suspicious behavior: structuring': 'Downstream addresses show structuring transactions deliberately kept below reporting thresholds.',
-        'downstream suspicious behavior: micro_funding': 'Downstream addresses show micro-funding many tiny deposits aggregating into larger amounts.',
-        'no prior suspicious history observed upstream in analyzed graph': 'No suspicious history found upstream this entity appears to be a clean entry point for illicit funds.',
+        'earliest reachable entity in traced suspicious flow': 'Origin point of a traced suspicious money flow. Funds entered the system through this entity.',
+        'downstream suspicious behavior: smurfing': 'Downstream addresses receiving funds from this entity show smurfing (splitting large amounts into many small transactions).',
+        'downstream suspicious behavior: structuring': 'Downstream addresses show structuring (transactions deliberately kept below reporting thresholds).',
+        'downstream suspicious behavior: micro_funding': 'Downstream addresses show micro-funding (many tiny deposits aggregating into larger amounts).',
+        'no prior suspicious history observed upstream in analyzed graph': 'No suspicious history found upstream. This entity appears to be a clean entry point for illicit funds.',
         'suspicious history observed upstream in analyzed graph': 'Upstream addresses feeding this entity also have suspicious transaction history.',
         'high placement score from graph position analysis': 'Graph position analysis identified this entity as a likely placement-stage entry point.',
         'entity validated as placement origin': 'Confirmed as a placement-stage origin by the validation engine.',
@@ -184,9 +184,9 @@ export default function Placement({ onNavigateToGraph, onShowAnalysisMenu, onOpe
             {/* Summary cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
                 {[
-                    { label: 'Placement Alerts', value: formatNumber(summaryBody.placements || 0, 0), icon: '??', tone: 'danger', sub: 'Entities above threshold' },
-                    { label: 'Behavior Hits', value: formatNumber(Object.values(summaryBody.behaviors || {}).reduce((t, c) => t + Number(c || 0), 0), 0), icon: '??', tone: 'warning', sub: 'Structuring  Smurfing  Micro-funding' },
-                    { label: 'Filtered Alerts', value: formatNumber(filteredAlerts.length, 0), icon: '??', tone: 'accent', sub: 'Matching current filters' },
+                    { label: 'Placement Alerts', value: formatNumber(summaryBody.placements || 0, 0), icon: '📍', tone: 'danger', sub: 'Entities above threshold' },
+                    { label: 'Behavior Hits', value: formatNumber(Object.values(summaryBody.behaviors || {}).reduce((t, c) => t + Number(c || 0), 0), 0), icon: '⚠️', tone: 'warning', sub: 'Structuring  Smurfing  Micro-funding' },
+                    { label: 'Filtered Alerts', value: formatNumber(filteredAlerts.length, 0), icon: '🔍', tone: 'accent', sub: 'Matching current filters' },
                 ].map(({ label, value, icon, tone, sub }) => {
                     const c = { danger: { bg: 'rgba(239,68,68,0.10)', border: 'rgba(239,68,68,0.25)', text: '#F87171', num: '#F87171' }, warning: { bg: 'rgba(251,191,36,0.10)', border: 'rgba(251,191,36,0.25)', text: '#FBBF24', num: '#FBBF24' }, accent: { bg: 'rgba(96,165,250,0.10)', border: 'rgba(96,165,250,0.25)', text: '#60A5FA', num: '#60A5FA' } }[tone];
                     return (
@@ -204,6 +204,7 @@ export default function Placement({ onNavigateToGraph, onShowAnalysisMenu, onOpe
                 <ChainFilter
                     selectedChain={chainFilter}
                     onChainChange={(c) => { setChainFilter(c); setPage(1); }}
+                    countKey="placement_count"
                     compact
                     label="Filter by Chain"
                 />
@@ -414,10 +415,10 @@ export default function Placement({ onNavigateToGraph, onShowAnalysisMenu, onOpe
                         <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(201,168,76,0.10)', background: 'linear-gradient(135deg,#0D1628,#132240)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div>
-                                    <div style={{ fontSize: '11px', fontWeight: '800', color: '#0f6578', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>?? Cluster Addresses</div>
+                                    <div style={{ fontSize: '11px', fontWeight: '800', color: '#0f6578', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>🔗 Cluster Addresses</div>
                                     <div style={{ fontSize: '12px', fontFamily: 'monospace', color: '#E2D9C8', wordBreak: 'break-all' }}>{clusterPopup.entityId}</div>
                                 </div>
-                                <button type="button" onClick={() => setClusterPopup(null)} style={{ border: '1px solid rgba(201,168,76,0.12)', background: 'linear-gradient(145deg,#101D32,#0D1628)', borderRadius: '8px', padding: '4px 10px', cursor: 'pointer', fontSize: '14px', color: '#6B7E94', flexShrink: 0, marginLeft: '12px' }}>?</button>
+                                <button type="button" onClick={() => setClusterPopup(null)} style={{ border: '1px solid rgba(201,168,76,0.12)', background: 'linear-gradient(145deg,#101D32,#0D1628)', borderRadius: '8px', padding: '4px 10px', cursor: 'pointer', fontSize: '14px', color: '#6B7E94', flexShrink: 0, marginLeft: '12px' }}>×</button>
                             </div>
                             <div style={{ marginTop: '10px', fontSize: '12px', color: '#6B7E94' }}>{clusterPopup.addresses.length} addresses</div>
                         </div>
@@ -427,7 +428,7 @@ export default function Placement({ onNavigateToGraph, onShowAnalysisMenu, onOpe
                             ) : clusterPopup.addresses.map((addr) => (
                                 <div key={addr} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '10px', background: 'rgba(201,168,76,0.04)', border: '1px solid rgba(201,168,76,0.12)', gap: '8px' }}>
                                     <span style={{ fontFamily: 'monospace', fontSize: '11px', color: '#E2D9C8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={addr}>{addr}</span>
-                                    <button type="button" onClick={() => { setClusterPopup(null); onNavigateToGraph && onNavigateToGraph(addr); }} style={{ fontSize: '11px', fontWeight: '700', padding: '5px 10px', borderRadius: '8px', background: '#0f6578', color: '#fff', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>View ?</button>
+                                    <button type="button" onClick={() => { setClusterPopup(null); onNavigateToGraph && onNavigateToGraph(addr); }} style={{ fontSize: '11px', fontWeight: '700', padding: '5px 10px', borderRadius: '8px', background: '#0f6578', color: '#fff', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>View ↗</button>
                                 </div>
                             ))}
                         </div>
@@ -446,7 +447,7 @@ export default function Placement({ onNavigateToGraph, onShowAnalysisMenu, onOpe
                                     <div style={{ fontSize: '11px', fontWeight: '800', color: '#C9A84C', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>🛡 Placement Reasons</div>
                                     <div style={{ fontSize: '12px', fontFamily: 'monospace', color: '#E2D9C8', wordBreak: 'break-all' }}>{reasonPopup.entityId}</div>
                                 </div>
-                                <button type="button" onClick={() => setReasonPopup(null)} style={{ border: '1px solid rgba(201,168,76,0.12)', background: 'linear-gradient(145deg,#101D32,#0D1628)', borderRadius: '8px', padding: '4px 10px', cursor: 'pointer', fontSize: '14px', color: '#6B7E94', flexShrink: 0, marginLeft: '12px' }}>?</button>
+                                <button type="button" onClick={() => setReasonPopup(null)} style={{ border: '1px solid rgba(201,168,76,0.12)', background: 'linear-gradient(145deg,#101D32,#0D1628)', borderRadius: '8px', padding: '4px 10px', cursor: 'pointer', fontSize: '14px', color: '#6B7E94', flexShrink: 0, marginLeft: '12px' }}>×</button>
                             </div>
                             <div style={{ marginTop: '10px', fontSize: '12px', color: '#6B7E94' }}>{reasonPopup.reasons.length} reason{reasonPopup.reasons.length !== 1 ? 's' : ''} detected</div>
                         </div>

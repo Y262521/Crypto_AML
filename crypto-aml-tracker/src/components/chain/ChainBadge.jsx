@@ -19,9 +19,9 @@ const CHAIN_META = {
 };
 
 const TYPE_STYLE = {
-    EVM: { label: 'EVM', color: '#60A5FA' },
+    EVM: { label: 'Account based', color: '#60A5FA' },
     UTXO: { label: 'UTXO', color: '#FB923C' },
-    ACCOUNT_BASED: { label: 'Account', color: '#A78BFA' },
+    ACCOUNT_BASED: { label: 'Account based', color: '#A78BFA' },
 };
 
 export default function ChainBadge({

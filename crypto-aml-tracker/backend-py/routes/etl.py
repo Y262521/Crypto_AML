@@ -389,7 +389,7 @@ async def get_etl_history(
         chain_clause = ""
         args: tuple = ()
         if chain:
-            chain_clause = "WHERE COALESCE(pr.chain_name, 'ethereum') = %s"
+            chain_clause = "WHERE FIND_IN_SET(%s, COALESCE(pr.chain_name, 'ethereum')) > 0"
             args = (chain,)
 
         rows = await fetch_all(
@@ -495,7 +495,7 @@ async def get_etl_history(
             })
 
         count_row = await fetch_one(
-            f"SELECT COUNT(*) AS cnt FROM placement_runs {chain_clause}",
+            f"SELECT COUNT(*) AS cnt FROM placement_runs pr {chain_clause}",
             args or None,
         )
         total = int((count_row or {}).get("cnt", 0))
@@ -508,6 +508,18 @@ async def get_etl_history(
 
 
 # ── GET /api/etl/errors ────────────────────────────────────────────────────────
+
+def _sanitize_error(msg: str | None) -> str:
+    if not msg:
+        return "ETL stopped before completion"
+    msg_lower = msg.lower()
+    if "module" in msg_lower or "scipy" in msg_lower or "importerror" in msg_lower or "connection" in msg_lower or "timeout" in msg_lower:
+        return "Source unavailable during ingestion"
+    if "keyboardinterrupt" in msg_lower or "restarted" in msg_lower or "terminated" in msg_lower:
+        return "Run interrupted: server restarted before pipeline completed"
+    if "traceback" in msg_lower or 'file "' in msg_lower or "line " in msg_lower:
+        return "ETL stopped before completion"
+    return msg
 
 @router.get("/errors")
 async def get_etl_errors(
@@ -533,7 +545,7 @@ async def get_etl_errors(
             "timestamp":      mem.get("last_run_at"),
             "chain":          get_env("ACTIVE_CHAIN", default="ethereum"),
             "phase":          "pipeline_execution",
-            "message":        err_summary.get("error") or "Pipeline run failed — see server logs for details",
+            "message":        _sanitize_error(err_summary.get("error") or "Pipeline run failed — see server logs for details"),
             "severity":       "critical",
             "recovery_state": "awaiting_next_scheduled_run",
             "source":         "scheduler",
@@ -547,6 +559,7 @@ async def get_etl_errors(
                 SELECT id, chain_name, started_at, completed_at, status, summary_json
                 FROM placement_runs
                 WHERE status NOT IN ('completed')
+                  AND source = 'pipeline'
                 ORDER BY started_at DESC
                 LIMIT %s OFFSET %s
                 """,
@@ -555,7 +568,7 @@ async def get_etl_errors(
             for row in failed_rows:
                 summary    = _decode_json(row.get("summary_json"))
                 status_val = (row.get("status") or "unknown").lower()
-                err_msg    = (
+                err_msg    = _sanitize_error(
                     summary.get("error")
                     or f"Run {row.get('id')} ended with status '{row.get('status')}'"
                 )
@@ -590,10 +603,6 @@ async def get_etl_errors(
             )
             stage_error_fields = [
                 ("neo4j_error",       "neo4j_load",           "warning"),
-                ("placement_error",   "placement_analysis",   "warning"),
-                ("layering_error",    "layering_analysis",    "warning"),
-                ("integration_error", "integration_analysis", "warning"),
-                ("clustering_error",  "clustering",           "warning"),
             ]
             for row in recent_completed:
                 summary = _decode_json(row.get("summary_json"))
@@ -605,7 +614,7 @@ async def get_etl_errors(
                             "timestamp":      _fmt_ts(row.get("completed_at") or row.get("started_at")),
                             "chain":          row.get("chain_name") or "ethereum",
                             "phase":          phase,
-                            "message":        str(err_val),
+                            "message":        _sanitize_error(str(err_val)),
                             "severity":       sev,
                             "recovery_state": "stage_skipped_pipeline_continued",
                             "source":         "placement_runs_summary",

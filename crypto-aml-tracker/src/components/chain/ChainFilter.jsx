@@ -21,13 +21,14 @@ const S = {
 // Static chain groups — shown even if no live data yet
 const CHAIN_GROUPS = [
     {
-        label: 'EVM Chains',
+        label: 'Account based',
         chains: [
             { chain_name: 'ethereum', display_name: 'Ethereum', native_asset: 'ETH' },
             { chain_name: 'bnb', display_name: 'BNB Chain', native_asset: 'BNB' },
             { chain_name: 'polygon', display_name: 'Polygon', native_asset: 'POL' },
             { chain_name: 'arbitrum', display_name: 'Arbitrum', native_asset: 'ETH' },
             { chain_name: 'base', display_name: 'Base', native_asset: 'ETH' },
+            { chain_name: 'solana', display_name: 'Solana', native_asset: 'SOL' },
         ],
     },
     {
@@ -39,12 +40,6 @@ const CHAIN_GROUPS = [
             { chain_name: 'bitcoin_cash', display_name: 'Bitcoin Cash', native_asset: 'BCH' },
         ],
     },
-    {
-        label: 'Account-Based',
-        chains: [
-            { chain_name: 'solana', display_name: 'Solana', native_asset: 'SOL' },
-        ],
-    },
 ];
 
 export default function ChainFilter({
@@ -52,18 +47,19 @@ export default function ChainFilter({
     onChainChange,
     compact = false,
     label = 'Chain',
+    countKey = 'tx_count',
     style = {},
 }) {
     const [activeCounts, setActiveCounts] = useState({});
 
-    // Fetch per-chain tx counts from /api/chains/stats
+    // Fetch per-chain stats from /api/chains/stats
     useEffect(() => {
         fetch(`${API_BASE}/chains/stats`)
             .then(r => r.ok ? r.json() : null)
             .then(data => {
                 if (data?.chains) {
                     const counts = {};
-                    data.chains.forEach(c => { counts[c.chain_name] = c.tx_count || 0; });
+                    data.chains.forEach(c => { counts[c.chain_name] = c[countKey] || 0; });
                     setActiveCounts(counts);
                 }
             })

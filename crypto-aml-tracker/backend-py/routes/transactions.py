@@ -67,15 +67,21 @@ def _require_mysql():
         )
 
 
-def _latest_transactions_sql(sort_by: str = "amount_desc") -> str:
+def _latest_transactions_sql(sort_by: str = "amount_desc", chain: str | None = None) -> str:
     order_clause = {
         "amount_desc": "ORDER BY value_eth DESC, block_number DESC, tx_hash DESC",
         "latest": "ORDER BY block_number DESC, tx_hash DESC",
     }.get(sort_by, "ORDER BY value_eth DESC, block_number DESC, tx_hash DESC")
+    
+    where_clause = ""
+    if chain and chain != "all":
+        where_clause = "WHERE COALESCE(chain_name, 'ethereum') = %s"
+        
     return f"""
         SELECT tx_hash, from_address, to_address, value_eth, timestamp, block_number,
-               is_contract_call, gas_used, status
+               is_contract_call, gas_used, status, COALESCE(chain_name, 'ethereum') AS chain_name
         FROM transactions
+        {where_clause}
         {order_clause}
         LIMIT %s OFFSET %s
         """
@@ -85,11 +91,20 @@ async def get_latest_transactions(
     limit: int = Query(200, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     sort_by: Literal["amount_desc", "latest"] = Query("amount_desc"),
+    chain: str | None = Query(None),
 ):
     _require_mysql()
     threshold = _threshold_eth()
-    total_row = await fetch_one("SELECT COUNT(*) AS total FROM transactions") or {}
-    rows = await fetch_all(_latest_transactions_sql(sort_by), (limit, offset))
+    
+    if chain and chain != "all":
+        total_row = await fetch_one(
+            "SELECT COUNT(*) AS total FROM transactions WHERE COALESCE(chain_name, 'ethereum') = %s",
+            (chain,)
+        ) or {}
+        rows = await fetch_all(_latest_transactions_sql(sort_by, chain), (chain, limit, offset))
+    else:
+        total_row = await fetch_one("SELECT COUNT(*) AS total FROM transactions") or {}
+        rows = await fetch_all(_latest_transactions_sql(sort_by), (limit, offset))
 
     results = []
     for row in rows:
@@ -107,6 +122,7 @@ async def get_latest_transactions(
             "status": row.get("status"),
             "riskScore": round(score, 1),
             "riskLabel": _risk_label(value_eth, threshold),
+            "chain": row.get("chain_name") or "ethereum",
         })
 
     total = int(total_row.get("total") or 0)

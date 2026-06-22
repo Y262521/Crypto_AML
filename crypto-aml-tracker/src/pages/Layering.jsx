@@ -1,4 +1,4 @@
-﻿// NBE Theme — Layering Stage Alerts
+// NBE Theme — Layering Stage Alerts
 import { useDeferredValue, useEffect, useRef, useState } from 'react';
 import Loader from '../components/common/Loader';
 import AnalyzeButton from '../components/common/AnalyzeButton';
@@ -347,6 +347,7 @@ export default function Layering({ onNavigateToGraph, onOpenWorkspace }) {
                 <ChainFilter
                     selectedChain={chainFilter}
                     onChainChange={(c) => { setChainFilter(c); setPage(1); }}
+                    countKey="layering_count"
                     compact
                     label="Filter by Chain"
                 />

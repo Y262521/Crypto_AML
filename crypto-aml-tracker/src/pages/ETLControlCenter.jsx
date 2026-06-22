@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getEtlStatus, getEtlHistory, getEtlErrors, getDatabasesHealth } from '../services/etlService';
+import ChainFilter from '../components/chain/ChainFilter';
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,11 @@ const STAGE_LABELS = {
   store:     'Store',
   ready:     'Ready for Analysis',
 };
+
+const SUPPORTED_CHAINS = [
+  'ethereum', 'bnb', 'polygon', 'arbitrum', 'base', 'solana',
+  'bitcoin', 'litecoin', 'dogecoin', 'bitcoin_cash'
+];
 
 // ── palette helpers ───────────────────────────────────────────────────────────
 
@@ -228,49 +234,6 @@ function PipelineStepper({ stages = [], onSelect }) {
   );
 }
 
-// ── Database Health Cards ─────────────────────────────────────────────────────
-
-function DatabaseCard({ db }) {
-  const p = statusPalette(db.status);
-  const records = [
-    ...(db.collections || []),
-    ...(db.tables || []),
-    ...(db.nodes || []),
-  ];
-
-  return (
-    <div style={{ background: '#0a1220', border: `1px solid ${p.border}`, borderRadius: '12px', padding: '16px 18px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-        <div>
-          <div style={{ fontSize: '13px', fontWeight: '700', color: '#e2d9c8' }}>{db.engine}</div>
-          <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>{db.role}</div>
-        </div>
-        <StatusBadge status={db.status} label={db.status === 'online' ? 'Online' : 'Offline'} />
-      </div>
-      {records.map((r) => (
-        <div key={r.name || r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '11px', padding: '3px 0', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-          <span style={{ color: '#64748b' }}>{r.name || r.label}</span>
-          <span style={{ color: '#94a3b8', fontWeight: '600' }}>
-            {r.count != null ? fmtNum(r.count) : <EmptyState label="No data yet" />}
-          </span>
-        </div>
-      ))}
-      <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#475569' }}>
-        <span>Latency</span>
-        <span style={{ color: '#94a3b8' }}>
-          {db.latency_ms != null ? `${db.latency_ms} ms` : <EmptyState label="Unavailable" />}
-        </span>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#475569', marginTop: '4px' }}>
-        <span>Last updated</span>
-        <span style={{ color: '#94a3b8', textAlign: 'right', maxWidth: '60%', wordBreak: 'break-all' }}>
-          {db.last_updated ? fmtTs(db.last_updated) || db.last_updated : <EmptyState label="No data yet" />}
-        </span>
-      </div>
-    </div>
-  );
-}
-
 // ── History Table ─────────────────────────────────────────────────────────────
 
 const paginationBtnStyle = (disabled) => ({
@@ -290,10 +253,6 @@ function HistoryTable({ items, total, page, onPage, onSelect }) {
     { key: 'end_time',                label: 'End',        width: '140px' },
     { key: 'duration_seconds',        label: 'Duration',   width: '80px'  },
     { key: 'status',                  label: 'Status',     width: '100px' },
-    { key: 'blocks_processed',        label: 'Blocks',     width: '80px'  },
-    { key: 'transactions_processed',  label: 'Txs',        width: '80px'  },
-    { key: 'normalized_record_count', label: 'Normalized', width: '90px'  },
-    { key: 'loaded_records_count',    label: 'Loaded',     width: '80px'  },
   ];
 
   return (
@@ -341,10 +300,6 @@ function HistoryTable({ items, total, page, onPage, onSelect }) {
                 <td style={{ padding: '10px 12px' }}>
                   <StatusBadge status={row.status === 'completed' ? 'success' : row.status || 'idle'} label={row.status || 'Idle'} />
                 </td>
-                <td style={{ padding: '10px 12px', color: '#94a3b8' }}>{row.blocks_processed != null ? fmtNum(row.blocks_processed) : <EmptyState label="Unavailable" />}</td>
-                <td style={{ padding: '10px 12px', color: '#94a3b8' }}>{row.transactions_processed != null ? fmtNum(row.transactions_processed) : <EmptyState label="Unavailable" />}</td>
-                <td style={{ padding: '10px 12px', color: '#94a3b8' }}>{row.normalized_record_count != null ? fmtNum(row.normalized_record_count) : <EmptyState label="Unavailable" />}</td>
-                <td style={{ padding: '10px 12px', color: '#94a3b8' }}>{row.loaded_records_count != null ? fmtNum(row.loaded_records_count) : <EmptyState label="Unavailable" />}</td>
               </tr>
             ))}
           </tbody>
@@ -456,17 +411,14 @@ export default function ETLControlCenter() {
   const [status,   setStatus]   = useState(null);
   const [history,  setHistory]  = useState({ items: [], total: 0 });
   const [errors,   setErrors]   = useState({ items: [], total: 0 });
-  const [dbHealth, setDbHealth] = useState({ databases: [] });
 
   const [statusLoading, setStatusLoading] = useState(true);
   const [histLoading,   setHistLoading]   = useState(true);
   const [errLoading,    setErrLoading]    = useState(true);
-  const [dbLoading,     setDbLoading]     = useState(true);
 
   const [statusErr,  setStatusErr]  = useState(null);
   const [histErr,    setHistErr]    = useState(null);
   const [errConsErr, setErrConsErr] = useState(null);
-  const [dbErr,      setDbErr]      = useState(null);
 
   const [histPage,  setHistPage]  = useState(1);
   const [errPage,   setErrPage]   = useState(1);
@@ -534,25 +486,12 @@ export default function ETLControlCenter() {
     }
   }, []);
 
-  const fetchDbHealth = useCallback(async () => {
-    try {
-      const data = await getDatabasesHealth();
-      setDbHealth(data);
-      setDbErr(null);
-    } catch (e) {
-      setDbErr(e.message);
-    } finally {
-      setDbLoading(false);
-    }
-  }, []);
-
   const refreshAll = useCallback(() => {
     fetchStatus();
     fetchHistory(histPageRef.current, selectedChainRef.current);
     fetchErrors(errPageRef.current);
-    fetchDbHealth();
     setRefreshedAt(new Date());
-  }, [fetchStatus, fetchHistory, fetchErrors, fetchDbHealth]);
+  }, [fetchStatus, fetchHistory, fetchErrors]);
 
   // Initial load + stable polling interval
   useEffect(() => {
@@ -566,9 +505,7 @@ export default function ETLControlCenter() {
 
   // ── derived data ──────────────────────────────────────────────────────────
 
-  const activeChains = status
-    ? [status.active_chain].filter(Boolean).map(c => c.toLowerCase())
-    : [];
+  const activeChains = SUPPORTED_CHAINS;
 
   const summary       = status?.last_run_summary || {};
   const activityState = status?.activity_state   || 'idle';
@@ -593,16 +530,12 @@ export default function ETLControlCenter() {
           <div style={{ fontSize: '13px', color: '#4b5e72', marginTop: '6px' }}>Blockchain ingestion and pipeline operational status</div>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <select
-            value={selectedChain}
-            onChange={e => setSelectedChain(e.target.value)}
-            style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid rgba(201,168,76,0.18)', background: 'rgba(201,168,76,0.06)', color: '#E2D9C8', fontSize: '12px', fontWeight: '600', cursor: 'pointer', outline: 'none' }}
-          >
-            <option value="all">All Chains</option>
-            {activeChains.map(c => (
-              <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
-            ))}
-          </select>
+          <ChainFilter
+            selectedChain={selectedChain}
+            onChainChange={setSelectedChain}
+            countKey="etl_run_count"
+            label=""
+          />
           <button
             onClick={refreshAll}
             style={{ padding: '8px 16px', borderRadius: '10px', fontSize: '12px', fontWeight: '700', background: 'rgba(201,168,76,0.1)', color: '#C9A84C', border: '1px solid rgba(201,168,76,0.25)', cursor: 'pointer' }}
@@ -677,6 +610,29 @@ export default function ETLControlCenter() {
         </Card>
       </div>
 
+      {/* Supported Networks Group */}
+      <div>
+        <SectionHeading>Supported Networks</SectionHeading>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
+          <Card>
+            <CardLabel>Account based</CardLabel>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
+              {['Ethereum', 'BNB Chain', 'Polygon', 'Arbitrum', 'Base', 'Solana'].map(c => (
+                <span key={c} style={{ padding: '4px 10px', background: 'rgba(96,165,250,0.1)', color: '#60A5FA', border: '1px solid rgba(96,165,250,0.2)', borderRadius: '6px', fontSize: '11px', fontWeight: '600' }}>{c}</span>
+              ))}
+            </div>
+          </Card>
+          <Card>
+            <CardLabel>UTXO Chains</CardLabel>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
+              {['Bitcoin', 'Litecoin', 'Dogecoin', 'Bitcoin Cash'].map(c => (
+                <span key={c} style={{ padding: '4px 10px', background: 'rgba(251,146,60,0.1)', color: '#FB923C', border: '1px solid rgba(251,146,60,0.2)', borderRadius: '6px', fontSize: '11px', fontWeight: '600' }}>{c}</span>
+              ))}
+            </div>
+          </Card>
+        </div>
+      </div>
+
       {/* Pipeline Stepper */}
       {!statusLoading && !statusErr && (
         <PipelineStepper stages={status?.stages || []} onSelect={setDetailItem} />
@@ -734,21 +690,6 @@ export default function ETLControlCenter() {
           </Card>
 
         </div>
-      </div>
-
-      {/* Database Infrastructure Health */}
-      <div>
-        <SectionHeading>Database Infrastructure Health</SectionHeading>
-        {dbLoading && <EmptyState label="Loading…" />}
-        {dbErr && <div style={{ color: '#f87171', fontSize: '12px' }}>Database health unavailable: {dbErr}</div>}
-        {!dbLoading && !dbErr && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
-            {(dbHealth.databases || []).map(db => <DatabaseCard key={db.engine} db={db} />)}
-            {(dbHealth.databases || []).length === 0 && (
-              <div style={{ color: '#475569', fontStyle: 'italic', fontSize: '12px' }}>No database status available</div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Historical Run Log */}

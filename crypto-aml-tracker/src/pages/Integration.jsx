@@ -1,4 +1,4 @@
-﻿import { useDeferredValue, useEffect, useState } from 'react';
+import { useDeferredValue, useEffect, useState } from 'react';
 import Loader from '../components/common/Loader';
 import AnalyzeButton from '../components/common/AnalyzeButton';
 import ChainBadge from '../components/chain/ChainBadge';
@@ -159,6 +159,7 @@ export default function Integration({ onNavigateToGraph, onOpenWorkspace }) {
                 <ChainFilter
                     selectedChain={chainFilter}
                     onChainChange={(c) => { setChainFilter(c); setPage(1); }}
+                    countKey="integration_count"
                     compact
                     label="Filter by Chain"
                 />

@@ -231,6 +231,7 @@ def _cluster_payload(
 
     return {
         "cluster_id": cid,
+        "chain_name": row.get("chain_name") or "ethereum",
         "cluster_size": int(activity.get("address_count") or row.get("cluster_size") or 0),
         "total_balance": float(row.get("total_balance") or 0.0),
         "risk_level": row.get("risk_level") or "normal",
@@ -270,6 +271,7 @@ async def get_clusters(limit: int = Query(500, ge=1, le=5000)):
     rows = await fetch_all(
         f"""
         SELECT c.id,
+               c.chain_name,
                COALESCE(cluster_sizes.member_count, 0) AS cluster_size,
                c.total_balance,
                c.risk_level,
@@ -313,6 +315,7 @@ async def get_clusters(limit: int = Query(500, ge=1, le=5000)):
     def summary_payload(row: dict) -> dict:
         return {
             "cluster_id": row.get("id"),
+            "chain_name": row.get("chain_name") or "ethereum",
             "cluster_size": int(row.get("cluster_size") or 0),
             "total_balance": float(row.get("total_balance") or 0.0),
             "risk_level": row.get("risk_level") or "normal",
@@ -551,6 +554,7 @@ async def get_cluster(cluster_id: str):
     row = await fetch_one(
         f"""
         SELECT c.id,
+               c.chain_name,
                COALESCE(m.member_count, 0) AS cluster_size,
                c.total_balance,
                c.risk_level,
